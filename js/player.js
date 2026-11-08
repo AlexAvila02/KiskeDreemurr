@@ -26,6 +26,8 @@ class Player {
     this.hasUsedDoubleJump = false;
     this.coyoteTime = 0;
     this.squashTimer = 0;
+    this.walkPhase = 0;   // ciclo de caminata (avanza con la velocidad)
+    this.dead = false;
 
     // Estado y dirección
     this.facing = 1; // 1 = derecha, -1 = izquierda
@@ -73,7 +75,7 @@ class Player {
   }
 
   attack(enemies) {
-    if (this.attackCooldown > 0 || this.isAttacking) return;
+    if (this.attackCooldown > 0 || this.isAttacking || this.dead) return;
     this.isAttacking = true;
     this.attackTimer = this.attackDuration;
     this.attackCooldown = 18;
@@ -135,7 +137,7 @@ class Player {
   }
 
   takeDamage(amount, knockback = 0) {
-    if (this.invulnerableTimer > 0) return;
+    if (this.invulnerableTimer > 0 || this.dead) return;
     this.hp = Math.max(0, this.hp - amount);
     this.invulnerableTimer = 55;
     this.vx = knockback;
@@ -148,22 +150,26 @@ class Player {
     }
 
     if (this.hp <= 0) {
-      this.respawn();
+      if (window.gameInstance) window.gameInstance.killPlayer();
+      else this.respawn();
     }
   }
 
-  respawn() {
-    this.hp = this.maxHp;
-    this.x = 80;
-    this.y = 350;
+  // fullHeal=true al morir; false al caer al vacío (solo se reubica)
+  respawn(fullHeal = true) {
+    const rp = (window.gameInstance && window.gameInstance.respawnPoint) || { x: 80, y: 410 };
+    if (fullHeal) this.hp = this.maxHp;
+    this.x = rp.x;
+    this.y = rp.y;
     this.vx = 0;
     this.vy = 0;
+    this.invulnerableTimer = 60;
     if (this.carriedItem) {
       this.carriedItem.active = false;
       this.carriedItem = null;
     }
     if (window.gameInstance) {
-      window.gameInstance.showNotification("Ruben vuelve a levantarse...");
+      window.gameInstance.showNotification(fullHeal ? "Ruben vuelve a levantarse..." : "¡Cuidado con el barranco!");
       window.gameInstance.updateHUD();
     }
   }
@@ -171,8 +177,8 @@ class Player {
   update(world, keys) {
     // Control horizontal
     let moveDir = 0;
-    if (keys['ArrowRight'] || keys['KeyD']) moveDir += 1;
-    if (keys['ArrowLeft'] || keys['KeyA']) moveDir -= 1;
+    if (keys['ArrowRight'] || keys['KeyD'] || keys['PadRight']) moveDir += 1;
+    if (keys['ArrowLeft'] || keys['KeyA'] || keys['PadLeft']) moveDir -= 1;
 
     if (moveDir !== 0) {
       this.vx += moveDir * this.acceleration;
@@ -221,7 +227,14 @@ class Player {
       this.coyoteTime--;
     }
 
-    // Actualizar física de la capa de Ruben
+    // Ciclo de caminata ligado a la velocidad real (no al reloj)
+    if (this.isGrounded && Math.abs(this.vx) > 0.4) {
+      this.walkPhase += Math.abs(this.vx) * 0.11;
+    } else {
+      this.walkPhase = 0;
+    }
+
+    // Actualizar física de la bufanda
     this.updateCapePhysics();
   }
 
@@ -265,23 +278,35 @@ class Player {
   }
 
   updateCapePhysics() {
-    const anchorX = this.x + this.width / 2 - this.facing * 4;
-    const anchorY = this.y + 14;
+    // Bufanda: segmentos de largo fijo. El ángulo depende de la velocidad
+    // (cuelga quieta, flamea hacia atrás al correr, sube al caer).
+    const SEG = 8;
+    const anchor = this.capePoints[0];
+    anchor.x = this.x + this.width / 2 - this.facing * 3;
+    anchor.y = this.y + 17;
 
-    this.capePoints[0].x = anchorX;
-    this.capePoints[0].y = anchorY;
-
+    const speed = Math.min(1, Math.abs(this.vx) / this.speed);
+    const back = -this.facing;
+    const t = Date.now() * 0.008;
     for (let i = 1; i < this.capePoints.length; i++) {
       const prev = this.capePoints[i - 1];
       const cur = this.capePoints[i];
-
-      const targetX = prev.x - this.facing * (this.vx * 1.5 + 4);
-      const targetY = prev.y + 10 - this.vy * 0.4;
-
-      cur.x += (targetX - cur.x) * 0.35;
-      cur.y += (targetY - cur.y) * 0.35;
+      // 0 rad = horizontal hacia atrás; PI/2 = colgando
+      let ang = Math.PI / 2 * (1 - speed * 0.85) + this.vy * 0.06;
+      ang += Math.sin(t + i * 1.3) * (0.12 + speed * 0.18);
+      ang = Math.max(-0.6, Math.min(Math.PI / 2 + 0.2, ang));
+      const tx = prev.x + back * Math.cos(ang) * SEG;
+      const ty = prev.y + Math.sin(ang) * SEG;
+      cur.x += (tx - cur.x) * 0.5;
+      cur.y += (ty - cur.y) * 0.5;
+      // Mantener el largo exacto del segmento
+      const dx = cur.x - prev.x, dy = cur.y - prev.y;
+      const d = Math.hypot(dx, dy) || 1;
+      cur.x = prev.x + dx / d * SEG;
+      cur.y = prev.y + dy / d * SEG;
     }
   }
+
 
   render(ctx, camera) {
     // Diseño original de Ruben: joven viajero del reino caído, estilo animación
@@ -294,9 +319,13 @@ class Player {
     const f = this.facing;
 
     // Squash & stretch: estira al subir/caer, aplasta al aterrizar
-    let stretch = 1 + Math.max(-0.12, Math.min(0.15, -this.vy * 0.015));
-    if (this.squashTimer > 0) stretch = 1 - this.squashTimer * 0.025;
+    if (this.dead) return;
+    let stretch = 1 + Math.max(-0.08, Math.min(0.1, -this.vy * 0.01));
+    if (this.isGrounded) stretch = 1;
+    if (this.squashTimer > 0) stretch = 1 - this.squashTimer * 0.02;
     const squash = 1 / stretch;
+    // Balanceo al caminar: el cuerpo rebota dos veces por ciclo
+    const bob = this.walkPhase ? -Math.abs(Math.sin(this.walkPhase)) * 2.5 : 0;
 
     const OUT = '#3a2416';      // contorno marrón cálido (tinta de animación)
     const SKIN = '#f2c79b';
@@ -319,30 +348,33 @@ class Player {
     ctx.scale(squash, stretch);
     ctx.translate(-cx, -feetY);
 
-    // 1. Cola de la bufanda (usa la física de capa existente)
-    ctx.fillStyle = SCARF;
-    ctx.beginPath();
-    ctx.moveTo(this.capePoints[0].x - camera.x, this.capePoints[0].y - camera.y - 2);
-    ctx.quadraticCurveTo(
-      this.capePoints[1].x - camera.x, this.capePoints[1].y - camera.y - 6,
-      this.capePoints[2].x - camera.x, this.capePoints[2].y - camera.y - 10 + Math.sin(t * 8) * 2
-    );
-    ctx.lineTo(this.capePoints[2].x - camera.x, this.capePoints[2].y - camera.y - 4);
-    ctx.quadraticCurveTo(
-      this.capePoints[1].x - camera.x, this.capePoints[1].y - camera.y,
-      this.capePoints[0].x - camera.x, this.capePoints[0].y - camera.y + 4
-    );
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
-
-    // 2. Piernas y botas (caminata con balanceo)
-    const walk = this.isGrounded && Math.abs(this.vx) > 0.5 ? Math.sin(t * 16) * 4 : 0;
-    ctx.fillStyle = BOOT;
-    for (const k of [-1, 1]) {
+    // 1. Cola de la bufanda (cinta que se afina)
+    {
+      const P = this.capePoints.map(p => ({ x: p.x - camera.x, y: p.y - camera.y + bob }));
+      ctx.fillStyle = SCARF;
       ctx.beginPath();
-      ctx.ellipse(cx + k * 5 + walk * k, feetY - 3, 5, 3.5, 0, 0, Math.PI * 2);
+      ctx.moveTo(P[0].x, P[0].y - 3);
+      ctx.quadraticCurveTo(P[1].x, P[1].y - 2.5, P[2].x, P[2].y - 1);
+      ctx.lineTo(P[2].x, P[2].y + 1.5);
+      ctx.quadraticCurveTo(P[1].x, P[1].y + 2.5, P[0].x, P[0].y + 3);
+      ctx.closePath();
       ctx.fill(); ctx.stroke();
     }
+
+    // 2. Piernas y botas: paso alternado (un pie adelante y levantado)
+    ctx.fillStyle = BOOT;
+    for (const k of [-1, 1]) {
+      const ph = this.walkPhase + (k === 1 ? 0 : Math.PI);
+      const stepX = this.walkPhase ? Math.cos(ph) * 4 * f : 0;
+      const lift = this.walkPhase ? Math.max(0, Math.sin(ph)) * 3 : 0;
+      const airTuck = this.isGrounded ? 0 : 2;
+      ctx.beginPath();
+      ctx.ellipse(cx + k * 4 + stepX, feetY - 3 - lift - airTuck, 5, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+
+    // Todo lo de arriba de las piernas rebota con el paso
+    ctx.translate(0, bob);
 
     // 3. Cuerpo: túnica en forma de pera con cinturón
     ctx.fillStyle = TUNIC;
@@ -362,22 +394,43 @@ class Player {
     ctx.roundRect(cx - f * 9 - 4, sy + 24, 8, 7, 2);
     ctx.fill(); ctx.stroke();
 
-    // 4. Brazo que sostiene la espada
-    const armX = cx + f * 8;
+    // 4. Brazo y espada. Al atacar, la espada barre de arriba hacia abajo por delante.
+    const shoulderX = cx + f * 6, shoulderY = sy + 21;
+    let swordAng; // ángulo de la hoja (0 = hacia adelante)
+    if (this.isAttacking) {
+      const p = 1 - this.attackTimer / this.attackDuration;
+      const e = 1 - Math.pow(1 - p, 3); // arranque rápido, frenada suave
+      swordAng = -1.9 + e * 3.0;
+    } else {
+      swordAng = -1.25 + Math.sin(this.walkPhase) * 0.15;
+    }
+    const hx = shoulderX + f * Math.cos(swordAng * 0.5) * 5;
+    const hy = shoulderY + Math.sin(swordAng * 0.5) * 5 + 2;
+    // Hoja
+    ctx.strokeStyle = '#e4e9ee';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx + f * Math.cos(swordAng) * 15, hy + Math.sin(swordAng) * 15);
+    ctx.stroke();
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Guarda
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#8a5a2b';
+    const gx = -Math.sin(swordAng) * 3, gy = Math.cos(swordAng) * 3;
+    ctx.beginPath();
+    ctx.moveTo(hx - f * gx, hy - gy);
+    ctx.lineTo(hx + f * gx, hy + gy);
+    ctx.stroke();
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 2;
+    // Mano
     ctx.fillStyle = SKIN;
     ctx.beginPath();
-    ctx.arc(armX, sy + 24, 3, 0, Math.PI * 2);
+    ctx.arc(hx, hy, 3, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
-    if (!this.isAttacking) {
-      ctx.strokeStyle = '#cfd6dd';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(armX, sy + 24);
-      ctx.lineTo(armX + f * 4, sy + 12);
-      ctx.stroke();
-      ctx.strokeStyle = OUT;
-      ctx.lineWidth = 2;
-    }
 
     // 5. Nudo de la bufanda al cuello
     ctx.fillStyle = SCARF;
@@ -441,23 +494,25 @@ class Player {
 
     ctx.restore();
 
-    // 7. Arco del ataque: pincelada cálida en lugar del corte azul
+    // 7. Estela del corte: media luna delante de Ruben que sigue a la espada
     if (this.isAttacking) {
       const p = 1 - this.attackTimer / this.attackDuration;
-      const ax = sx + (f === 1 ? this.width + 4 : -4);
-      const ay = sy + this.height / 2;
+      const e = 1 - Math.pow(1 - p, 3);
+      const ox = sx + this.width / 2 + f * 8;
+      const oy = sy + 21;
+      const a0 = -1.9, a1 = -1.9 + e * 3.0;
+      const R = 30;
+      const toAng = a => (f === 1 ? a : Math.PI - a);
       ctx.save();
-      ctx.globalAlpha = 1 - p * 0.6;
-      ctx.strokeStyle = '#fff4d6';
+      ctx.globalAlpha = Math.min(1, 1.6 - p * 1.4);
+      ctx.fillStyle = 'rgba(255, 244, 214, 0.9)';
       ctx.shadowColor = '#ffcf6b';
       ctx.shadowBlur = 10;
-      ctx.lineCap = 'round';
-      ctx.lineWidth = 5 - p * 3;
-      const a0 = f === 1 ? -Math.PI * 0.45 : Math.PI * 0.45;
-      const a1 = f === 1 ? Math.PI * 0.45 : Math.PI * 1.45;
       ctx.beginPath();
-      ctx.arc(ax, ay, 30, a0, a1, f !== 1);
-      ctx.stroke();
+      ctx.arc(ox, oy, R, toAng(a0), toAng(a1), f !== 1);
+      ctx.arc(ox + f * 5, oy, R - 9, toAng(a1), toAng(a0), f === 1);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
   }

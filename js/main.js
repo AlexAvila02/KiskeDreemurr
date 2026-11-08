@@ -41,6 +41,13 @@ class Game {
     this.isPlaying = false;
     this.activeInteraction = null;
 
+    // Paso fijo de simulación (60 actualizaciones/seg en cualquier monitor)
+    this.STEP = 1000 / 60;
+    this.accumulator = 0;
+    this.respawnPoint = { x: 80, y: 410 };
+    this.deathTimer = 0;      // cuadros restantes de la animación de muerte
+    this.DEATH_FRAMES = 75;
+
     this.init();
   }
 
@@ -50,6 +57,7 @@ class Game {
     // Cargar sala inicial
     this.loadRoom(0);
     this.setupInputs();
+    this.setupGamepad();
     this.updateHUD();
     this.renderMiniMap();
 
@@ -76,10 +84,20 @@ class Game {
       this.player.vx = 0;
       this.player.vy = 0;
     }
+    // Ruben reaparece donde entró a esta sala
+    this.respawnPoint = { x: this.player.x, y: this.player.y };
+    // Cámara directo a Ruben (sin barrido desde la sala anterior)
+    this.camera.x = Math.max(0, Math.min(room.width - this.canvas.width, this.player.x - this.canvas.width / 2));
+    this.camera.y = Math.max(0, Math.min(room.height - this.canvas.height, this.player.y - this.canvas.height / 2));
 
     // Instanciar enemigos y objetos de la sala
     this.enemies = room.spawnEnemies ? room.spawnEnemies() : [];
     this.debrisItems = room.spawnDebris ? room.spawnDebris() : [];
+    // Si Ruben llevaba una piedra, la lleva consigo a la nueva sala
+    if (this.player.carriedItem) this.debrisItems.push(this.player.carriedItem);
+    window.particleSystem.particles && (window.particleSystem.particles.length = 0);
+    if (window.particleSystem.setBiome) window.particleSystem.setBiome(room.biome || 'pradera');
+    if (window.soundManager.setBiomeAmbience) window.soundManager.setBiomeAmbience(room.biome || 'pradera');
 
     // Actualizar HUD
     this.zoneTag.textContent = room.name;
@@ -88,57 +106,119 @@ class Game {
 
   setupInputs() {
     window.addEventListener('keydown', (e) => {
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
       this.keys[e.code] = true;
 
       if (!this.isPlaying) return;
+      // Mantener apretada una tecla no repite saltos/ataques
+      if (e.repeat) return;
 
-      // Salto
-      if (e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') {
-        if (!this.dialogBox.classList.contains('hidden')) {
-          this.closeDialog();
-        } else {
-          this.player.jump();
-        }
-      }
-
-      // Ataque (J o Z)
-      if (e.code === 'KeyJ' || e.code === 'KeyZ') {
-        this.player.attack(this.enemies);
-      }
-
-      // Agarrar / Lanzar escombro (K o X)
-      if (e.code === 'KeyK' || e.code === 'KeyX') {
-        this.player.interactOrThrow(this.debrisItems);
-      }
-
-      // Interactuar (E)
-      if (e.code === 'KeyE') {
-        if (!this.dialogBox.classList.contains('hidden')) {
-          this.closeDialog();
-        } else {
-          this.checkInteractions();
-        }
-      }
+      if (['Space', 'KeyW', 'ArrowUp', 'KeyX'].includes(e.code)) this.doAction('jump');
+      if (e.code === 'KeyJ' || e.code === 'KeyZ') this.doAction('attack');
+      if (e.code === 'KeyK') this.doAction('grab');
+      if (e.code === 'KeyE') this.doAction('interact');
     });
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
     });
 
+    // Si la ventana pierde el foco, soltar todas las teclas (evita que Ruben siga caminando solo)
+    window.addEventListener('blur', () => { this.keys = {}; });
+
     // Controles táctiles / de ratón en el canvas
     this.canvas.addEventListener('mousedown', (e) => {
-      if (!this.isPlaying) return;
-      if (e.button === 0) {
-        // Clic izquierdo: Ataque
-        this.player.attack(this.enemies);
-      } else if (e.button === 2) {
-        // Clic derecho: Agarrar / Lanzar
-        e.preventDefault();
-        this.player.interactOrThrow(this.debrisItems);
-      }
+      if (e.button === 0) this.doAction('attack');          // Clic izquierdo: atacar
+      else if (e.button === 2) { e.preventDefault(); this.doAction('grab'); } // Clic derecho: agarrar/lanzar
     });
 
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // Acción del jugador (la usan teclado, mouse y mando)
+  doAction(action) {
+    if (!this.isPlaying || this.deathTimer > 0) return;
+    const dialogOpen = !this.dialogBox.classList.contains('hidden');
+
+    // Con una nota abierta, saltar o interactuar la cierra; lo demás se ignora
+    if (dialogOpen) {
+      if (action === 'jump' || action === 'interact') this.closeDialog();
+      return;
+    }
+
+    if (action === 'jump') this.player.jump();
+    else if (action === 'attack') this.player.attack(this.enemies);
+    else if (action === 'grab') this.player.interactOrThrow(this.debrisItems);
+    else if (action === 'interact') this.checkInteractions();
+  }
+
+  // ===== Mando (Gamepad API, mapeo estándar Xbox / PlayStation) =====
+  // A/✕ = saltar · X/□ = atacar · B/○ = agarrar/lanzar · Y/△ = leer/abrir
+  // RB/R1 = atacar · LB/L1 = agarrar · Start = comenzar · stick izq. o cruceta = moverse
+  setupGamepad() {
+    this.padPrev = [];
+    this.padIndex = null;
+    this.PAD_BUTTONS = { 0: 'jump', 2: 'attack', 5: 'attack', 7: 'attack', 1: 'grab', 4: 'grab', 3: 'interact' };
+
+    window.addEventListener('gamepadconnected', (e) => {
+      this.padIndex = e.gamepad.index;
+      this.padPrev = [];
+      this.showNotification('🎮 Mando conectado');
+    });
+    window.addEventListener('gamepaddisconnected', (e) => {
+      if (e.gamepad.index === this.padIndex) {
+        this.padIndex = null;
+        this.keys['PadLeft'] = this.keys['PadRight'] = false;
+        this.showNotification('Mando desconectado');
+      }
+    });
+  }
+
+  getPad() {
+    if (!navigator.getGamepads) return null;
+    const pads = navigator.getGamepads();
+    if (this.padIndex !== null && pads[this.padIndex]) return pads[this.padIndex];
+    // Algunos navegadores no avisan la conexión hasta tocar un botón: buscar cualquiera
+    for (const p of pads) if (p && p.connected) { this.padIndex = p.index; return p; }
+    return null;
+  }
+
+  pollGamepad() {
+    const pad = this.getPad();
+    if (!pad) return;
+
+    const pressed = pad.buttons.map(b => b && (b.pressed || b.value > 0.5));
+    const justPressed = (i) => pressed[i] && !this.padPrev[i];
+
+    // Movimiento: stick izquierdo con zona muerta, o cruceta
+    const ax = pad.axes[0] || 0;
+    const DEAD = 0.35;
+    this.keys['PadLeft'] = ax < -DEAD || !!pressed[14];
+    this.keys['PadRight'] = ax > DEAD || !!pressed[15];
+
+    // Pantalla de inicio: A o Start comienzan
+    if (!this.isPlaying) {
+      if (justPressed(0) || justPressed(9)) this.btnStart.click();
+    } else {
+      for (const i in this.PAD_BUTTONS) {
+        if (justPressed(+i)) this.doAction(this.PAD_BUTTONS[i]);
+      }
+    }
+    this.padPrev = pressed;
+  }
+
+  // Vibración del mando (si el mando y el navegador la soportan)
+  rumble(strength = 0.5, durationMs = 150) {
+    const pad = this.getPad();
+    const act = pad && pad.vibrationActuator;
+    if (!act || !act.playEffect) return;
+    try {
+      act.playEffect('dual-rumble', {
+        duration: durationMs,
+        strongMagnitude: Math.min(1, strength),
+        weakMagnitude: Math.min(1, strength * 0.6)
+      });
+    } catch (e) { /* sin vibración */ }
   }
 
   checkInteractions() {
@@ -156,9 +236,11 @@ class Game {
 
     // 2. Revisar puerta sellada
     if (room.door && room.door.isLocked) {
-      const doorCenterX = room.door.x + room.door.width / 2;
-      const doorCenterY = room.door.y + room.door.height / 2;
-      if (Math.hypot(px - doorCenterX, py - doorCenterY) < 70) {
+      // Distancia al rectángulo de la puerta (no a su centro: la puerta es muy alta)
+      const d = room.door;
+      const nx = Math.max(d.x, Math.min(px, d.x + d.width));
+      const ny = Math.max(d.y, Math.min(py, d.y + d.height));
+      if (Math.hypot(px - nx, py - ny) < 50) {
         if (this.player.keys >= room.door.requiredKeys) {
           room.door.isLocked = false;
           window.soundManager.playDoorUnlock();
@@ -173,6 +255,38 @@ class Game {
         return;
       }
     }
+  }
+
+  // Ruben muere (por vida en 0 o por caer al vacío)
+  killPlayer(cause = 'hit') {
+    if (this.deathTimer > 0) return;
+    const p = this.player;
+    p.dead = true;
+    p.hp = 0;
+    this.deathTimer = this.DEATH_FRAMES;
+    this.deathCause = cause;
+    if (cause !== 'fall') {
+      window.particleSystem.createHitImpact(p.x + p.width / 2, p.y + p.height / 2, 24);
+      window.particleSystem.createDust(p.x + p.width / 2, p.y + p.height / 2, 16, '#d9a634');
+    }
+    window.soundManager.playHit();
+    this.triggerScreenShake(9, 300);
+    this.updateHUD();
+  }
+
+  // Reinicia la sala actual: enemigos y piedras vuelven a su lugar, Ruben con vida completa
+  restartRoom() {
+    const p = this.player;
+    if (p.carriedItem) { p.carriedItem.isCarried = false; p.carriedItem = null; }
+    p.dead = false;
+    p.hp = p.maxHp;
+    p.invulnerableTimer = 60;
+    p.isAttacking = false;
+    p.attackTimer = 0;
+    const rp = this.respawnPoint;
+    this.loadRoom(this.world.currentRoomIndex, rp.x, rp.y);
+    this.showNotification(this.deathCause === 'fall' ? 'Ruben cayó al vacío... vuelve a intentarlo' : 'Ruben vuelve a levantarse...');
+    this.updateHUD();
   }
 
   showDialog(speaker, text) {
@@ -198,6 +312,7 @@ class Game {
   triggerScreenShake(intensity = 6, durationMs = 150) {
     this.screenShakeIntensity = intensity;
     this.screenShakeTime = durationMs;
+    this.rumble(intensity / 10, durationMs);
   }
 
   updateHUD() {
@@ -215,17 +330,18 @@ class Game {
     // Objeto agarrado
     if (this.player.carriedItem) {
       this.carryText.textContent = 'Roca Lista';
-      this.carryIndicator.style.borderColor = '#8ec3ff';
+      this.carryIndicator.style.borderColor = '#f0bf4c';
     } else {
       this.carryText.textContent = 'Vacío';
-      this.carryIndicator.style.borderColor = 'rgba(100, 150, 210, 0.3)';
+      this.carryIndicator.style.borderColor = '#8a623e';
     }
   }
 
   renderMiniMap() {
     this.miniMap.innerHTML = '';
-    // Representación de las 4 habitaciones (grid 2x2 o fila)
-    for (let i = 0; i < 4; i++) {
+    const totalRooms = Math.max(4, this.world.rooms.length);
+    for (let i = 0; i < totalRooms; i++) {
+      if (!this.world.rooms[i]) continue;
       const cell = document.createElement('div');
       cell.className = 'map-cell';
       if (this.visitedRooms.has(i)) cell.classList.add('visited');
@@ -247,7 +363,7 @@ class Game {
         py <= exit.y + exit.h
       ) {
         this.loadRoom(exit.targetRoom, exit.targetX, exit.targetY);
-        break;
+        return;
       }
     }
 
@@ -266,11 +382,27 @@ class Game {
 
   update(dt) {
     if (!this.isPlaying) return;
+    // El mundo se congela mientras se lee una nota
+    if (!this.dialogBox.classList.contains('hidden')) return;
+
+    // Animación de muerte: el mundo sigue de fondo, Ruben no se controla
+    if (this.deathTimer > 0) {
+      this.deathTimer--;
+      window.particleSystem.update();
+      if (this.deathTimer === 0) this.restartRoom();
+      return;
+    }
 
     const room = this.world.getCurrentRoom();
 
     // Actualizar Ruben
     this.player.update(this.world, this.keys);
+
+    // Caída al vacío = muerte
+    if (this.player.y > room.height + 20) {
+      this.killPlayer('fall');
+      return;
+    }
 
     // Actualizar Enemigos
     for (const enemy of this.enemies) {
@@ -301,7 +433,7 @@ class Game {
 
     // Vibración de pantalla (Screen Shake)
     if (this.screenShakeTime > 0) {
-      this.screenShakeTime -= dt;
+      this.screenShakeTime -= this.STEP;
       const shakeOffsetX = (Math.random() - 0.5) * this.screenShakeIntensity * 2;
       const shakeOffsetY = (Math.random() - 0.5) * this.screenShakeIntensity * 2;
       this.camera.x += shakeOffsetX;
@@ -333,18 +465,35 @@ class Game {
 
     // 6. Efecto de Iluminación Ambiental (Luz tenue alrededor de Ruben)
     this.renderLighting();
+
+    // 7. Fundido a negro al morir
+    if (this.deathTimer > 0) {
+      const k = 1 - this.deathTimer / this.DEATH_FRAMES; // 0 -> 1
+      const alpha = Math.min(1, k * 1.6);
+      this.ctx.save();
+      this.ctx.fillStyle = `rgba(10, 6, 4, ${alpha})`;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.globalAlpha = Math.min(1, k * 2.5);
+      this.ctx.fillStyle = '#f2d29b';
+      this.ctx.font = '600 34px Cinzel, Georgia, serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(this.deathCause === 'fall' ? 'Ruben cayó...' : 'Ruben cayó en combate...', this.canvas.width / 2, this.canvas.height / 2);
+      this.ctx.restore();
+    }
   }
 
   renderLighting() {
     const rx = this.player.x + this.player.width / 2 - this.camera.x;
     const ry = this.player.y + this.player.height / 2 - this.camera.y;
+    const biome = this.world.getCurrentBiome ? this.world.getCurrentBiome() : null;
+    const edgeTint = (biome && biome.vignetteTint) || 'rgba(48, 26, 12, 0.24)';
 
     this.ctx.save();
-    // Viñeta y halo de luz mística
-    const lightGrad = this.ctx.createRadialGradient(rx, ry, 30, rx, ry, 340);
-    lightGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    lightGrad.addColorStop(0.7, 'rgba(4, 7, 14, 0.45)');
-    lightGrad.addColorStop(1, 'rgba(2, 4, 8, 0.85)');
+    // Viñeta cálida y muy suave de película animada clásica (sin oscurecer el paisaje exterior)
+    const lightGrad = this.ctx.createRadialGradient(rx, ry, 140, this.canvas.width / 2, this.canvas.height / 2, 560);
+    lightGrad.addColorStop(0, 'rgba(255, 235, 190, 0)');
+    lightGrad.addColorStop(0.75, 'rgba(40, 22, 10, 0.08)');
+    lightGrad.addColorStop(1, edgeTint);
 
     this.ctx.fillStyle = lightGrad;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -353,10 +502,16 @@ class Game {
 
   gameLoop(currentTime) {
     if (!this.lastTime) this.lastTime = currentTime;
-    const dt = currentTime - this.lastTime;
+    // Limitar dt para que una pestaña en segundo plano no provoque un salto enorme
+    const dt = Math.min(250, currentTime - this.lastTime);
     this.lastTime = currentTime;
 
-    this.update(dt);
+    this.pollGamepad();
+    this.accumulator += dt;
+    while (this.accumulator >= this.STEP) {
+      this.update(this.STEP);
+      this.accumulator -= this.STEP;
+    }
     this.render();
 
     requestAnimationFrame((ts) => this.gameLoop(ts));

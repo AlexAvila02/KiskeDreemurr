@@ -48,6 +48,12 @@ class ThrowableDebris {
         }
       }
 
+      // Colisión con muros quebradizos ("defensa con ingenio")
+      if (world.checkBreakableImpact && world.checkBreakableImpact({ x: this.x, y: this.y, w: this.width, h: this.height })) {
+        this.shatter();
+        return;
+      }
+
       // Colisión con suelo / plataformas
       for (const plat of world.getPlatforms()) {
         if (
@@ -208,8 +214,9 @@ class CrawlerEnemy {
       ctx.filter = 'brightness(2.5)';
     }
 
-    // Caparazón ocre redondeado, contorno de tinta marrón
-    ctx.fillStyle = '#c98a3a';
+    // Caparazón redondeado según bioma, contorno de tinta marrón
+    const pal = (window.gameInstance && window.gameInstance.world && window.gameInstance.world.getCurrentBiome && window.gameInstance.world.getCurrentBiome().enemyPalette) || null;
+    ctx.fillStyle = (pal && pal.crawlerFill) || '#c98a3a';
     ctx.strokeStyle = '#3a2416';
     ctx.lineWidth = 2;
 
@@ -324,9 +331,10 @@ class FlyingShadeEnemy {
     ctx.save();
     if (this.hitCooldown > 0) ctx.filter = 'brightness(2.5)';
 
-    // Alas etéreas
+    // Alas etéreas y cuerpo acordes a la zona
+    const pal = (window.gameInstance && window.gameInstance.world && window.gameInstance.world.getCurrentBiome && window.gameInstance.world.getCurrentBiome().enemyPalette) || null;
     const wingFlap = Math.sin(Date.now() * 0.015) * 8;
-    ctx.fillStyle = 'rgba(232, 200, 130, 0.75)';
+    ctx.fillStyle = (pal && pal.mothWing) || 'rgba(232, 200, 130, 0.75)';
     ctx.strokeStyle = '#3a2416';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -334,8 +342,8 @@ class FlyingShadeEnemy {
     ctx.ellipse(sx + this.width - 6, sy + 6 - wingFlap, 12, 6, 0.4, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
 
-    // Cuerpo peludo marrón
-    ctx.fillStyle = '#8a5a2b';
+    // Cuerpo peludo
+    ctx.fillStyle = (pal && pal.mothBody) || '#8a5a2b';
     ctx.strokeStyle = '#3a2416';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
