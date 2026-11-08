@@ -1,0 +1,351 @@
+/* Estilos Visuales - Estética Misterio / Hollow Knight */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  background-color: #05070d;
+  color: #e3ebf7;
+  font-family: 'Outfit', sans-serif;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+#game-container {
+  position: relative;
+  width: 960px;
+  height: 540px;
+  box-shadow: 0 0 50px rgba(16, 32, 64, 0.7), 0 0 100px rgba(0, 0, 0, 0.95);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(80, 120, 180, 0.25);
+  background: #080b12;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Capa HUD y superposiciones */
+#hud-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-top-left {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.character-portrait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portrait-glow {
+  width: 14px;
+  height: 14px;
+  background: radial-gradient(circle, #a8d5ff 0%, #3576bf 70%, transparent 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 10px #70b4ff;
+}
+
+.portrait-name {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #f0f6ff;
+  text-shadow: 0 0 8px rgba(112, 180, 255, 0.6);
+}
+
+.health-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.mask-node {
+  width: 22px;
+  height: 28px;
+  background: #0f1624;
+  border: 2px solid #5a779d;
+  border-radius: 4px 4px 10px 10px;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.8);
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.mask-node.active {
+  background: linear-gradient(180deg, #f0f6ff 0%, #b2d7ff 60%, #5b95d9 100%);
+  border-color: #dbeaff;
+  box-shadow: 0 0 10px rgba(160, 210, 255, 0.7), inset 0 0 6px #fff;
+}
+
+.mask-node.active::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.items-display {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.item-slot {
+  background: rgba(10, 16, 28, 0.75);
+  border: 1px solid rgba(100, 150, 210, 0.3);
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+}
+
+.slot-icon {
+  font-size: 14px;
+}
+
+.slot-text {
+  color: #cfdcf0;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Zona y mapa */
+.hud-top-right {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.zone-tag {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: #92b7e6;
+  text-shadow: 0 0 12px rgba(80, 140, 220, 0.5);
+  background: rgba(8, 12, 22, 0.6);
+  padding: 4px 12px;
+  border-right: 3px solid #6b9ee0;
+}
+
+.mini-map {
+  display: grid;
+  grid-template-columns: repeat(3, 24px);
+  grid-gap: 3px;
+  background: rgba(7, 10, 18, 0.85);
+  border: 1px solid rgba(80, 120, 180, 0.3);
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.map-cell {
+  width: 24px;
+  height: 16px;
+  background: rgba(25, 35, 55, 0.4);
+  border: 1px dashed rgba(80, 120, 180, 0.25);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.map-cell.visited {
+  background: rgba(70, 110, 170, 0.45);
+  border: 1px solid #5a88c7;
+}
+
+.map-cell.current {
+  background: #a8d4ff;
+  border: 1px solid #ffffff;
+  box-shadow: 0 0 8px #70b4ff;
+}
+
+/* Cuadro de diálogo / Lore */
+.dialog-box {
+  position: absolute;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  max-width: 720px;
+  background: linear-gradient(180deg, rgba(14, 20, 34, 0.95) 0%, rgba(8, 12, 22, 0.98) 100%);
+  border: 1px solid #486a99;
+  border-radius: 6px;
+  padding: 18px 24px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.9), 0 0 15px rgba(60, 110, 180, 0.25);
+  pointer-events: auto;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.dialog-box.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 20px);
+}
+
+.dialog-speaker {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #7ab3f3;
+  margin-bottom: 6px;
+}
+
+.dialog-text {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #e5efff;
+}
+
+.dialog-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #728ca8;
+  text-align: right;
+  letter-spacing: 1px;
+}
+
+/* Pantalla de Inicio / Menú */
+.overlay-screen {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(14, 22, 38, 0.92) 0%, rgba(4, 7, 13, 0.98) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  pointer-events: auto;
+  transition: opacity 0.4s ease;
+}
+
+.overlay-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.title-container {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.game-title {
+  font-family: 'Cinzel', serif;
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: 10px;
+  color: #f2f7ff;
+  text-shadow: 0 0 25px rgba(112, 180, 255, 0.7), 0 0 50px rgba(70, 130, 220, 0.4);
+}
+
+.game-subtitle {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  letter-spacing: 8px;
+  color: #8bb3e8;
+  margin-top: 2px;
+}
+
+.lore-preview {
+  max-width: 580px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #a4bedc;
+  margin-bottom: 24px;
+  font-style: italic;
+}
+
+.btn-start {
+  font-family: 'Cinzel', serif;
+  background: linear-gradient(180deg, #284469 0%, #17283f 100%);
+  color: #e6f1ff;
+  border: 1px solid #5b87be;
+  padding: 12px 36px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 0 15px rgba(50, 110, 200, 0.3);
+}
+
+.btn-start:hover {
+  background: linear-gradient(180deg, #386094 0%, #20395c 100%);
+  border-color: #8ec3ff;
+  box-shadow: 0 0 25px rgba(100, 170, 255, 0.6);
+  transform: translateY(-2px);
+  color: #ffffff;
+}
+
+.controls-guide {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  font-size: 12px;
+  color: #7b94b2;
+}
+
+.control-key span {
+  display: inline-block;
+  background: rgba(30, 45, 70, 0.6);
+  border: 1px solid rgba(100, 150, 220, 0.3);
+  padding: 2px 7px;
+  border-radius: 3px;
+  color: #d1e4fc;
+  font-weight: 600;
+}
+
+/* Notificación emergente */
+.notification {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(14, 25, 45, 0.95);
+  border: 1px solid #6b9be0;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #e2efff;
+  box-shadow: 0 0 15px rgba(80, 140, 230, 0.5);
+  transition: all 0.3s ease;
+}
+
+.notification.hidden {
+  opacity: 0;
+  transform: translate(-50%, -10px);
+  pointer-events: none;
+}

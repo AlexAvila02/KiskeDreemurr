@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruben: En Busca de Angelo - Metroidvania 2D</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="game-container">
+    <!-- Canvas principal de juego -->
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+    <!-- Capa de Interfaz de Usuario (HUD) -->
+    <div id="hud-overlay">
+      <!-- Vidas y Máscaras -->
+      <div class="hud-top-left">
+        <div class="character-portrait">
+          <div class="portrait-glow"></div>
+          <span class="portrait-name">RUBEN</span>
+        </div>
+        <div id="health-bar" class="health-bar" title="Salud de Ruben">
+          <!-- Generado dinámicamente -->
+        </div>
+        <div class="items-display">
+          <div id="key-indicator" class="item-slot" title="Llave del Portón">
+            <span class="slot-icon">🗝️</span>
+            <span id="key-count" class="slot-text">0/1</span>
+          </div>
+          <div id="carry-indicator" class="item-slot" title="Objeto en mano">
+            <span class="slot-icon">🪨</span>
+            <span id="carry-text" class="slot-text">Vacío</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nombre de zona y minimapa -->
+      <div class="hud-top-right">
+        <div id="zone-tag" class="zone-tag">PRADERAS DEL REINO CAÍDO</div>
+        <div id="mini-map" class="mini-map">
+          <!-- Habitaciones visitadas -->
+        </div>
+      </div>
+
+      <!-- Diálogo / Mensaje de Lore / Carteles -->
+      <div id="dialog-box" class="dialog-box hidden">
+        <div class="dialog-speaker" id="dialog-speaker">Nota de Angelo</div>
+        <div class="dialog-text" id="dialog-text">...</div>
+        <div class="dialog-hint">[Presiona E o ESPACIO para cerrar]</div>
+      </div>
+
+      <!-- Pantalla de Inicio / Pausa -->
+      <div id="overlay-screen" class="overlay-screen">
+        <div class="title-container">
+          <h1 class="game-title">RUBEN</h1>
+          <p class="game-subtitle">EN BUSCA DE ANGELO</p>
+        </div>
+        <p class="lore-preview">
+          Hace dos semanas tu hermano mayor Angelo dejó el reino abandonado sin dar señales.<br>
+          Solo quedan sus notas. Seguí sus pistas por praderas, bosques y montañas, y traelo de vuelta para levantar a tu pueblo.
+        </p>
+        <button id="btn-start" class="btn-start">COMENZAR AVENTURA</button>
+        <div class="controls-guide">
+          <div class="control-key"><span>A / D</span> o <span>← / →</span> Moverse</div>
+          <div class="control-key"><span>ESPACIO / W</span> Saltar & Doble Salto</div>
+          <div class="control-key"><span>J / Click Izq</span> Golpear (Ataque)</div>
+          <div class="control-key"><span>K / Click Der</span> Agarrar / Lanzar Objeto</div>
+          <div class="control-key"><span>E</span> Interactuar / Leer / Abrir Puertas</div>
+        </div>
+      </div>
+
+      <!-- Notificación flotante emergente -->
+      <div id="notification" class="notification hidden"></div>
+    </div>
+  </div>
+
+  <!-- Scripts de la arquitectura modular sin dependencias externas -->
+  <script src="js/audio.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/enemies.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
