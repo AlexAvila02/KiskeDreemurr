@@ -14,7 +14,8 @@ Varios agentes de IA pueden trabajar en paralelo en esta carpeta. Sigue este flu
    node scripts/check-project.js
    ```
    Verifica sintaxis JS de todos los módulos, integridad de `<script src>` en `index.html`, y que todas las salas tengan `spawnEnemies`/`spawnDebris` como funciones válidas y biomas existentes.
-3. **Extensión sin tocar `js/main.js` ni `js/world.js`**:
+3. **Pushear siempre a `main`**: Al completar cualquier tarea, corrección o mejora (tras validar con `check-project.js`), realiza `git add`, `git commit` y **pushea siempre a `main`** (`git push origin main`) para mantener sincronizado el repositorio.
+4. **Extensión sin tocar `js/main.js` ni `js/world.js`**:
    - **Hooks del Motor (`window.GameHooks`)**: Cualquier script nuevo puede suscribirse sin modificar `js/main.js`:
      - `window.GameHooks.onInit.push((game) => ...)`
      - `window.GameHooks.onRoomLoad.push((game, room, index) => ...)`
