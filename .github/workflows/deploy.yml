@@ -1,4 +1,4 @@
-name: Desplegar en GitHub Pages
+name: Sincronizar y Desplegar en GitHub Pages
 
 on:
   push:
@@ -6,29 +6,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: "pages-sync"
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  sync-to-pages:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout del repositorio
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          fetch-depth: 0
+
+      - name: Sincronizar con rama gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin main:gh-pages --force

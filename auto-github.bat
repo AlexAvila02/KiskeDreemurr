@@ -33,7 +33,7 @@ if errorlevel 1 (
   echo [%time:~0,8%] Aviso: no se pudo combinar con GitHub, se reintenta en 60 s.
   git rebase --abort >nul 2>nul
 ) else (
-  git push -q origin main
+  git push -q origin main gh-pages
   if errorlevel 1 (
     echo [%time:~0,8%] Aviso: no se pudo subir ^(sin internet o sin permiso^). Se reintenta en 60 s.
   ) else (
