@@ -39,7 +39,20 @@ class Game {
     this.notificationTimer = null;
 
     this.isPlaying = false;
+    this.isPaused = false;
     this.activeInteraction = null;
+
+    // Elementos de Pausa y Configuración de Controles
+    this.pauseModal = document.getElementById('pause-modal');
+    this.btnHudPause = document.getElementById('btn-hud-pause');
+    this.btnOpenControls = document.getElementById('btn-open-controls-menu');
+    this.btnPauseResume = document.getElementById('btn-pause-resume');
+    this.btnPauseControls = document.getElementById('btn-pause-controls');
+    this.btnPauseRestart = document.getElementById('btn-pause-restart');
+    this.btnPauseMenu = document.getElementById('btn-pause-menu');
+
+    // Gestor de Controles Personalizados
+    this.controlsManager = new ControlsManager(this);
 
     // Paso fijo de simulación (60 actualizaciones/seg en cualquier monitor)
     this.STEP = 1000 / 60;
@@ -48,11 +61,32 @@ class Game {
     this.deathTimer = 0;      // cuadros restantes de la animación de muerte
     this.DEATH_FRAMES = 75;
 
+    // Pulido de animación / "game feel"
+    this.hitStopFrames = 0;               // congelamiento breve al conectar golpes
+    this.shake = { x: 0, y: 0 };          // desplazamiento de vibración (no altera la cámara real)
+    this.screenShakeDuration = 1;
+    this.camLook = 0;                     // anticipación de cámara hacia donde mira Ruben
+    this.irisOpen = 0;                    // transición circular de apertura (1 -> 0)
+    this.IRIS_FRAMES = 34;
+    this.damageFlash = 0;                 // viñeta roja al recibir daño
+    this.typeInterval = null;             // efecto máquina de escribir en las notas
+    this.dialogTyping = false;
+
     this.init();
   }
 
   init() {
     window.gameInstance = this;
+
+    // Exponer hooks globales para que cualquier archivo nuevo (plugins/expansiones) se integre sin editar main.js
+    window.GameHooks = window.GameHooks || {
+      onInit: [],
+      onRoomLoad: [],
+      onUpdate: [],
+      onRenderWorld: [],
+      onRenderHUD: [],
+      onAction: []
+    };
 
     // Cargar sala inicial
     this.loadRoom(0);
@@ -61,13 +95,62 @@ class Game {
     this.updateHUD();
     this.renderMiniMap();
 
+    for (const fn of window.GameHooks.onInit) {
+      try { fn(this); } catch (e) { console.error(e); }
+    }
+
     // Botón de Inicio
     this.btnStart.addEventListener('click', () => {
       window.soundManager.init();
       this.overlayScreen.classList.add('hidden');
       this.isPlaying = true;
+      this.irisOpen = 1; // apertura en iris al comenzar
       this.showNotification("Seguí las notas de Angelo...");
     });
+
+    // Botón de Modificar Controles desde la Pantalla de Inicio
+    if (this.btnOpenControls) {
+      this.btnOpenControls.addEventListener('click', () => {
+        window.soundManager.init();
+        this.controlsManager.openModal();
+      });
+    }
+
+    // Botón de Pausa en el HUD
+    if (this.btnHudPause) {
+      this.btnHudPause.addEventListener('click', () => {
+        this.togglePause();
+      });
+    }
+
+    // Botones del Menú de Pausa
+    if (this.btnPauseResume) {
+      this.btnPauseResume.addEventListener('click', () => {
+        this.togglePause(false);
+      });
+    }
+
+    if (this.btnPauseControls) {
+      this.btnPauseControls.addEventListener('click', () => {
+        if (this.pauseModal) this.pauseModal.classList.add('hidden');
+        this.controlsManager.openModal();
+      });
+    }
+
+    if (this.btnPauseRestart) {
+      this.btnPauseRestart.addEventListener('click', () => {
+        this.togglePause(false);
+        this.restartRoom();
+      });
+    }
+
+    if (this.btnPauseMenu) {
+      this.btnPauseMenu.addEventListener('click', () => {
+        this.togglePause(false);
+        this.isPlaying = false;
+        this.overlayScreen.classList.remove('hidden');
+      });
+    }
 
     // Arrancar el ciclo de render
     requestAnimationFrame((ts) => this.gameLoop(ts));
@@ -87,8 +170,11 @@ class Game {
     // Ruben reaparece donde entró a esta sala
     this.respawnPoint = { x: this.player.x, y: this.player.y };
     // Cámara directo a Ruben (sin barrido desde la sala anterior)
-    this.camera.x = Math.max(0, Math.min(room.width - this.canvas.width, this.player.x - this.canvas.width / 2));
+    this.camLook = this.player.facing * 40;
+    this.camera.x = Math.max(0, Math.min(room.width - this.canvas.width, this.player.x + this.camLook - this.canvas.width / 2));
     this.camera.y = Math.max(0, Math.min(room.height - this.canvas.height, this.player.y - this.canvas.height / 2));
+    // Transición de iris (estilo cortometraje clásico) al entrar a la sala
+    if (this.isPlaying) this.irisOpen = 1;
 
     // Instanciar enemigos y objetos de la sala
     this.enemies = room.spawnEnemies ? room.spawnEnemies() : [];
@@ -101,22 +187,72 @@ class Game {
 
     // Actualizar HUD
     this.zoneTag.textContent = room.name;
+    this.retriggerClass(this.zoneTag, 'zone-reveal');
     this.renderMiniMap();
+  }
+
+  // Reinicia una animación CSS quitando y volviendo a poner la clase
+  retriggerClass(el, cls) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth; // fuerza reflow para que la animación arranque de nuevo
+    el.classList.add(cls);
+  }
+
+  // Congela la simulación unos cuadros para dar peso a los impactos
+  hitStop(frames = 4) {
+    this.hitStopFrames = Math.max(this.hitStopFrames, frames);
   }
 
   setupInputs() {
     window.addEventListener('keydown', (e) => {
-      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+      // Si el gestor de controles está esperando una tecla para reasignar, no procesar el juego
+      if (this.controlsManager && this.controlsManager.isListening()) {
+        return;
+      }
+
+      // Tecla Escape para pausar o cerrar ventanas
+      if (e.code === 'Escape') {
+        if (this.controlsManager && this.controlsManager.isModalOpen()) {
+          this.controlsManager.closeModal();
+          return;
+        }
+        if (this.isPlaying) {
+          this.togglePause();
+          return;
+        }
+      }
+
+      // Prevenir scroll en el navegador para teclas de control
+      const prevent = this.controlsManager
+        ? this.controlsManager.shouldPreventDefault(e.code)
+        : ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code);
+      if (prevent) e.preventDefault();
+
       this.keys[e.code] = true;
 
-      if (!this.isPlaying) return;
+      // Pantalla de inicio: ENTER comienza (si no está abierto el menú de controles)
+      if (!this.isPlaying && e.code === 'Enter' && !e.repeat) {
+        const modalOpen = this.controlsManager && this.controlsManager.isModalOpen && this.controlsManager.isModalOpen();
+        if (!modalOpen && !this.overlayScreen.classList.contains('hidden')) { e.preventDefault(); this.btnStart.click(); }
+        return;
+      }
+
+      if (!this.isPlaying || this.isPaused) return;
       // Mantener apretada una tecla no repite saltos/ataques
       if (e.repeat) return;
 
-      if (['Space', 'KeyW', 'ArrowUp', 'KeyX'].includes(e.code)) this.doAction('jump');
-      if (e.code === 'KeyJ' || e.code === 'KeyZ') this.doAction('attack');
-      if (e.code === 'KeyK') this.doAction('grab');
-      if (e.code === 'KeyE') this.doAction('interact');
+      // Obtener acción correspondiente según la personalización de controles
+      const action = this.controlsManager ? this.controlsManager.getActionForKey(e.code) : null;
+      if (action) {
+        this.doAction(action);
+      } else {
+        // Respaldo directo en caso de no haberse cargado el gestor
+        if (['Space', 'KeyX'].includes(e.code)) this.doAction('jump');
+        if (e.code === 'KeyJ' || e.code === 'KeyZ') this.doAction('attack');
+        if (e.code === 'KeyK') this.doAction('grab');
+        if (e.code === 'KeyE') this.doAction('interact');
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -128,6 +264,7 @@ class Game {
 
     // Controles táctiles / de ratón en el canvas
     this.canvas.addEventListener('mousedown', (e) => {
+      if (this.isPaused) return;
       if (e.button === 0) this.doAction('attack');          // Clic izquierdo: atacar
       else if (e.button === 2) { e.preventDefault(); this.doAction('grab'); } // Clic derecho: agarrar/lanzar
     });
@@ -135,9 +272,42 @@ class Game {
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  // Alterna o fuerza el estado de pausa del juego
+  togglePause(forceState = null) {
+    if (!this.isPlaying || this.deathTimer > 0) return;
+
+    if (forceState !== null) {
+      this.isPaused = forceState;
+    } else {
+      this.isPaused = !this.isPaused;
+    }
+
+    if (this.isPaused) {
+      if (this.pauseModal) this.pauseModal.classList.remove('hidden');
+    } else {
+      if (this.pauseModal) this.pauseModal.classList.add('hidden');
+      if (this.controlsManager && this.controlsManager.isModalOpen()) {
+        this.controlsManager.closeModal();
+      }
+    }
+  }
+
+  // Dirección en la que Ruben apunta al atacar (teclado o mando)
+  getAim() {
+    const cm = this.controlsManager;
+    const k = this.keys;
+    const on = (id, fallback) => cm ? cm.isActive(id, k) : fallback.some(c => k[c]);
+    return {
+      up: on('aimUp', ['KeyW', 'ArrowUp', 'PadUp']),
+      down: on('aimDown', ['KeyS', 'ArrowDown', 'PadDown']),
+      left: on('moveLeft', ['KeyA', 'ArrowLeft', 'PadLeft']),
+      right: on('moveRight', ['KeyD', 'ArrowRight', 'PadRight'])
+    };
+  }
+
   // Acción del jugador (la usan teclado, mouse y mando)
   doAction(action) {
-    if (!this.isPlaying || this.deathTimer > 0) return;
+    if (!this.isPlaying || this.isPaused || this.deathTimer > 0) return;
     const dialogOpen = !this.dialogBox.classList.contains('hidden');
 
     // Con una nota abierta, saltar o interactuar la cierra; lo demás se ignora
@@ -147,7 +317,7 @@ class Game {
     }
 
     if (action === 'jump') this.player.jump();
-    else if (action === 'attack') this.player.attack(this.enemies);
+    else if (action === 'attack') this.player.attack(this.enemies, this.getAim());
     else if (action === 'grab') this.player.interactOrThrow(this.debrisItems);
     else if (action === 'interact') this.checkInteractions();
   }
@@ -176,29 +346,104 @@ class Game {
 
   getPad() {
     if (!navigator.getGamepads) return null;
-    const pads = navigator.getGamepads();
-    if (this.padIndex !== null && pads[this.padIndex]) return pads[this.padIndex];
+    let pads;
+    try { pads = navigator.getGamepads(); } catch (e) { return null; }
+    if (!pads) return null;
+    if (this.padIndex !== null && pads[this.padIndex] && pads[this.padIndex].connected) return pads[this.padIndex];
     // Algunos navegadores no avisan la conexión hasta tocar un botón: buscar cualquiera
-    for (const p of pads) if (p && p.connected) { this.padIndex = p.index; return p; }
+    for (const p of pads) if (p && p.connected) { this.padIndex = p.index; this.padPrev = []; return p; }
     return null;
+  }
+
+  // Indicador en pantalla: muestra si hay mando y si el navegador lo reconoce como estándar
+  updatePadBadge(pad) {
+    if (!this.padBadge) {
+      this.padBadge = document.createElement('div');
+      this.padBadge.style.cssText = 'position:absolute;left:50%;bottom:10px;transform:translateX(-50%);' +
+        'font:600 12px Outfit,sans-serif;padding:4px 10px;border-radius:12px;pointer-events:none;' +
+        'background:rgba(58,36,22,.75);color:#f9efd8;transition:opacity .6s;z-index:50';
+      const host = document.getElementById('game-container') || document.body;
+      host.appendChild(this.padBadge);
+    }
+    const id = pad ? (pad.id || 'mando') + '|' + pad.mapping : '';
+    if (id === this.padBadgeId) return;
+    this.padBadgeId = id;
+    if (!pad) {
+      this.padBadge.style.opacity = '0';
+      return;
+    }
+    const name = String(pad.id || '').replace(/\(.*?\)/g, '').trim().slice(0, 40) || 'Mando';
+    this.padBadge.textContent = '🎮 ' + name + (pad.mapping === 'standard' ? '' : ' · modo compatibilidad');
+    this.padBadge.style.opacity = '1';
+    clearTimeout(this.padBadgeTimer);
+    this.padBadgeTimer = setTimeout(() => { if (this.padBadge) this.padBadge.style.opacity = '0'; }, 4000);
+    console.log('[Mando]', pad.id || '(sin nombre)', 'mapping=' + (pad.mapping || 'no estándar'), 'botones=' + pad.buttons.length, 'ejes=' + pad.axes.length);
   }
 
   pollGamepad() {
     const pad = this.getPad();
-    if (!pad) return;
+    this.updatePadBadge(pad);
+    if (!pad) {
+      if (this.keys['PadLeft'] || this.keys['PadRight'] || this.keys['PadUp'] || this.keys['PadDown']) {
+        this.keys['PadLeft'] = this.keys['PadRight'] = this.keys['PadUp'] = this.keys['PadDown'] = false;
+      }
+      return;
+    }
 
-    const pressed = pad.buttons.map(b => b && (b.pressed || b.value > 0.5));
+    const pressed = Array.from(pad.buttons, b => !!b && (b.pressed || b.value > 0.5));
     const justPressed = (i) => pressed[i] && !this.padPrev[i];
+    const anyJust = pressed.some((v, i) => v && !this.padPrev[i]);
 
     // Movimiento: stick izquierdo con zona muerta, o cruceta
-    const ax = pad.axes[0] || 0;
     const DEAD = 0.35;
-    this.keys['PadLeft'] = ax < -DEAD || !!pressed[14];
-    this.keys['PadRight'] = ax > DEAD || !!pressed[15];
+    const ax = pad.axes[0] || 0;
+    let left = ax < -DEAD || !!pressed[14];
+    let right = ax > DEAD || !!pressed[15];
 
-    // Pantalla de inicio: A o Start comienzan
-    if (!this.isPlaying) {
-      if (justPressed(0) || justPressed(9)) this.btnStart.click();
+    // Mandos NO estándar (genéricos, algunos de PlayStation): la cruceta suele venir
+    // como ejes 6/7 o como un "hat" en el eje 9
+    if (pad.mapping !== 'standard') {
+      const a6 = pad.axes[6], a9 = pad.axes[9];
+      if (a6 !== undefined) { if (a6 < -0.5) left = true; if (a6 > 0.5) right = true; }
+      if (a9 !== undefined && a9 >= -1.01 && a9 <= 1.01) {
+        if (a9 > 0.3) left = true;                    // izquierda, abajo-izq, arriba-izq
+        if (a9 < -0.2 && a9 > -0.9) right = true;     // derecha y diagonales derechas
+      }
+    }
+    this.keys['PadLeft'] = left;
+    this.keys['PadRight'] = right;
+
+    // Apuntar arriba/abajo: stick izquierdo vertical o cruceta
+    const ay = pad.axes[1] || 0;
+    let up = ay < -0.5 || !!pressed[12];
+    let down = ay > 0.5 || !!pressed[13];
+    if (pad.mapping !== 'standard') {
+      const a7 = pad.axes[7], a9 = pad.axes[9];
+      if (a7 !== undefined) { if (a7 < -0.5) up = true; if (a7 > 0.5) down = true; }
+      if (a9 !== undefined && a9 >= -1.01 && a9 <= 1.01) {
+        if (a9 < -0.6 || a9 > 0.9) up = true;          // arriba y diagonales de arriba
+        if (a9 > -0.3 && a9 < 0.6) down = true;        // abajo y diagonales de abajo
+      }
+    }
+    this.keys['PadUp'] = up;
+    this.keys['PadDown'] = down;
+
+    const modalOpen = this.controlsManager && this.controlsManager.isModalOpen && this.controlsManager.isModalOpen();
+
+    if (modalOpen) {
+      // Con el menú de controles abierto, B o Start lo cierran
+      if (justPressed(1) || justPressed(9)) {
+        this.controlsManager.closeModal();
+        if (this.isPaused && this.pauseModal) this.pauseModal.classList.remove('hidden');
+      }
+    } else if (!this.isPlaying) {
+      // Pantalla de inicio: cualquier botón comienza
+      if (anyJust) this.btnStart.click();
+    } else if (this.isPaused) {
+      if (justPressed(0) || justPressed(9) || justPressed(1)) this.togglePause(false);
+    } else if (justPressed(9) || justPressed(8)) {
+      // Start (o Select) pausa
+      this.togglePause();
     } else {
       for (const i in this.PAD_BUTTONS) {
         if (justPressed(+i)) this.doAction(this.PAD_BUTTONS[i]);
@@ -265,6 +510,12 @@ class Game {
     p.hp = 0;
     this.deathTimer = this.DEATH_FRAMES;
     this.deathCause = cause;
+    if (p.startDeath) p.startDeath();
+    // Punto central de la transición de cierre (donde cayó Ruben, dentro de pantalla)
+    this.deathFocus = {
+      x: Math.max(40, Math.min(this.canvas.width - 40, p.x + p.width / 2 - this.camera.x)),
+      y: Math.max(40, Math.min(this.canvas.height - 40, p.y + p.height / 2 - this.camera.y))
+    };
     if (cause !== 'fall') {
       window.particleSystem.createHitImpact(p.x + p.width / 2, p.y + p.height / 2, 24);
       window.particleSystem.createDust(p.x + p.width / 2, p.y + p.height / 2, 16, '#d9a634');
@@ -291,12 +542,45 @@ class Game {
 
   showDialog(speaker, text) {
     this.dialogSpeaker.textContent = speaker;
-    this.dialogText.textContent = text;
-    this.dialogBox.classList.remove('hidden');
+    this.dialogBox.classList.remove('hidden', 'typed');
+    this.retriggerClass(this.dialogBox, 'dialog-pop');
     window.soundManager.playPickup();
+
+    // Efecto máquina de escribir: el texto restante queda invisible para que
+    // el cuadro tenga su tamaño final desde el principio (sin saltos de diseño).
+    if (this.typeInterval) clearInterval(this.typeInterval);
+    this.dialogFullText = text;
+    this.dialogText.innerHTML = '';
+    const shown = document.createElement('span');
+    const ghost = document.createElement('span');
+    ghost.className = 'dialog-ghost';
+    ghost.textContent = text;
+    this.dialogText.append(shown, ghost);
+    this.dialogTyping = true;
+    let i = 0;
+    this.typeInterval = setInterval(() => {
+      i = Math.min(text.length, i + 2);
+      shown.textContent = text.slice(0, i);
+      ghost.textContent = text.slice(i);
+      if (i >= text.length) this.finishTyping();
+    }, 24);
+  }
+
+  // Completa el texto de la nota de inmediato
+  finishTyping() {
+    if (this.typeInterval) clearInterval(this.typeInterval);
+    this.typeInterval = null;
+    this.dialogTyping = false;
+    this.dialogText.textContent = this.dialogFullText || this.dialogText.textContent;
+    this.dialogBox.classList.add('typed');
   }
 
   closeDialog() {
+    // Primera pulsación mientras escribe: mostrar todo el texto; la segunda cierra
+    if (this.dialogTyping) {
+      this.finishTyping();
+      return;
+    }
     this.dialogBox.classList.add('hidden');
   }
 
@@ -304,37 +588,77 @@ class Game {
     if (this.notificationTimer) clearTimeout(this.notificationTimer);
     this.notification.textContent = msg;
     this.notification.classList.remove('hidden');
+    this.retriggerClass(this.notification, 'notify-pop');
     this.notificationTimer = setTimeout(() => {
       this.notification.classList.add('hidden');
     }, 3200);
   }
 
   triggerScreenShake(intensity = 6, durationMs = 150) {
+    // No pisar una vibración más fuerte que todavía está en curso
+    if (this.screenShakeTime > 0 && intensity < this.screenShakeIntensity * (this.screenShakeTime / this.screenShakeDuration)) return;
     this.screenShakeIntensity = intensity;
     this.screenShakeTime = durationMs;
+    this.screenShakeDuration = durationMs;
     this.rumble(intensity / 10, durationMs);
   }
 
+  // Vibración con caída cuadrática (fuerte al inicio, se apaga suave)
+  updateShake() {
+    if (this.screenShakeTime > 0) {
+      this.screenShakeTime -= this.STEP;
+      const k = Math.max(0, this.screenShakeTime / this.screenShakeDuration);
+      const amp = this.screenShakeIntensity * k * k;
+      this.shake.x = (Math.random() - 0.5) * 2 * amp;
+      this.shake.y = (Math.random() - 0.5) * 2 * amp;
+    } else {
+      this.shake.x = this.shake.y = 0;
+    }
+    if (this.damageFlash > 0) this.damageFlash = Math.max(0, this.damageFlash - 0.05);
+  }
+
   updateHUD() {
-    // Máscaras de salud
-    this.healthBar.innerHTML = '';
-    for (let i = 0; i < this.player.maxHp; i++) {
-      const mask = document.createElement('div');
-      mask.className = 'mask-node' + (i < this.player.hp ? ' active' : '');
-      this.healthBar.appendChild(mask);
+    // Corazones de salud: se actualizan en el lugar para poder animar pérdidas y curaciones
+    const maxHp = this.player.maxHp, hp = this.player.hp;
+    if (this.healthBar.children.length !== maxHp) {
+      this.healthBar.innerHTML = '';
+      for (let i = 0; i < maxHp; i++) {
+        const mask = document.createElement('div');
+        mask.className = 'mask-node' + (i < hp ? ' active' : '');
+        this.healthBar.appendChild(mask);
+      }
+    } else {
+      let gainedIndex = 0;
+      Array.from(this.healthBar.children).forEach((node, i) => {
+        const active = i < hp;
+        const was = node.classList.contains('active');
+        if (was && !active) {
+          node.classList.remove('active', 'gained');
+          this.retriggerClass(node, 'lost');
+        } else if (!was && active) {
+          node.classList.remove('lost');
+          node.classList.add('active');
+          node.style.animationDelay = `${gainedIndex++ * 70}ms`; // se rellenan en cascada
+          this.retriggerClass(node, 'gained');
+        }
+      });
     }
 
-    // Llaves
+    // Llaves (pulso al conseguir una nueva)
+    if (this.lastKeyCount !== undefined && this.player.keys > this.lastKeyCount) {
+      this.retriggerClass(this.keyCount.parentElement, 'slot-pulse');
+    }
+    this.lastKeyCount = this.player.keys;
     this.keyCount.textContent = `${this.player.keys}/1`;
 
     // Objeto agarrado
-    if (this.player.carriedItem) {
-      this.carryText.textContent = 'Roca Lista';
-      this.carryIndicator.style.borderColor = '#f0bf4c';
-    } else {
-      this.carryText.textContent = 'Vacío';
-      this.carryIndicator.style.borderColor = '#8a623e';
+    const carrying = !!this.player.carriedItem;
+    if (carrying !== this.lastCarrying) {
+      this.carryIndicator.classList.toggle('is-active', carrying);
+      if (carrying) this.retriggerClass(this.carryIndicator, 'slot-pulse');
+      this.lastCarrying = carrying;
     }
+    this.carryText.textContent = carrying ? 'Roca Lista' : 'Vacío';
   }
 
   renderMiniMap() {
@@ -356,12 +680,17 @@ class Game {
     const py = this.player.y + this.player.height / 2;
 
     for (const exit of room.exits) {
-      if (
-        px >= exit.x &&
-        px <= exit.x + exit.w &&
-        py >= exit.y &&
-        py <= exit.y + exit.h
-      ) {
+      // Las salidas pegadas al borde izquierdo/derecho funcionan a cualquier altura:
+      // si Ruben cruza el borde saltando, igual cambia de sala (antes pasaba por
+      // encima de la zona, salía del mapa y "caía al vacío").
+      const EDGE = 8;
+      const leftEdge = exit.x <= EDGE;
+      const rightEdge = exit.x + exit.w >= room.width - EDGE;
+      let inside;
+      if (leftEdge) inside = px <= exit.x + exit.w && py <= exit.y + exit.h;
+      else if (rightEdge) inside = px >= exit.x && py <= exit.y + exit.h;
+      else inside = px >= exit.x && px <= exit.x + exit.w && py >= exit.y && py <= exit.y + exit.h;
+      if (inside) {
         this.loadRoom(exit.targetRoom, exit.targetX, exit.targetY);
         return;
       }
@@ -381,22 +710,42 @@ class Game {
   }
 
   update(dt) {
-    if (!this.isPlaying) return;
+    if (!this.isPlaying || this.isPaused) return;
+    if (this.irisOpen > 0) this.irisOpen = Math.max(0, this.irisOpen - 1 / this.IRIS_FRAMES);
     // El mundo se congela mientras se lee una nota
     if (!this.dialogBox.classList.contains('hidden')) return;
 
     // Animación de muerte: el mundo sigue de fondo, Ruben no se controla
     if (this.deathTimer > 0) {
       this.deathTimer--;
+      if (this.player.updateDeath) this.player.updateDeath();
       window.particleSystem.update();
+      this.updateShake();
       if (this.deathTimer === 0) this.restartRoom();
+      return;
+    }
+
+    // Hit-stop: todo se detiene un instante (la vibración sigue para vender el golpe)
+    if (this.hitStopFrames > 0) {
+      this.hitStopFrames--;
+      this.updateShake();
       return;
     }
 
     const room = this.world.getCurrentRoom();
 
-    // Actualizar Ruben
-    this.player.update(this.world, this.keys);
+    // Actualizar Ruben pasando el gestor de controles para movimiento dinámico
+    this.player.update(this.world, this.keys, this.controlsManager);
+
+    // Ruben no puede salir del mapa por los costados (solo por las salidas)
+    const p = this.player;
+    if (p.x < 0) { p.x = 0; p.vx = 0; }
+    if (p.x + p.width > room.width) { p.x = room.width - p.width; p.vx = 0; }
+
+    // Las salidas se revisan antes que la caída, para no morir al cruzar un borde
+    const roomBefore = this.world.currentRoomIndex;
+    this.checkRoomExits();
+    if (this.world.currentRoomIndex !== roomBefore) return;
 
     // Caída al vacío = muerte
     if (this.player.y > room.height + 20) {
@@ -420,9 +769,12 @@ class Game {
     // Comprobar transiciones de sala y llaves
     this.checkRoomExits();
 
-    // Suavizado de Cámara centrado en Ruben
-    const targetCamX = this.player.x + this.player.width / 2 - this.canvas.width / 2;
-    const targetCamY = this.player.y + this.player.height / 2 - this.canvas.height / 2;
+    // Suavizado de Cámara centrado en Ruben, con anticipación hacia donde mira/corre
+    const lookTarget = this.player.facing * 40 + this.player.vx * 6;
+    this.camLook += (lookTarget - this.camLook) * 0.035;
+    const fallLook = Math.max(0, this.player.vy - 4) * 8; // mira hacia abajo en caídas largas
+    const targetCamX = this.player.x + this.player.width / 2 + this.camLook - this.canvas.width / 2;
+    const targetCamY = this.player.y + this.player.height / 2 + fallLook - this.canvas.height / 2;
 
     this.camera.x += (targetCamX - this.camera.x) * 0.1;
     this.camera.y += (targetCamY - this.camera.y) * 0.1;
@@ -431,54 +783,158 @@ class Game {
     this.camera.x = Math.max(0, Math.min(room.width - this.canvas.width, this.camera.x));
     this.camera.y = Math.max(0, Math.min(room.height - this.canvas.height, this.camera.y));
 
-    // Vibración de pantalla (Screen Shake)
-    if (this.screenShakeTime > 0) {
-      this.screenShakeTime -= this.STEP;
-      const shakeOffsetX = (Math.random() - 0.5) * this.screenShakeIntensity * 2;
-      const shakeOffsetY = (Math.random() - 0.5) * this.screenShakeIntensity * 2;
-      this.camera.x += shakeOffsetX;
-      this.camera.y += shakeOffsetY;
-    }
+    // Vibración de pantalla (Screen Shake): se aplica al dibujar, sin desplazar la cámara real
+    this.updateShake();
   }
 
   render() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Cámara de dibujo = cámara real + vibración
+    const cam = { x: this.camera.x + this.shake.x, y: this.camera.y + this.shake.y };
 
     // 1. Renderizar Mundo y Plataformas
-    this.world.render(this.ctx, this.camera);
+    this.world.render(ctx, cam);
+
+    // 1b. Señal de pasajes hacia arriba (haz de luz + flecha)
+    this.renderExitHints();
 
     // 2. Renderizar Partículas de Fondo
-    window.particleSystem.render(this.ctx, this.camera);
+    window.particleSystem.render(ctx, cam);
 
     // 3. Renderizar Escombros
     for (const item of this.debrisItems) {
-      item.render(this.ctx, this.camera);
+      item.render(ctx, cam);
     }
 
     // 4. Renderizar Enemigos
     for (const enemy of this.enemies) {
-      enemy.render(this.ctx, this.camera);
+      enemy.render(ctx, cam);
     }
 
     // 5. Renderizar al Protagonista Ruben
-    this.player.render(this.ctx, this.camera);
+    this.player.render(ctx, cam);
 
     // 6. Efecto de Iluminación Ambiental (Luz tenue alrededor de Ruben)
     this.renderLighting();
 
-    // 7. Fundido a negro al morir
+    // 6b. Viñeta roja breve al recibir daño
+    if (this.damageFlash > 0) {
+      const W = this.canvas.width, H = this.canvas.height;
+      const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.65);
+      g.addColorStop(0, 'rgba(160, 30, 20, 0)');
+      g.addColorStop(1, `rgba(160, 30, 20, ${0.45 * this.damageFlash})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 7. Apertura en iris al entrar a una sala
+    if (this.irisOpen > 0 && this.deathTimer <= 0) {
+      const p = 1 - this.irisOpen;
+      const e = 1 - Math.pow(1 - p, 3);
+      const fx = this.player.x + this.player.width / 2 - this.camera.x;
+      const fy = this.player.y + this.player.height / 2 - this.camera.y;
+      this.renderIris(fx, fy, e * Math.hypot(this.canvas.width, this.canvas.height));
+    }
+
+    // 8. Derrota: Ruben sale despedido, el iris se cierra sobre él y aparece el texto
     if (this.deathTimer > 0) {
       const k = 1 - this.deathTimer / this.DEATH_FRAMES; // 0 -> 1
-      const alpha = Math.min(1, k * 1.6);
-      this.ctx.save();
-      this.ctx.fillStyle = `rgba(10, 6, 4, ${alpha})`;
-      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-      this.ctx.globalAlpha = Math.min(1, k * 2.5);
-      this.ctx.fillStyle = '#f2d29b';
-      this.ctx.font = '600 34px Cinzel, Georgia, serif';
-      this.ctx.textAlign = 'center';
-      this.ctx.fillText(this.deathCause === 'fall' ? 'Ruben cayó...' : 'Ruben cayó en combate...', this.canvas.width / 2, this.canvas.height / 2);
-      this.ctx.restore();
+      const focus = this.deathFocus || { x: this.canvas.width / 2, y: this.canvas.height / 2 };
+      const closeK = Math.max(0, Math.min(1, (k - 0.2) / 0.45));
+      const ease = closeK * closeK * (3 - 2 * closeK); // smoothstep
+      const maxR = Math.hypot(this.canvas.width, this.canvas.height);
+      this.renderIris(focus.x, focus.y, (1 - ease) * maxR);
+
+      const textK = Math.max(0, Math.min(1, (k - 0.55) / 0.3));
+      if (textK > 0) {
+        const pop = 0.85 + 0.15 * (1 - Math.pow(1 - textK, 3));
+        ctx.save();
+        ctx.globalAlpha = textK;
+        ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        ctx.scale(pop, pop);
+        ctx.font = '600 34px Cinzel, Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#3a2416';
+        const msg = this.deathCause === 'fall' ? 'Ruben cayó...' : 'Ruben cayó en combate...';
+        ctx.strokeText(msg, 0, 0);
+        ctx.fillStyle = '#f2d29b';
+        ctx.fillText(msg, 0, 0);
+        // Filete ornamental bajo el texto
+        const lw = 140 * textK;
+        ctx.strokeStyle = 'rgba(217, 166, 52, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-lw, 30); ctx.lineTo(lw, 30);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // Cortinilla circular estilo cortometraje clásico: todo negro salvo un círculo
+  renderIris(cx, cy, radius) {
+    const ctx = this.ctx;
+    const W = this.canvas.width, H = this.canvas.height;
+    ctx.save();
+    ctx.fillStyle = '#120b07';
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    if (radius > 0.5) ctx.arc(cx, cy, radius, 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
+    if (radius > 0.5 && radius < Math.hypot(W, H)) {
+      // Borde de tinta del iris
+      ctx.strokeStyle = '#3a2416';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  renderExitHints() {
+    const room = this.world.getCurrentRoom();
+    if (!room.exits) return;
+    const ctx = this.ctx;
+    const t = Date.now() * 0.003;
+    for (const ex of room.exits) {
+      if (!ex.hint || ex.hint.dir !== 'up') continue;
+      const x = ex.hint.x - this.camera.x;
+      const w = ex.hint.w;
+      const y0 = -this.camera.y;
+      ctx.save();
+      // Haz de luz que cae por el hueco del techo
+      const g = ctx.createLinearGradient(0, y0, 0, y0 + 150);
+      g.addColorStop(0, 'rgba(255, 236, 170, 0.55)');
+      g.addColorStop(1, 'rgba(255, 236, 170, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x + w, y0);
+      ctx.lineTo(x + w + 20, y0 + 150);
+      ctx.lineTo(x - 20, y0 + 150);
+      ctx.closePath();
+      ctx.fill();
+      // Flecha que sube y baja
+      const ay = y0 + 45 + Math.sin(t) * 5;
+      const ax = x + w / 2;
+      ctx.fillStyle = '#f9efd8';
+      ctx.strokeStyle = '#3a2416';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay - 12);
+      ctx.lineTo(ax + 10, ay);
+      ctx.lineTo(ax + 4, ay);
+      ctx.lineTo(ax + 4, ay + 10);
+      ctx.lineTo(ax - 4, ay + 10);
+      ctx.lineTo(ax - 4, ay);
+      ctx.lineTo(ax - 10, ay);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -490,7 +946,11 @@ class Game {
 
     this.ctx.save();
     // Viñeta cálida y muy suave de película animada clásica (sin oscurecer el paisaje exterior)
-    const lightGrad = this.ctx.createRadialGradient(rx, ry, 140, this.canvas.width / 2, this.canvas.height / 2, 560);
+    // Círculos concéntricos en el centro de la pantalla: la viñeta queda pareja.
+    // (Antes un círculo seguía a Ruben y el otro estaba fijo; al ir a la izquierda
+    // se desfasaban y oscurecían la imagen.)
+    const cxv = this.canvas.width / 2, cyv = this.canvas.height / 2;
+    const lightGrad = this.ctx.createRadialGradient(cxv, cyv, 220, cxv, cyv, 600);
     lightGrad.addColorStop(0, 'rgba(255, 235, 190, 0)');
     lightGrad.addColorStop(0.75, 'rgba(40, 22, 10, 0.08)');
     lightGrad.addColorStop(1, edgeTint);
@@ -506,7 +966,7 @@ class Game {
     const dt = Math.min(250, currentTime - this.lastTime);
     this.lastTime = currentTime;
 
-    this.pollGamepad();
+    try { this.pollGamepad(); } catch (e) { console.warn('[Mando] error:', e); }
     this.accumulator += dt;
     while (this.accumulator >= this.STEP) {
       this.update(this.STEP);

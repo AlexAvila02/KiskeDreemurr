@@ -2,6 +2,12 @@
  * Entidades Enemigas y Objetos Interactivos Arrojables
  */
 
+// Paleta del bioma actual (colores de enemigos acordes a cada zona)
+function getEnemyPalette() {
+  const g = window.gameInstance;
+  return (g && g.world && g.world.getCurrentBiome && g.world.getCurrentBiome().enemyPalette) || null;
+}
+
 // Objeto o Escombro Arrojable
 class ThrowableDebris {
   constructor(x, y) {
@@ -16,15 +22,25 @@ class ThrowableDebris {
     this.isGrounded = true;
     this.damage = 25;
     this.active = true;
+    // Animación (solo visual)
+    this.rot = 0;
+    this.spawnPop = 1;        // aparece con un pequeño rebote
+    this.carryLag = 0;        // retraso al seguir a Ruben (follow-through)
+    this.trail = [];          // estela al ser lanzada
   }
 
   update(world, player, enemies) {
     if (!this.active) return;
+    if (this.spawnPop > 0) this.spawnPop = Math.max(0, this.spawnPop - 0.06);
 
     if (this.isCarried) {
-      // Posición sobre la cabeza del jugador
-      this.x = player.x + player.width / 2 - this.width / 2;
-      this.y = player.y - this.height - 4;
+      // Posición sobre la cabeza del jugador (con un leve retraso y rebote al caminar)
+      const targetX = player.x + player.width / 2 - this.width / 2;
+      this.carryLag += ((targetX - this.x) - this.carryLag) * 0.35;
+      this.x = targetX;
+      const bob = player.walkPhase ? Math.abs(Math.sin(player.walkPhase)) * 2 : 0;
+      this.y = player.y - this.height - 4 - bob;
+      this.rot += (-this.carryLag * 0.04 - this.rot) * 0.25;
       return;
     }
 
@@ -32,6 +48,9 @@ class ThrowableDebris {
       this.vy += 0.35; // Gravedad
       this.x += this.vx;
       this.y += this.vy;
+      this.rot += this.vx * 0.045; // gira en el aire
+      this.trail.push({ x: this.x + this.width / 2, y: this.y + this.height / 2 });
+      if (this.trail.length > 7) this.trail.shift();
 
       // Colisión con enemigos
       for (const enemy of enemies) {
@@ -43,6 +62,7 @@ class ThrowableDebris {
           this.y + this.height > enemy.y
         ) {
           enemy.takeDamage(this.damage, Math.sign(this.vx) * 6);
+          if (window.gameInstance && window.gameInstance.hitStop) window.gameInstance.hitStop(5);
           this.shatter();
           return;
         }
@@ -75,6 +95,7 @@ class ThrowableDebris {
       // Gravedad leve si está en el suelo
       this.vy += 0.3;
       this.y += this.vy;
+      this.rot *= 0.8;
 
       for (const plat of world.getPlatforms()) {
         if (
@@ -104,17 +125,44 @@ class ThrowableDebris {
     if (!this.active) return;
     const sx = this.x - camera.x;
     const sy = this.y - camera.y;
+    const cx = sx + this.width / 2;
+    const cy = sy + this.height / 2;
+    const now = Date.now();
+
+    // Estela de movimiento al volar
+    if (this.isThrown && this.trail.length > 1) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (let i = 1; i < this.trail.length; i++) {
+        const k = i / this.trail.length;
+        ctx.strokeStyle = `rgba(255, 240, 210, ${k * 0.35})`;
+        ctx.lineWidth = k * 9;
+        ctx.beginPath();
+        ctx.moveTo(this.trail[i - 1].x - camera.x, this.trail[i - 1].y - camera.y);
+        ctx.lineTo(this.trail[i].x - camera.x, this.trail[i].y - camera.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     ctx.save();
-    // Brillo sutil si no está arrojado para indicar que se puede recoger
+    // Brillo pulsante si está en el suelo para indicar que se puede recoger
     if (!this.isThrown && !this.isCarried) {
       ctx.shadowColor = '#ffe9a8';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 6 + (Math.sin(now * 0.005) + 1) * 5;
     }
+
+    // Rebote de aparición (escala elástica)
+    const pop = this.spawnPop > 0 ? 1 + Math.sin(this.spawnPop * Math.PI) * 0.35 : 1;
+    ctx.translate(cx, cy);
+    ctx.rotate(this.rot);
+    ctx.scale(pop, pop);
+    ctx.translate(-cx, -cy);
 
     ctx.fillStyle = '#8c7b66';
     ctx.strokeStyle = '#3a2416';
     ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
 
     // Forma irregular de roca/escombro
     ctx.beginPath();
@@ -124,12 +172,21 @@ class ThrowableDebris {
     ctx.lineTo(sx + 3, sy + this.height);
     ctx.closePath();
     ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.stroke();
 
-    // Brillo de luz en la piedra
+    // Sombreado inferior y brillo de luz en la piedra
+    ctx.fillStyle = 'rgba(58, 36, 22, 0.25)';
+    ctx.beginPath();
+    ctx.moveTo(sx + this.width, sy + this.height - 2);
+    ctx.lineTo(sx + 3, sy + this.height);
+    ctx.lineTo(sx + 5, sy + this.height - 5);
+    ctx.lineTo(sx + this.width - 2, sy + this.height - 6);
+    ctx.closePath();
+    ctx.fill();
     ctx.fillStyle = '#d8ccb8';
     ctx.beginPath();
-    ctx.arc(sx + this.width / 2, sy + this.height / 2, 2.5, 0, Math.PI * 2);
+    ctx.arc(sx + this.width / 2 - 2, sy + this.height / 2 - 2, 2.5, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
@@ -152,6 +209,11 @@ class CrawlerEnemy {
     this.alive = true;
     this.hitCooldown = 0;
     this.knockbackVx = 0;
+    // Animación (solo visual)
+    this.animT = Math.random() * 10;
+    this.sx = 1; this.vsx = 0;   // resorte de aplastamiento (giros y golpes)
+    this.dyingTimer = 0;         // animación de derrota tras morir
+    this.DYING_FRAMES = 26;
   }
 
   takeDamage(amount, knockback = 0) {
@@ -159,6 +221,7 @@ class CrawlerEnemy {
     this.hp -= amount;
     this.hitCooldown = 15;
     this.knockbackVx = knockback;
+    this.sx = 0.7; this.vsx = 0;
     window.soundManager.playHit();
     window.particleSystem.createHitImpact(this.x + this.width / 2, this.y + this.height / 2, 10);
     if (window.gameInstance) window.gameInstance.triggerScreenShake(5, 100);
@@ -170,6 +233,7 @@ class CrawlerEnemy {
 
   die() {
     this.alive = false;
+    this.dyingTimer = this.DYING_FRAMES;
     window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height / 2, 12, '#c98a3a');
     // Suelta un escombro arrojable al morir
     if (window.gameInstance && window.gameInstance.debrisItems) {
@@ -178,7 +242,19 @@ class CrawlerEnemy {
   }
 
   update(world, player) {
-    if (!this.alive) return;
+    // Resorte de squash & stretch
+    this.vsx = (this.vsx + (1 - this.sx) * 0.3) * 0.7;
+    this.sx += this.vsx;
+
+    if (!this.alive) {
+      if (this.dyingTimer > 0) {
+        this.dyingTimer--;
+        if (this.dyingTimer === 0) {
+          window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height / 2, 8, '#e8d2a6');
+        }
+      }
+      return;
+    }
 
     if (this.hitCooldown > 0) this.hitCooldown--;
 
@@ -188,8 +264,10 @@ class CrawlerEnemy {
     } else {
       // Patrullaje
       this.x += this.speed * this.facing;
+      this.animT += this.speed * 0.22;
       if (Math.abs(this.x - this.startX) > this.patrolDistance) {
         this.facing *= -1;
+        this.sx = 0.82; this.vsx = 0; // pequeño "frenazo" al darse vuelta
       }
     }
 
@@ -205,40 +283,119 @@ class CrawlerEnemy {
   }
 
   render(ctx, camera) {
-    if (!this.alive) return;
+    if (!this.alive && this.dyingTimer <= 0) return;
     const sx = this.x - camera.x;
     const sy = this.y - camera.y;
+    const cx = sx + this.width / 2;
+    const baseY = sy + this.height;
+    const f = this.facing;
+    const pal = getEnemyPalette();
+    const flash = this.hitCooldown > 9; // destello blanco en los primeros cuadros del golpe
+    const OUT = '#3a2416';
+    const SHELL = flash ? '#fff8ec' : ((pal && pal.crawlerFill) || '#c98a3a');
 
     ctx.save();
-    if (this.hitCooldown > 0) {
-      ctx.filter = 'brightness(2.5)';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Derrota: queda patas arriba, salta y se desvanece
+    let dyingK = 0;
+    if (!this.alive) {
+      dyingK = 1 - this.dyingTimer / this.DYING_FRAMES; // 0 -> 1
+      ctx.globalAlpha = Math.max(0, 1 - Math.pow(dyingK, 2));
+      const hop = Math.sin(Math.min(1, dyingK * 1.6) * Math.PI) * 14;
+      ctx.translate(0, -hop);
+      // Se da vuelta (patas arriba) girando sobre su centro
+      const ccy = sy + this.height / 2;
+      ctx.translate(cx, ccy);
+      ctx.rotate(Math.PI * Math.min(1, dyingK * 2.2) * f);
+      ctx.translate(-cx, -ccy);
+    }
+
+    // Sombra de contacto
+    ctx.fillStyle = 'rgba(40, 22, 10, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(cx, baseY + 1, this.width * 0.45 * this.sx, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Squash & stretch desde la base + leve balanceo al caminar
+    const walkBob = this.alive ? Math.abs(Math.sin(this.animT)) * 1.4 : 0;
+    const sy2 = 1 / this.sx;
+    ctx.translate(cx, baseY);
+    ctx.scale(this.sx, sy2);
+    ctx.rotate(this.alive ? Math.sin(this.animT) * 0.04 : 0);
+    ctx.translate(-cx, -baseY - walkBob);
+
+    // Patitas (3 por lado visibles, en trípode alternado)
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const lx = sx + 8 + i * 9;
+      const ph = this.animT * 2 + i * 2.1;
+      const swing = this.alive ? Math.sin(ph) * 3 : Math.sin(Date.now() * 0.03 + i) * 3; // pataleo al morir
+      const lift = this.alive ? Math.max(0, Math.cos(ph)) * 2 : 0;
+      ctx.beginPath();
+      ctx.moveTo(lx, sy + this.height - 5);
+      ctx.quadraticCurveTo(lx + swing * 0.5 + f * 2, sy + this.height - 1 - lift, lx + swing + f * 2, sy + this.height + 2 + walkBob - lift);
+      ctx.stroke();
     }
 
     // Caparazón redondeado según bioma, contorno de tinta marrón
-    const pal = (window.gameInstance && window.gameInstance.world && window.gameInstance.world.getCurrentBiome && window.gameInstance.world.getCurrentBiome().enemyPalette) || null;
-    ctx.fillStyle = (pal && pal.crawlerFill) || '#c98a3a';
-    ctx.strokeStyle = '#3a2416';
+    ctx.fillStyle = SHELL;
+    ctx.strokeStyle = OUT;
     ctx.lineWidth = 2;
-
     ctx.beginPath();
-    ctx.ellipse(sx + this.width / 2, sy + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, sy + this.height / 2, this.width / 2, this.height / 2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+
+    // Brillo del caparazón (barniz de animación clásica)
+    if (!flash) {
+      ctx.fillStyle = 'rgba(255, 245, 220, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(cx - f * 5, sy + 6, 7, 3, -0.3 * f, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Línea del caparazón y ojo de cartoon (blanco con pupila)
     ctx.beginPath();
-    ctx.moveTo(sx + this.width / 2, sy + 2);
-    ctx.lineTo(sx + this.width / 2, sy + this.height - 2);
+    ctx.moveTo(cx, sy + 2);
+    ctx.lineTo(cx, sy + this.height - 2);
     ctx.stroke();
-    const eyeOffsetX = this.facing === 1 ? this.width * 0.78 : this.width * 0.22;
+    const eyeOffsetX = f === 1 ? this.width * 0.78 : this.width * 0.22;
+    const ey = sy + this.height / 2 - 3;
+    const blink = this.alive && ((Date.now() * 0.001 + this.startX * 0.01) % 4) < 0.12;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(sx + eyeOffsetX, sy + this.height / 2 - 3, 4, 0, Math.PI * 2);
+    ctx.arc(sx + eyeOffsetX, ey, 4, 0, Math.PI * 2);
     ctx.fill(); ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.fillStyle = '#2b1a10';
-    ctx.beginPath();
-    ctx.arc(sx + eyeOffsetX + this.facing * 1.2, sy + this.height / 2 - 2.5, 1.8, 0, Math.PI * 2);
-    ctx.fill();
+    if (!this.alive) {
+      // Ojo en espiral / cruz al ser derrotado
+      ctx.beginPath();
+      ctx.moveTo(sx + eyeOffsetX - 2, ey - 2); ctx.lineTo(sx + eyeOffsetX + 2, ey + 2);
+      ctx.moveTo(sx + eyeOffsetX + 2, ey - 2); ctx.lineTo(sx + eyeOffsetX - 2, ey + 2);
+      ctx.stroke();
+    } else if (blink) {
+      ctx.beginPath();
+      ctx.moveTo(sx + eyeOffsetX - 3, ey); ctx.lineTo(sx + eyeOffsetX + 3, ey);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#2b1a10';
+      ctx.beginPath();
+      ctx.arc(sx + eyeOffsetX + f * 1.2, ey + 0.5, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Antenas que se mecen con el paso
+    ctx.lineWidth = 1.5;
+    const antX = sx + eyeOffsetX;
+    for (const k of [0, 1]) {
+      const sway = Math.sin(this.animT * 1.5 + k) * 2;
+      ctx.beginPath();
+      ctx.moveTo(antX - f * 2 + k * f * 3, sy + 3);
+      ctx.quadraticCurveTo(antX + f * 4 + k * f * 2, sy - 5, antX + f * 7 + sway + k * f * 2, sy - 6 + k * 2);
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
@@ -261,6 +418,15 @@ class FlyingShadeEnemy {
     this.detectionRadius = 240;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
+    // Animación (solo visual)
+    this.flapT = Math.random() * 10;
+    this.tilt = 0;
+    this.prevX = x;
+    this.lookX = 1;
+    this.dyingTimer = 0;
+    this.DYING_FRAMES = 28;
+    this.alert = 0;   // "¡!" breve al detectar a Ruben
+    this.wasChasing = false;
   }
 
   takeDamage(amount, knockback = 0) {
@@ -280,6 +446,7 @@ class FlyingShadeEnemy {
 
   die() {
     this.alive = false;
+    this.dyingTimer = this.DYING_FRAMES;
     window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height / 2, 10, '#e8c882');
     if (window.gameInstance && window.gameInstance.debrisItems) {
       window.gameInstance.debrisItems.push(new ThrowableDebris(this.x + 6, this.y));
@@ -287,10 +454,19 @@ class FlyingShadeEnemy {
   }
 
   update(world, player) {
-    if (!this.alive) return;
+    if (!this.alive) {
+      if (this.dyingTimer > 0) {
+        this.dyingTimer--;
+        this.y += 1.2; // cae en espiral
+        this.x += Math.sin(this.dyingTimer * 0.5) * 1.5;
+      }
+      return;
+    }
 
     if (this.hitCooldown > 0) this.hitCooldown--;
+    if (this.alert > 0) this.alert--;
 
+    let chasing = false;
     if (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1) {
       this.x += this.knockbackVx;
       this.y += this.knockbackVy;
@@ -305,12 +481,22 @@ class FlyingShadeEnemy {
         // Acechar y descender lentamente hacia Ruben
         this.x += (dx / dist) * this.speed;
         this.y += (dy / dist) * this.speed;
+        chasing = true;
+        this.lookX = Math.sign(dx) || this.lookX;
       } else {
         // Flotación suave en su punto de origen
         this.angle += 0.04;
         this.y = this.originY + Math.sin(this.angle) * 16;
       }
     }
+    if (chasing && !this.wasChasing) this.alert = 40;
+    this.wasChasing = chasing;
+
+    // Inclinación según la velocidad horizontal y aleteo más rápido al perseguir
+    const vx = this.x - this.prevX;
+    this.prevX = this.x;
+    this.tilt += (vx * 0.18 - this.tilt) * 0.15;
+    this.flapT += chasing ? 0.42 : 0.28;
 
     // Colisión dañina con el jugador
     if (
@@ -324,40 +510,120 @@ class FlyingShadeEnemy {
   }
 
   render(ctx, camera) {
-    if (!this.alive) return;
+    if (!this.alive && this.dyingTimer <= 0) return;
     const sx = this.x - camera.x;
     const sy = this.y - camera.y;
+    const cx = sx + this.width / 2;
+    const cy = sy + this.height / 2;
+    const pal = getEnemyPalette();
+    const flash = this.hitCooldown > 9;
+    const OUT = '#3a2416';
 
     ctx.save();
-    if (this.hitCooldown > 0) ctx.filter = 'brightness(2.5)';
+    ctx.lineJoin = 'round';
+    if (!this.alive) {
+      const k = 1 - this.dyingTimer / this.DYING_FRAMES;
+      ctx.globalAlpha = Math.max(0, 1 - k * k);
+    }
+
+    // Aleteo: las alas se pliegan (escala vertical) en vez de solo desplazarse
+    const flap = this.alive ? Math.sin(this.flapT) : Math.sin(this.flapT + this.dyingTimer) * 0.3;
+    const wingScale = 0.35 + (flap + 1) * 0.35;  // 0.35 .. 1.05
+    const bodyBob = -flap * 1.5;                  // el cuerpo sube cuando las alas bajan
+
+    ctx.translate(cx, cy + bodyBob);
+    ctx.rotate(this.alive ? this.tilt : this.dyingTimer * 0.3);
+    ctx.translate(-cx, -cy);
 
     // Alas etéreas y cuerpo acordes a la zona
-    const pal = (window.gameInstance && window.gameInstance.world && window.gameInstance.world.getCurrentBiome && window.gameInstance.world.getCurrentBiome().enemyPalette) || null;
-    const wingFlap = Math.sin(Date.now() * 0.015) * 8;
-    ctx.fillStyle = (pal && pal.mothWing) || 'rgba(232, 200, 130, 0.75)';
-    ctx.strokeStyle = '#3a2416';
+    ctx.fillStyle = flash ? '#fff8ec' : ((pal && pal.mothWing) || 'rgba(232, 200, 130, 0.75)');
+    ctx.strokeStyle = OUT;
     ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(sx + 6, sy + 6 - wingFlap, 12, 6, -0.4, 0, Math.PI * 2);
-    ctx.ellipse(sx + this.width - 6, sy + 6 - wingFlap, 12, 6, 0.4, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
+    for (const k of [-1, 1]) {
+      ctx.save();
+      ctx.translate(cx + k * 3, cy - 2);
+      ctx.scale(1, wingScale);
+      ctx.rotate(k * (0.4 + flap * 0.15));
+      // Ala superior
+      ctx.beginPath();
+      ctx.ellipse(k * 10, -6, 12, 6.5, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      // Ala inferior más pequeña
+      ctx.beginPath();
+      ctx.ellipse(k * 7, 3, 7, 4.5, k * 0.5, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      // Mancha decorativa del ala
+      ctx.fillStyle = 'rgba(58, 36, 22, 0.25)';
+      ctx.beginPath();
+      ctx.arc(k * 12, -6, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = flash ? '#fff8ec' : ((pal && pal.mothWing) || 'rgba(232, 200, 130, 0.75)');
+    }
 
     // Cuerpo peludo
-    ctx.fillStyle = (pal && pal.mothBody) || '#8a5a2b';
-    ctx.strokeStyle = '#3a2416';
+    ctx.fillStyle = flash ? '#fff8ec' : ((pal && pal.mothBody) || '#8a5a2b');
+    ctx.strokeStyle = OUT;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(sx + this.width / 2, sy + this.height / 2, 10, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, 9, 10.5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Ojos grandes de cartoon
-    ctx.fillStyle = '#2b1a10';
-    ctx.beginPath();
-    ctx.arc(sx + this.width / 2 - 3, sy + this.height / 2 - 1, 2, 0, Math.PI * 2);
-    ctx.arc(sx + this.width / 2 + 3, sy + this.height / 2 - 1, 2, 0, Math.PI * 2);
-    ctx.fill();
+    // Antenas plumosas
+    ctx.lineWidth = 1.3;
+    ctx.lineCap = 'round';
+    for (const k of [-1, 1]) {
+      const sway = Math.sin(this.flapT * 0.5 + k) * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx + k * 3, cy - 9);
+      ctx.quadraticCurveTo(cx + k * 6, cy - 16, cx + k * 9 + sway, cy - 17);
+      ctx.stroke();
+    }
+
+    // Ojos grandes de cartoon que siguen a Ruben
+    const look = this.lookX * 0.8;
+    if (!this.alive) {
+      ctx.strokeStyle = '#2b1a10';
+      ctx.lineWidth = 1.2;
+      for (const k of [-1, 1]) {
+        const ex = cx + k * 3.5;
+        ctx.beginPath();
+        ctx.moveTo(ex - 1.5, cy - 2.5); ctx.lineTo(ex + 1.5, cy + 0.5);
+        ctx.moveTo(ex + 1.5, cy - 2.5); ctx.lineTo(ex - 1.5, cy + 0.5);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cx - 3.5, cy - 1, 2.8, 0, Math.PI * 2);
+      ctx.arc(cx + 3.5, cy - 1, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2b1a10';
+      ctx.beginPath();
+      ctx.arc(cx - 3.5 + look, cy - 0.6, 1.6, 0, Math.PI * 2);
+      ctx.arc(cx + 3.5 + look, cy - 0.6, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.restore();
+
+    // Señal de alerta "!" al detectar a Ruben (aparece con rebote y se desvanece)
+    if (this.alive && this.alert > 0) {
+      const k = 1 - this.alert / 40;
+      const pop = k < 0.2 ? Math.sin((k / 0.2) * Math.PI * 0.5) * 1.25 : 1 + (0.25 * Math.max(0, 0.3 - k));
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.alert / 12);
+      ctx.translate(cx, sy - 14);
+      ctx.scale(pop, pop);
+      ctx.font = '800 16px Cinzel, Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#3a2416';
+      ctx.fillStyle = '#ffe28a';
+      ctx.strokeText('!', 0, 0);
+      ctx.fillText('!', 0, 0);
+      ctx.restore();
+    }
   }
 }

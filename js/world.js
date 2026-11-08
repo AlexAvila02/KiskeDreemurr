@@ -10,6 +10,9 @@ class World {
     this.rooms = [];
     this.biomes = World.BIOMES;
     this.setupRooms();
+    if (Array.isArray(window.PendingRooms)) {
+      for (const cfg of window.PendingRooms) this.registerRoom(cfg);
+    }
   }
 
   // Paletas y temas visuales por zona según docs/LORE.md
@@ -186,7 +189,9 @@ class World {
       platforms: [
         { x: 0, y: 460, w: 420, h: 80, type: 'ground' },
         { x: 620, y: 460, w: 820, h: 80, type: 'ground' },
-        { x: 0, y: 0, w: 1440, h: 20, type: 'ceiling' },
+        // Techo de copas con un hueco (x 280-410) para subir al molino con doble salto
+        { x: 0, y: 0, w: 280, h: 20, type: 'ceiling' },
+        { x: 410, y: 0, w: 1030, h: 20, type: 'ceiling' },
         { x: 440, y: 390, w: 85, h: 20, type: 'ruins' },
         { x: 535, y: 320, w: 75, h: 20, type: 'ruins' },
         { x: 200, y: 330, w: 120, h: 20, type: 'ruins' },
@@ -204,7 +209,10 @@ class World {
       ],
       exits: [
         { x: 0, y: 350, w: 40, h: 110, targetRoom: 0, targetX: 1200, targetY: 410 },
-        { x: 270, y: 60, w: 150, h: 40, targetRoom: 2, targetX: 100, targetY: 410 },
+        // Pasaje hacia arriba: se activa al atravesar el hueco del techo
+        // (toda la franja por encima del techo, para que nunca quede atrapado arriba)
+        { x: 0, y: -400, w: 1440, h: 390, targetRoom: 2, targetX: 100, targetY: 410,
+          hint: { dir: 'up', x: 280, w: 130 } },
         { x: 1390, y: 360, w: 50, h: 100, targetRoom: 3, targetX: 70, targetY: 410 }
       ],
       door: {
@@ -374,103 +382,118 @@ class World {
     const biome = this.getCurrentBiome();
     const OUT = '#3a2416';
 
-    // 1. Cielo pintado según el bioma de la zona
-    ctx.save();
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, room.height);
-    for (const [stop, color] of biome.skyStops) {
-      skyGrad.addColorStop(stop, color);
-    }
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, 960, 540);
-
-    // Sol poniente o luna brumosa en el horizonte
-    if (room.biome === 'pradera') {
-      const sunX = 720 - camera.x * 0.05;
-      const sunY = 260;
-      const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 110);
-      sunGrad.addColorStop(0, 'rgba(255, 242, 190, 0.85)');
-      sunGrad.addColorStop(0.4, 'rgba(245, 185, 95, 0.35)');
-      sunGrad.addColorStop(1, 'rgba(245, 185, 95, 0)');
-      ctx.fillStyle = sunGrad;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, 110, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Siluetas lejanas en paralaje lento (montañas, árboles altos o torres del reino)
-    ctx.fillStyle = biome.farSilhouette;
-    if (room.biome === 'bosque') {
-      // Árboles altos del Bosque de los Susurros
-      for (let i = 0; i < 10; i++) {
-        const tX = (i * 140) - (camera.x * 0.14) % 140;
-        ctx.fillRect(tX + 45, 80, 26, 400);
-        ctx.beginPath();
-        ctx.arc(tX + 58, 110, 55, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    // 1. Cielo y fondo procedural según el bioma de la zona
+    if (typeof CodeArt !== 'undefined' && typeof CodeArt.renderBiomeBackground === 'function') {
+      CodeArt.renderBiomeBackground(
+        ctx,
+        room.biome,
+        camera,
+        960,
+        540,
+        Date.now(),
+        {
+          hasWindmill: !!room.hasWindmill,
+          hasTower: room.biome === 'pradera' || room.biome === 'castillo'
+        }
+      );
     } else {
-      // Picos y siluetas de torres del Reino Caído
-      for (let i = 0; i < 7; i++) {
-        const pX = (i * 220) - (camera.x * 0.12) % 220;
+      ctx.save();
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, room.height);
+      for (const [stop, color] of biome.skyStops) {
+        skyGrad.addColorStop(stop, color);
+      }
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, 960, 540);
+
+      // Sol poniente o luna brumosa en el horizonte
+      if (room.biome === 'pradera') {
+        const sunX = 720 - camera.x * 0.05;
+        const sunY = 260;
+        const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 110);
+        sunGrad.addColorStop(0, 'rgba(255, 242, 190, 0.85)');
+        sunGrad.addColorStop(0.4, 'rgba(245, 185, 95, 0.35)');
+        sunGrad.addColorStop(1, 'rgba(245, 185, 95, 0)');
+        ctx.fillStyle = sunGrad;
         ctx.beginPath();
-        ctx.moveTo(pX, 470);
-        ctx.lineTo(pX + 70, 210);
-        ctx.lineTo(pX + 140, 470);
+        ctx.arc(sunX, sunY, 110, 0, Math.PI * 2);
         ctx.fill();
       }
-    }
 
-    // Colinas redondeadas estilo animación años 50 (Paralaje medio)
-    ctx.fillStyle = biome.midHills;
-    ctx.strokeStyle = biome.midHillsStroke;
-    ctx.lineWidth = 2;
-    for (let j = 0; j < 8; j++) {
-      const cX = (j * 170) - (camera.x * 0.25) % 170;
-      ctx.beginPath();
-      ctx.ellipse(cX + 80, 465, 115, 62, 0, Math.PI, 0);
-      ctx.fill();
-      ctx.stroke();
-    }
+      // Siluetas lejanas en paralaje lento (montañas, árboles altos o torres del reino)
+      ctx.fillStyle = biome.farSilhouette;
+      if (room.biome === 'bosque') {
+        // Árboles altos del Bosque de los Susurros
+        for (let i = 0; i < 10; i++) {
+          const tX = (i * 140) - (camera.x * 0.14) % 140;
+          ctx.fillRect(tX + 45, 80, 26, 400);
+          ctx.beginPath();
+          ctx.arc(tX + 58, 110, 55, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        // Picos y siluetas de torres del Reino Caído
+        for (let i = 0; i < 7; i++) {
+          const pX = (i * 220) - (camera.x * 0.12) % 220;
+          ctx.beginPath();
+          ctx.moveTo(pX, 470);
+          ctx.lineTo(pX + 70, 210);
+          ctx.lineTo(pX + 140, 470);
+          ctx.fill();
+        }
+      }
 
-    // Molino antiguo con aspas giratorias en el Altozano del Molino
-    if (room.hasWindmill) {
-      const mx = 930 - camera.x;
-      const my = 160 - camera.y;
-      ctx.save();
-      ctx.fillStyle = '#5c432d';
-      ctx.strokeStyle = OUT;
+      // Colinas redondeadas estilo animación años 50 (Paralaje medio)
+      ctx.fillStyle = biome.midHills;
+      ctx.strokeStyle = biome.midHillsStroke;
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(mx - 28, my);
-      ctx.lineTo(mx - 18, my - 95);
-      ctx.lineTo(mx + 18, my - 95);
-      ctx.lineTo(mx + 28, my);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+      for (let j = 0; j < 8; j++) {
+        const cX = (j * 170) - (camera.x * 0.25) % 170;
+        ctx.beginPath();
+        ctx.ellipse(cX + 80, 465, 115, 62, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.stroke();
+      }
 
-      // Techo cónico del molino
-      ctx.fillStyle = '#8c412b';
-      ctx.beginPath();
-      ctx.moveTo(mx - 24, my - 95);
-      ctx.lineTo(mx, my - 122);
-      ctx.lineTo(mx + 24, my - 95);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+      // Molino antiguo con aspas giratorias en el Altozano del Molino
+      if (room.hasWindmill) {
+        const mx = 930 - camera.x;
+        const my = 160 - camera.y;
+        ctx.save();
+        ctx.fillStyle = '#5c432d';
+        ctx.strokeStyle = OUT;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(mx - 28, my);
+        ctx.lineTo(mx - 18, my - 95);
+        ctx.lineTo(mx + 18, my - 95);
+        ctx.lineTo(mx + 28, my);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
 
-      // Aspas giratorias
-      ctx.translate(mx, my - 82);
-      ctx.rotate(Date.now() * 0.0007);
-      ctx.fillStyle = '#e8d2a6';
-      for (let a = 0; a < 4; a++) {
-        ctx.rotate(Math.PI / 2);
-        ctx.fillRect(-3, 0, 6, 54);
-        ctx.strokeRect(-3, 0, 6, 54);
+        // Techo cónico del molino
+        ctx.fillStyle = '#8c412b';
+        ctx.beginPath();
+        ctx.moveTo(mx - 24, my - 95);
+        ctx.lineTo(mx, my - 122);
+        ctx.lineTo(mx + 24, my - 95);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Aspas giratorias
+        ctx.translate(mx, my - 82);
+        ctx.rotate(Date.now() * 0.0007);
+        ctx.fillStyle = '#e8d2a6';
+        for (let a = 0; a < 4; a++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.fillRect(-3, 0, 6, 54);
+          ctx.strokeRect(-3, 0, 6, 54);
+        }
+        ctx.restore();
       }
       ctx.restore();
     }
-    ctx.restore();
 
     // 2. Dibujar Plataformas (Contorno de tinta cálida y vegetación superior)
     const windWave = Math.sin(Date.now() * 0.003) * 2;

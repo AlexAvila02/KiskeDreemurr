@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estudio de Arte y Fondos Procedurales | Ruben & Angelo</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      background: #2a1f18;
+      color: #f7eed7;
+      font-family: 'Georgia', serif;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .studio-container {
+      max-width: 1040px;
+      width: 100%;
+      background: #392b23;
+      border: 3px solid #d9a634;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+
+    .studio-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #5a4436;
+      padding-bottom: 15px;
+      margin-bottom: 15px;
+    }
+
+    .studio-title {
+      margin: 0;
+      font-size: 26px;
+      color: #fce7ba;
+      letter-spacing: 1px;
+    }
+
+    .studio-subtitle {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: #d1b896;
+    }
+
+    .canvas-viewport {
+      position: relative;
+      width: 960px;
+      height: 540px;
+      margin: 0 auto;
+      border: 4px solid #1e1510;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .studio-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+      background: #2b1f18;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #5a4436;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-group label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #e5c99d;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    select, input[type="range"], button {
+      background: #48362b;
+      color: #fff;
+      border: 1px solid #7a5d48;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    select:focus, button:hover {
+      border-color: #d9a634;
+      background: #574134;
+      cursor: pointer;
+    }
+
+    .layer-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      grid-column: 1 / -1;
+      padding: 10px 0;
+      border-top: 1px dashed #5a4436;
+    }
+
+    .layer-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #3f2e24;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      border: 1px solid #6b4e3a;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .layer-badge.active {
+      background: #64492c;
+      border-color: #d9a634;
+      color: #ffe6a8;
+    }
+
+    .code-export-box {
+      margin-top: 15px;
+      background: #1b130e;
+      border: 1px solid #4a3628;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .code-export-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    pre {
+      margin: 0;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      color: #8be9fd;
+      line-height: 1.4;
+    }
+
+    .btn-action {
+      background: #9b4b2c;
+      border-color: #d46b41;
+      font-weight: bold;
+    }
+    .btn-action:hover {
+      background: #b55734;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="studio-container">
+    <div class="studio-header">
+      <div>
+        <h1 class="studio-title">🎨 Estudio de Arte y Fondos Procedurales</h1>
+        <p class="studio-subtitle">Generador de escenarios y capas atmosféricas con estética años 50 para Agentes y Desarrolladores</p>
+      </div>
+      <a href="index.html" class="btn-action" style="text-decoration:none; display:inline-block; padding:8px 16px; border-radius:6px; color:#fff;">🎮 Volver al Juego</a>
+    </div>
+
+    <!-- Viewport Canvas 960x540 -->
+    <div class="canvas-viewport">
+      <canvas id="studioCanvas" width="960" height="540"></canvas>
+    </div>
+
+    <!-- Panel de Controles Interactivos -->
+    <div class="studio-controls">
+      <div class="control-group">
+        <label for="selectBiome">Bioma de Escenario</label>
+        <select id="selectBiome">
+          <option value="pradera">Pradera del Ocaso (Reino Caído)</option>
+          <option value="bosque">Bosque de los Susurros</option>
+          <option value="montana">Cumbres de la Niebla (Montaña)</option>
+          <option value="castillo">Ruinas del Castillo Olvidado</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="sliderCameraX">Desplazamiento Cámara X (<span id="valCamX">0</span> px)</label>
+        <input type="range" id="sliderCameraX" min="0" max="2400" value="0">
+      </div>
+
+      <div class="control-group">
+        <label for="sliderWind">Fuerza del Viento (<span id="valWind">1.0</span>x)</label>
+        <input type="range" id="sliderWind" min="0" max="30" value="10">
+      </div>
+
+      <div class="control-group">
+        <label for="sliderGrain">Grano de Papel / Lienzo (<span id="valGrain">0.035</span>)</label>
+        <input type="range" id="sliderGrain" min="0" max="100" value="35">
+      </div>
+
+      <!-- Toggles de Capas de Arte -->
+      <div class="layer-toggles">
+        <span class="layer-badge active" data-layer="sky">☀️ Cielo y Sol</span>
+        <span class="layer-badge active" data-layer="godRays">✨ Rayos Crepusculares</span>
+        <span class="layer-badge active" data-layer="mountains">⛰️ Cordillera Fractal</span>
+        <span class="layer-badge active" data-layer="hills">🌾 Colinas Medias</span>
+        <span class="layer-badge active" data-layer="architecture">🏰 Molino / Arquitectura</span>
+        <span class="layer-badge active" data-layer="foliage">🌿 Follaje y Árboles</span>
+        <span class="layer-badge active" data-layer="platforms">🧱 Plataforma Muestra</span>
+        <span class="layer-badge active" data-layer="vignette">🎬 Viñeta y Textura</span>
+      </div>
+    </div>
+
+    <!-- Caja de Exportación de Código para Agentes -->
+    <div class="code-export-box">
+      <div class="code-export-header">
+        <strong style="color:#d9a634;">💻 Código Generado para Usar en Habitaciones / Agentes:</strong>
+        <button id="btnCopyCode">📋 Copiar Snippet</button>
+      </div>
+      <pre id="codeOutput">// El código se actualiza dinámicamente con los parámetros seleccionados...</pre>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/code-art-engine.js"></script>
+  <script>
+    const canvas = document.getElementById('studioCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const selectBiome = document.getElementById('selectBiome');
+    const sliderCameraX = document.getElementById('sliderCameraX');
+    const sliderWind = document.getElementById('sliderWind');
+    const sliderGrain = document.getElementById('sliderGrain');
+    const valCamX = document.getElementById('valCamX');
+    const valWind = document.getElementById('valWind');
+    const valGrain = document.getElementById('valGrain');
+    const codeOutput = document.getElementById('codeOutput');
+    const btnCopyCode = document.getElementById('btnCopyCode');
+
+    const layers = {
+      sky: true,
+      godRays: true,
+      mountains: true,
+      hills: true,
+      architecture: true,
+      foliage: true,
+      platforms: true,
+      vignette: true
+    };
+
+    document.querySelectorAll('.layer-badge').forEach(badge => {
+      badge.addEventListener('click', () => {
+        const layerKey = badge.dataset.layer;
+        layers[layerKey] = !layers[layerKey];
+        badge.classList.toggle('active', layers[layerKey]);
+        updateSnippet();
+      });
+    });
+
+    sliderCameraX.addEventListener('input', () => {
+      valCamX.textContent = sliderCameraX.value;
+      updateSnippet();
+    });
+
+    sliderWind.addEventListener('input', () => {
+      valWind.textContent = (sliderWind.value / 10).toFixed(1);
+    });
+
+    sliderGrain.addEventListener('input', () => {
+      valGrain.textContent = (sliderGrain.value / 1000).toFixed(3);
+    });
+
+    selectBiome.addEventListener('change', updateSnippet);
+
+    function updateSnippet() {
+      const b = selectBiome.value;
+      const snippet = `// Renderizado de fondo procedural para sala con bioma '${b}'
+// Requiere js/code-art-engine.js (CodeArt)
+if (typeof CodeArt !== 'undefined') {
+  CodeArt.renderBiomeBackground(ctx, '${b}', camera, 960, 540, Date.now(), {
+    hasWindmill: ${layers.architecture && b === 'pradera'},
+    hasTower: ${layers.architecture && (b === 'pradera' || b === 'castillo')},
+    drawGodRays: ${layers.godRays},
+    drawMountains: ${layers.mountains},
+    drawHills: ${layers.hills}
+  });
+}`;
+      codeOutput.textContent = snippet;
+    }
+
+    btnCopyCode.addEventListener('click', () => {
+      navigator.clipboard.writeText(codeOutput.textContent).then(() => {
+        btnCopyCode.textContent = '✅ ¡Copiado!';
+        setTimeout(() => btnCopyCode.textContent = '📋 Copiar Snippet', 2000);
+      });
+    });
+
+    updateSnippet();
+
+    // Bucle de animación continuo
+    function renderLoop() {
+      const cameraX = parseFloat(sliderCameraX.value);
+      const windSpeed = parseFloat(sliderWind.value) / 10;
+      const grainAlpha = parseFloat(sliderGrain.value) / 1000;
+      const biomeKey = selectBiome.value;
+      const now = Date.now();
+      const preset = CodeArt.PRESETS[biomeKey] || CodeArt.PRESETS.pradera;
+
+      ctx.clearRect(0, 0, 960, 540);
+
+      // 1. Cielo
+      if (layers.sky) {
+        const cel = preset.celestial ? { ...preset.celestial, x: preset.celestial.x - cameraX * 0.03 } : null;
+        CodeArt.drawSky(ctx, 960, 540, preset.skyStops, cel);
+
+        if (layers.godRays && cel && preset.godRays) {
+          CodeArt.drawGodRays(ctx, cel.x, cel.y, { color: preset.godRaysColor });
+        }
+      } else {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, 960, 540);
+      }
+
+      // 2. Montañas
+      if (layers.mountains && preset.farMountain) {
+        CodeArt.drawMountainRange(ctx, preset.farMountain.yBase, preset.farMountain.peak, 960, cameraX, 0.08, {
+          fillColor: preset.farMountain.color,
+          snowCap: preset.farMountain.snowCap
+        });
+      }
+
+      // 3. Silueta de bosque
+      if (layers.foliage && biomeKey === 'bosque') {
+        CodeArt.drawForestBackdrop(ctx, 470, 960, cameraX, 0.18, {
+          fillColor: 'rgba(25, 48, 36, 0.82)'
+        });
+      }
+
+      // 4. Colinas
+      if (layers.hills && preset.midHills) {
+        CodeArt.drawRollingHills(ctx, preset.midHills.yBase, preset.midHills.amp, 960, cameraX, 0.25, {
+          fillColor: preset.midHills.color,
+          strokeColor: preset.midHills.stroke
+        });
+      }
+
+      // 5. Arquitectura
+      if (layers.architecture) {
+        if (biomeKey === 'pradera') {
+          const mx = 820 - cameraX * 0.55;
+          CodeArt.drawWindmill(ctx, mx, 360, now * 0.0007);
+        }
+        if (biomeKey === 'castillo' || biomeKey === 'pradera') {
+          const tx = 320 - cameraX * 0.45;
+          CodeArt.drawRuinedTower(ctx, tx, 420, { broken: true, vines: true });
+        }
+      }
+
+      // 6. Árbol de demostración
+      if (layers.foliage) {
+        const ax = 540 - cameraX * 0.7;
+        CodeArt.drawStylizedTree(ctx, ax, 450, {
+          height: 105,
+          radius: 48,
+          trunkColor: preset.treePalette.trunkColor,
+          leafDark: preset.treePalette.leafDark,
+          leafMid: preset.treePalette.leafMid,
+          leafLight: preset.treePalette.leafLight
+        });
+      }
+
+      // 7. Plataforma y césped de prueba (Plano jugable)
+      if (layers.platforms) {
+        const platX = 140 - cameraX;
+        const platY = 440;
+        const platW = 680;
+        const platH = 70;
+
+        ctx.save();
+        ctx.fillStyle = '#65503d';
+        ctx.strokeStyle = '#3a2416';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(platX, platY, platW, platH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Franja de césped
+        ctx.fillStyle = '#788c38';
+        ctx.fillRect(platX + 2, platY, platW - 4, 6);
+
+        // Briznas con viento
+        const windWave = Math.sin(now * 0.003 * windSpeed) * 3 * windSpeed;
+        CodeArt.drawGrassTufts(ctx, platX, platY, platW, windWave, {
+          bladeColor: '#a5b84d',
+          bladeHeight: 7
+        });
+        ctx.restore();
+      }
+
+      // 8. Viñeta y Textura
+      if (layers.vignette) {
+        CodeArt.drawVignette(ctx, 960, 540);
+        CodeArt.drawParchmentTexture(ctx, 960, 540, grainAlpha);
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>

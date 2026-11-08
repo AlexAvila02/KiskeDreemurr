@@ -37,9 +37,12 @@
         </div>
       </div>
 
-      <!-- Nombre de zona y minimapa -->
+      <!-- Nombre de zona, botón de pausa y minimapa -->
       <div class="hud-top-right">
-        <div id="zone-tag" class="zone-tag">PRADERAS DEL REINO CAÍDO</div>
+        <div class="hud-top-right-header">
+          <div id="zone-tag" class="zone-tag">PRADERAS DEL REINO CAÍDO</div>
+          <button id="btn-hud-pause" class="btn-hud-pause" title="Pausa / Modificar Controles (ESC)" aria-label="Menú de pausa y controles">⚙️</button>
+        </div>
         <div id="mini-map" class="mini-map">
           <!-- Habitaciones visitadas -->
         </div>
@@ -58,18 +61,64 @@
           <h1 class="game-title">RUBEN</h1>
           <p class="game-subtitle">EN BUSCA DE ANGELO</p>
         </div>
-        <p class="lore-preview">
-          Hace dos semanas tu hermano mayor Angelo dejó el reino abandonado sin dar señales.<br>
-          Solo quedan sus notas. Seguí sus pistas por praderas, bosques y montañas, y traelo de vuelta para levantar a tu pueblo.
-        </p>
-        <button id="btn-start" class="btn-start">COMENZAR AVENTURA</button>
-        <div class="controls-guide">
-          <div class="control-key"><span>A / D</span> o <span>← / →</span> Moverse</div>
-          <div class="control-key"><span>ESPACIO / W / X</span> Saltar & Doble Salto</div>
-          <div class="control-key"><span>J / Click Izq</span> Golpear (Ataque)</div>
-          <div class="control-key"><span>K / Click Der</span> Agarrar / Lanzar Objeto</div>
-          <div class="control-key"><span>E</span> Interactuar / Leer / Abrir Puertas</div>
-          <div class="control-key">🎮 <span>Stick / Cruceta</span> Moverse · <span>A</span> Saltar · <span>X</span> Atacar · <span>B</span> Agarrar · <span>Y</span> Leer/Abrir</div>
+        <div class="menu-actions">
+          <button id="btn-start" class="btn-start">JUGAR</button>
+          <button id="btn-open-controls-menu" class="btn-secondary">CONTROLES</button>
+        </div>
+        <p class="press-hint">Presioná ENTER o cualquier botón del mando</p>
+      </div>
+
+      <!-- Menú de Pausa en Partida -->
+      <div id="pause-modal" class="modal-overlay hidden">
+        <div class="modal-card pause-card">
+          <h2 class="modal-title">PAUSA</h2>
+          <p class="modal-subtitle">EL REINO AGUARDA</p>
+          <div class="pause-actions">
+            <button id="btn-pause-resume" class="btn-start">CONTINUAR</button>
+            <button id="btn-pause-controls" class="btn-secondary">⚙️ MODIFICAR CONTROLES</button>
+            <button id="btn-pause-restart" class="btn-secondary">🔄 REINICIAR SALA</button>
+            <button id="btn-pause-menu" class="btn-secondary">🏠 MENÚ PRINCIPAL</button>
+          </div>
+          <div class="pause-hint">[Presiona ESC para continuar]</div>
+        </div>
+      </div>
+
+      <!-- Modal de Configuración y Modificación de Controles -->
+      <div id="controls-modal" class="modal-overlay hidden">
+        <div class="modal-card controls-card">
+          <div class="modal-header">
+            <div>
+              <h2 class="modal-title">MODIFICAR CONTROLES</h2>
+              <p class="modal-subtitle">PERSONALIZA TUS TECLAS PARA LA AVENTURA</p>
+            </div>
+            <button id="btn-close-controls" class="btn-close" title="Cerrar ventana">✕</button>
+          </div>
+
+          <p class="controls-instructions">
+            Haz clic en una casilla para reasignarla. Pulsa <span class="key-tag">Supr</span> o <span class="key-tag">Borrar</span> para vaciarla, o <span class="key-tag">Esc</span> para cancelar.
+          </p>
+
+          <div class="controls-table-header">
+            <span>Acción</span>
+            <div class="slot-titles">
+              <span>Principal</span>
+              <span>Alternativa</span>
+            </div>
+          </div>
+
+          <div id="controls-list" class="controls-list">
+            <!-- Filas generadas dinámicamente por ControlsManager -->
+          </div>
+
+          <div class="controls-aux-info">
+            <div class="aux-badge">🖱️ <span>Clic Izquierdo</span> Atacar · <span>Clic Derecho</span> Agarrar / Lanzar</div>
+            <div class="aux-badge">🎮 <span>Mando</span> Compatible con Stick / Cruceta / Botones</div>
+          </div>
+
+          <div class="modal-footer">
+            <button id="btn-reset-controls" class="btn-secondary btn-danger-subtle">RESTABLECER POR DEFECTO</button>
+            <button id="btn-save-controls" class="btn-start">GUARDAR Y SALIR</button>
+          </div>
         </div>
       </div>
 
@@ -81,7 +130,9 @@
   <!-- Scripts de la arquitectura modular sin dependencias externas -->
   <script src="js/audio.js"></script>
   <script src="js/particles.js"></script>
+  <script src="js/code-art-engine.js"></script>
   <script src="js/enemies.js"></script>
+  <script src="js/controls.js"></script>
   <script src="js/player.js"></script>
   <script src="js/world.js"></script>
   <script src="js/main.js"></script>

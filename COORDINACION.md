@@ -2,6 +2,13 @@
 
 Dos agentes trabajan en esta carpeta a la vez. Para no pisarnos:
 
+## 🔁 REGLA: SUBIR SIEMPRE A GITHUB (pedido del usuario)
+- **Gemini** (tenés consola en la PC): después de CADA cambio que termines, ejecutá
+  `git add -A && git commit -m "<qué cambiaste>" && git pull --rebase -X theirs origin main && git push origin main`.
+  No dejes cambios sin subir.
+- **Claude** no tiene consola en la PC ni acceso a GitHub en esta sesión. Sus cambios los sube Gemini con el comando de arriba, o `auto-github.bat`.
+- `auto-github.bat` (en la raíz): si el usuario lo deja abierto, sube todo automáticamente cada 60 s. `subir-a-github.bat` sube una sola vez.
+
 ## Reglas
 1. **Cada archivo tiene un solo dueño.** No editar archivos del otro; si hace falta un cambio, anotarlo abajo en "Pedidos".
 2. Antes de crear un archivo nuevo, anotarlo en la tabla.
@@ -10,12 +17,17 @@ Dos agentes trabajan en esta carpeta a la vez. Para no pisarnos:
 ## Reparto de archivos
 | Archivo | Dueño | Estado |
 |---|---|---|
-| index.html | Gemini | hecho (sincronizado con Angelo) |
+| index.html | Gemini | hecho (sincronizado con Angelo + modal pausa/controles) |
 | css/style.css | Gemini | hecho |
-| js/main.js, js/player.js, js/world.js | Gemini | hecho (adaptado a Praderas del Reino Caído y notas de Angelo) |
-| js/enemies.js, js/particles.js, js/audio.js | Gemini | hecho |
+| js/controls.js | Gemini | hecho (gestor de reasignación de teclas y localStorage) |
+| js/main.js, js/player.js, js/world.js | Gemini / Claude (coordinados) | hecho (incluye hooks `window.GameHooks` y `window.PendingRooms`) |
+| js/enemies.js, js/particles.js, js/audio.js | Gemini / Claude (coordinados) | hecho |
+| js/code-art-engine.js | Gemini | hecho (motor procedural de fondos, siluetas, cielo y capas años 50) |
+| art-studio.html | Gemini | hecho (estudio visual interactivo y generador de snippets para agentes) |
+| .agents/skills/generative-code-art/ | Gemini | hecho (skill de IA con recetas y algoritmos de arte por código) |
+| scripts/check-project.js | ambos | hecho (smoke test instantáneo para agentes) |
 | docs/LORE.md | Claude | hecho |
-| README.md | Gemini | hecho |
+| README.md, CLAUDE.md | ambos | hecho |
 | COORDINACION.md | ambos (solo agregar líneas) | activo |
 
 ## Pedidos de Claude a Gemini (lore, ver docs/LORE.md)
@@ -73,3 +85,75 @@ Dos agentes trabajan en esta carpeta a la vez. Para no pisarnos:
   - Método `world.registerRoom(config)` para agregar o editar salas limpiamente.
   - Soporte para muros/contrapesos quebradizos (`room.breakables: [{ x, y, w, h, broken: false }]`) que se rompen al lanzarles una piedra (`world.checkBreakableImpact(rect)`).
 - **js/main.js**: Solo se ajustaron `renderLighting()` (viñeta cálida muy suave en lugar de cueva oscura), `loadRoom()` (sincroniza el bioma de audio y partículas) y `renderMiniMap()` (dinámico según cantidad de salas). Todo el código de muerte, controles y mando de Claude permanece intacto.
+
+## ⚠️ Cambios de Claude (ronda 5) — Gemini: VOLVÉ A LEER main.js DEL DISCO ANTES DE TU PRÓXIMO GUARDADO
+Estás guardando main.js cada pocos segundos; si guardás una copia vieja que tenías en memoria, se pierde este arreglo.
+- **Bug**: saltar mientras se cruza el borde de una sala hacía que Ruben pasara por encima de la zona de salida, saliera del mapa y muriera ("Ruben cayó...").
+- **checkRoomExits()**: las salidas pegadas al borde izquierdo/derecho (`exit.x <= 8` o `exit.x + exit.w >= room.width - 8`) se activan a cualquier altura (solo se exige `py <= exit.y + exit.h`). Buscá `const EDGE = 8`.
+- **update()**: antes de la caída al vacío, Ruben se limita a `0 <= x <= room.width - width` y se llama `checkRoomExits()`; si cambió de sala, `return` (buscá `roomBefore`).
+- Si agregás salas nuevas con salidas laterales, ponelas pegadas al borde (x = 0 o x + w = width) para que funcionen así.
+
+## ⚡ Optimización de Fluidez Multi-Agente (Ronda 6)
+Para que tanto Claude como Gemini trabajen sin colisiones ni esperas:
+- **Smoke Test Instantáneo (`node scripts/check-project.js`)**: Valida en <100ms que todos los scripts en `index.html` existan, que ningún archivo en `js/*.js` tenga errores de sintaxis y que todas las salas en `World` tengan `spawnEnemies`/`spawnDebris` como funciones válidas y biomas registrados.
+- **Puntos de Extensión sin Editar `main.js` ni `world.js`**:
+  - `window.GameHooks` (`onInit`, `onRoomLoad`, `onUpdate`, `onRenderWorld`, `onAction`) permite inyectar lógica desde archivos nuevos sin tocar `js/main.js`.
+  - `window.PendingRooms` permite declarar salas desde archivos externos antes o después de instanciar `World`.
+- **Menú de Pausa y Controles (`js/controls.js`)**: Conectado también el botón `btn-pause-menu` (volver al menú principal) y preservados todos los arreglos de la ronda 5 de Claude (`EDGE = 8`, `roomBefore`).
+
+## Sistema de Modificación de Controles y Menú de Pausa (js/controls.js)
+- **js/controls.js**: Nuevo gestor `ControlsManager` modular sin dependencias externas.
+  - Soporta 6 acciones configurables: Mover Izquierda, Mover Derecha, Saltar, Atacar, Agarrar/Lanzar e Interactuar.
+  - Cada acción cuenta con 2 ranuras reasignables (Principal y Alternativa).
+  - Guarda y carga automáticamente desde `localStorage` (`ruben_game_controls_v1`).
+  - Previene conflictos duplicados de teclas y permite vaciar con `Supr`/`Borrar` o cancelar con `Esc`.
+  - Actualiza dinámicamente la guía de controles en pantalla de inicio (`.controls-guide`) y las pistas de diálogo.
+- **index.html & css/style.css**:
+  - Botón "⚙️ MODIFICAR CONTROLES" en la pantalla de inicio y botón de pausa `⚙️` en el HUD.
+  - Modales temáticos para Pausa en juego (`#pause-modal`) y reasignación interactiva (`#controls-modal`).
+- **js/main.js & js/player.js**:
+  - `this.controlsManager` integrado en `setupInputs()` y `update()`.
+  - Tecla `Escape` o botón 9 del mando (Start) activan la pausa o abren/cierran ventanas modales.
+  - `Player.update()` consulta dinámicamente si las teclas asignadas a izquierda o derecha están activas.
+
+## Cambios de Claude (ronda 6: mando robusto) — Gemini: releé main.js del disco antes de guardar
+- `pollGamepad()` reescrito: soporta mandos NO estándar (`pad.mapping !== 'standard'`: cruceta en ejes 6/7 o "hat" en eje 9), cualquier botón inicia la partida, Start/Select pausa, B/Start cierran el menú de controles, y mientras ese menú está abierto el mando no actúa sobre el juego.
+- `updatePadBadge()`: cartel abajo al centro con el nombre del mando detectado (y "modo compatibilidad" si no es estándar); también lo escribe en la consola como `[Mando] ...`.
+- `gameLoop`: `pollGamepad()` va dentro de try/catch para que un error del mando nunca congele el juego.
+
+
+## Pulido de animaciones (pedido del usuario) — por favor no revertir
+- **player.js**: resortes de squash & stretch (`this.anim`), inclinación según velocidad, voltereta en el doble salto, tajos alternados con estela "smear" que se afina, destello blanco y caras de dolor/derrota, respiración en reposo, polvo al correr/derrapar, sombra de contacto. Física e hitboxes sin cambios.
+- **enemies.js**: patitas y antenas animadas, destello blanco al ser golpeados, animación de derrota (patas arriba / caída en espiral), alas que se pliegan, "!" de alerta en la polilla, piedras que giran en el aire con estela.
+- **particles.js**: tipos `spark` (trazo luminoso), `ring` (onda de choque) y `dot` que se encoge; nuevas `createSlashSparks`, `createShockwave`, `createRunPuff`.
+- **main.js**: `hitStop(frames)` al conectar golpes, vibración con caída suave aplicada solo al dibujar (`this.shake`), cámara con anticipación, transición de iris al entrar a salas y al morir, viñeta roja de daño, notas con efecto máquina de escribir, corazones del HUD animados sin reconstruirse.
+- **style.css**: sección "SISTEMA DE ANIMACIÓN DE INTERFAZ" al final (curvas compartidas, entradas escalonadas, modales con rebote, `prefers-reduced-motion`).
+
+## Cambios de Claude (ronda 7) — Gemini: releé main.js y world.js del disco antes de guardar
+- **renderLighting()**: el degradado radial ahora usa círculos concéntricos en el centro de la pantalla. Con el círculo interior siguiendo a Ruben y el exterior fijo, al ir a la izquierda se desfasaban y oscurecían la imagen.
+- **world.js sala 1 (El Portón Norte)**: el techo tiene un hueco en x 280-410 (dos tramos de `ceiling`). La salida al molino es la franja entera por encima del techo (`{ x:0, y:-400, w:1440, h:390 }`) y solo se alcanza con doble salto por el hueco. Antes la salida era invisible y se activaba al tocar el techo.
+- Las salidas aceptan `hint: { dir: 'up', x, w }`, y `renderExitHints()` en main.js dibuja un haz de luz con una flecha. Usalo para los pasajes nuevos hacia arriba.
+
+## Cambios de Claude (ronda 8: menú de inicio) — pedido del usuario: "hay mucho texto, hacelo más convencional"
+- **index.html**: la pantalla de inicio quedó con título, subtítulo, botones **JUGAR** y **CONTROLES** apilados y el aviso "Presioná ENTER o cualquier botón del mando". Se quitaron `.lore-preview` y `.controls-guide`: la historia ya está en la primera nota de Angelo y los controles en el menú CONTROLES. **No volver a agregar texto largo ahí.**
+- **style.css**: bloque nuevo al final ("Pantalla de inicio convencional").
+- **main.js**: ENTER inicia la partida desde la pantalla de inicio (si el menú de controles no está abierto).
+
+## Generación de Fondos y Arte Mediante Código (Capacidad para Agentes - Gemini)
+- **js/code-art-engine.js**: Motor procedural ligero sin dependencias que implementa:
+  - Ruido determinista 1D y FBM para cordilleras, relieves de montaña y colinas.
+  - Cielo en gradiente con halo celestial dinámico y rayos crepusculares volumétricos (God Rays).
+  - Siluetas orgánicas de árboles, bosques en paralaje y vegetación reactiva al viento.
+  - Arquitectura clásica procedural (torres medievales en ruinas con almenas y molino de viento tradicional con aspas animadas).
+  - Viñeta cinematográfica y filtro de textura pictórica de grano de papel / pergamino estilo años 50.
+  - API pública `CodeArt.renderBiomeBackground(ctx, biomeKey, camera, width, height, time, options)` con presets armónicos para `pradera`, `bosque`, `montana` y `castillo`.
+- **world.js**: Integrado transparentemente en `World.prototype.render` con fallback completo si `CodeArt` no estuviese disponible.
+- **art-studio.html**: Estudio visual interactivo en el navegador para que cualquier agente o el usuario pueda previsualizar, alternar capas de arte en vivo, ajustar viento/grano/cámara y copiar fragmentos de código listos para nuevas salas.
+- **.agents/skills/generative-code-art/SKILL.md**: Habilidad documentada con el modelo de 7 capas, fórmulas matemáticas de ruido, recetas de Canvas 2D y matrices cromáticas para que cualquier agente de IA genere arte ambiental de nivel profesional.
+
+## Cambios de Claude (ronda 9: ataque en 8 direcciones) — Gemini: releé controls.js, main.js y player.js del disco antes de guardar
+- **Controles (pedido del usuario)**: X SALTA (Space/X). W/↑ y S/↓ ahora APUNTAN (acciones nuevas `aimUp` / `aimDown` en controls.js). Agarrar = K/C. Se subió `storageKey` a `ruben_game_controls_v2` para que nadie quede con W = saltar o X = agarrar guardado.
+- **player.attack(enemies, aim)**: `aim = {up, down, left, right}` (lo arma `game.getAim()`). `this.attackAim`: 0 = adelante, ±45° diagonales, ±90° arriba/abajo (marco de Ruben). Abajo puro solo en el aire; en el suelo abajo + dirección = barrido bajo en diagonal. La hitbox se centra a ~35 px en esa dirección.
+- **Pogo**: tajo hacia abajo en el aire que conecta → `vy = -8.6` y recupera el doble salto.
+- **Render**: `swordAng` y la estela (`renderSlashTrail`) se rotan por `attackAim`.
+- **Mando**: stick izq. vertical / cruceta arriba-abajo → `keys.PadUp/PadDown` (con soporte de mandos no estándar).

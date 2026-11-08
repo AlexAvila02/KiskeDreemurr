@@ -150,6 +150,36 @@ body {
   gap: 8px;
 }
 
+.hud-top-right-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-hud-pause {
+  pointer-events: auto;
+  background: rgba(45, 29, 18, 0.88);
+  border: 1.5px solid #8a623e;
+  border-radius: 4px;
+  color: #f7ebd2;
+  font-size: 14px;
+  width: 32px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+.btn-hud-pause:hover {
+  background: rgba(70, 45, 28, 0.95);
+  border-color: #d9a634;
+  color: #ffe28a;
+  transform: scale(1.06);
+}
+
 .zone-tag {
   font-family: 'Cinzel', serif;
   font-size: 13px;
@@ -306,6 +336,43 @@ body {
   font-style: italic;
 }
 
+.menu-actions {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-secondary {
+  font-family: 'Cinzel', serif;
+  background: linear-gradient(180deg, #3d291b 0%, #291b12 100%);
+  color: #f7ebd2;
+  border: 2px solid #5c3d24;
+  outline: 1.5px solid #8a623e;
+  padding: 11px 24px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 0 #1e130c, 0 0 12px rgba(0, 0, 0, 0.4);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(180deg, #523725 0%, #3a261a 100%);
+  outline-color: #d9a634;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 #1e130c, 0 0 16px rgba(217, 166, 52, 0.35);
+}
+
+.btn-secondary.btn-danger-subtle:hover {
+  outline-color: #d9534f;
+  color: #ffd6d6;
+}
+
 .btn-start {
   font-family: 'Cinzel', serif;
   background: linear-gradient(180deg, #4f8f69 0%, #35694b 100%);
@@ -373,4 +440,694 @@ body {
   opacity: 0;
   transform: translate(-50%, -10px);
   pointer-events: none;
+}
+
+/* ===== Ventanas Modales (Pausa y Configuración de Controles) ===== */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 9, 6, 0.88);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  pointer-events: auto;
+  z-index: 100;
+  transition: opacity 0.25s ease;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modal-card {
+  background: linear-gradient(180deg, #2b1c12 0%, #1c120b 100%);
+  border: 3px solid #5c3d24;
+  outline: 2px solid #b58952;
+  border-radius: 10px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(217, 166, 52, 0.18);
+  color: #f7ebd2;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tarjeta de Pausa */
+.pause-card {
+  width: 380px;
+  padding: 28px 24px;
+  text-align: center;
+  align-items: center;
+}
+
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin: 22px 0 14px 0;
+}
+
+.pause-hint {
+  font-size: 11.5px;
+  color: #bfa07d;
+  letter-spacing: 0.8px;
+}
+
+/* Tarjeta de Controles */
+.controls-card {
+  width: 650px;
+  max-height: 500px;
+  padding: 18px 24px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.modal-title {
+  font-family: 'Cinzel', serif;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #fff2d0;
+  text-shadow: 0 2px 0 #3a2416, 0 0 15px rgba(217, 166, 52, 0.4);
+}
+
+.modal-subtitle {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #e6b85c;
+  margin-top: 2px;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  color: #bfa07d;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-close:hover {
+  color: #fff;
+  transform: scale(1.15);
+}
+
+.controls-instructions {
+  font-size: 12px;
+  color: #d1b899;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.key-tag {
+  background: rgba(65, 42, 26, 0.85);
+  border: 1px solid #9e7344;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #fff2d0;
+  font-weight: 600;
+}
+
+.controls-table-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 11.5px;
+  color: #a8855e;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  border-bottom: 1px solid #4a3220;
+}
+
+.slot-titles {
+  display: flex;
+  gap: 12px;
+  width: 220px;
+  justify-content: space-between;
+}
+
+.slot-titles span {
+  width: 100px;
+  text-align: center;
+}
+
+.controls-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.controls-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.controls-list::-webkit-scrollbar-track {
+  background: rgba(30, 20, 13, 0.7);
+  border-radius: 3px;
+}
+
+.controls-list::-webkit-scrollbar-thumb {
+  background: #5c3d24;
+  border-radius: 3px;
+}
+
+.controls-list::-webkit-scrollbar-thumb:hover {
+  background: #8a623e;
+}
+
+.control-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(38, 24, 15, 0.75);
+  border: 1px solid #4a3220;
+  padding: 5px 12px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.control-row:hover {
+  background: rgba(48, 30, 18, 0.9);
+  border-color: #6b4629;
+}
+
+.control-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: #f7ebd2;
+  font-weight: 500;
+}
+
+.action-icon {
+  font-size: 16px;
+  width: 22px;
+  text-align: center;
+}
+
+.control-slots {
+  display: flex;
+  gap: 12px;
+  width: 220px;
+  justify-content: space-between;
+}
+
+.btn-key-slot {
+  width: 100px;
+  height: 31px;
+  background: linear-gradient(180deg, #3d291b 0%, #291b12 100%);
+  border: 1.5px solid #8a623e;
+  border-radius: 5px;
+  color: #fff2d0;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 0 #1e130c;
+  transition: all 0.2s ease;
+  padding: 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-key-slot:hover {
+  border-color: #d9a634;
+  background: linear-gradient(180deg, #4d3322 0%, #352317 100%);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 #1e130c, 0 0 8px rgba(217, 166, 52, 0.3);
+}
+
+.btn-key-slot.empty {
+  color: #7d654f;
+  border-style: dashed;
+  background: rgba(28, 18, 11, 0.6);
+}
+
+.btn-key-slot.listening {
+  border-color: #f0bf4c;
+  background: #543922;
+  color: #ffe699;
+  animation: pulseKeySlot 0.8s infinite alternate;
+  box-shadow: 0 0 12px rgba(240, 191, 76, 0.7);
+}
+
+@keyframes pulseKeySlot {
+  0% { transform: scale(1); border-color: #d9a634; }
+  100% { transform: scale(1.04); border-color: #fff0aa; box-shadow: 0 0 16px rgba(255, 228, 132, 0.85); }
+}
+
+.controls-aux-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #4a3220;
+  font-size: 11.5px;
+  color: #bfa07d;
+}
+
+.aux-badge span {
+  background: rgba(65, 42, 26, 0.75);
+  border: 1px solid #7d5934;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #ffefc7;
+  font-weight: 600;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1.5px solid #4a3220;
+}
+
+
+/* =====================================================================
+   SISTEMA DE ANIMACIÓN DE INTERFAZ
+   Curvas y duraciones compartidas para que todo se mueva con la misma
+   "voz": entradas con frenado suave, rebotes elásticos sutiles (estilo
+   animación clásica) y salidas rápidas.
+   ===================================================================== */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);          /* frenado largo y elegante */
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);           /* salidas rápidas */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* rebote leve */
+  --ease-smooth: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 160ms;
+  --dur-med: 320ms;
+  --dur-slow: 600ms;
+}
+
+/* ---------- Pantalla de inicio: entrada escalonada ---------- */
+.overlay-screen {
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out), filter var(--dur-slow) var(--ease-out);
+}
+
+.overlay-screen.hidden {
+  transform: scale(1.08);
+  filter: blur(6px);
+}
+
+.overlay-screen .title-container,
+.overlay-screen .lore-preview,
+.overlay-screen .menu-actions,
+.overlay-screen .controls-guide {
+  opacity: 0;
+  animation: riseIn 900ms var(--ease-out) forwards;
+}
+
+.overlay-screen .title-container { animation-delay: 150ms; }
+.overlay-screen .lore-preview    { animation-delay: 450ms; }
+.overlay-screen .menu-actions    { animation-delay: 650ms; }
+.overlay-screen .controls-guide  { animation-delay: 850ms; }
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(18px); filter: blur(3px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+/* Título: flota suavemente y un brillo dorado recorre las letras */
+.game-title {
+  position: relative;
+  background: linear-gradient(100deg, #fff2d0 0%, #fff2d0 40%, #ffe9a8 48%, #ffffff 50%, #ffe9a8 52%, #fff2d0 60%, #fff2d0 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 0 #3a2416) drop-shadow(0 0 22px rgba(217, 166, 52, 0.45));
+  text-shadow: none;
+  animation: titleFloat 5s var(--ease-smooth) infinite, titleShine 6s linear infinite;
+  animation-delay: 1s, 1.4s;
+}
+
+@keyframes titleFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+@keyframes titleShine {
+  0%       { background-position: 120% 0; }
+  35%,100% { background-position: -30% 0; }
+}
+
+.game-subtitle {
+  animation: subtitleSpacing 1400ms var(--ease-out) 300ms both;
+}
+
+@keyframes subtitleSpacing {
+  from { letter-spacing: 14px; opacity: 0; }
+  to   { letter-spacing: 7px;  opacity: 1; }
+}
+
+/* ---------- Botones: respuesta táctil clara ---------- */
+.btn-start,
+.btn-secondary {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out),
+    background var(--dur-med) var(--ease-out),
+    outline-color var(--dur-med) var(--ease-out),
+    color var(--dur-fast) ease;
+}
+
+/* Destello que cruza el botón al pasar el cursor */
+.btn-start::after,
+.btn-secondary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 248, 225, 0.28), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  transition: left 0s;
+}
+
+.btn-start:hover::after,
+.btn-secondary:hover::after {
+  left: 130%;
+  transition: left 650ms var(--ease-out);
+}
+
+.btn-start:active,
+.btn-secondary:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow: 0 1px 0 #1e130c, 0 0 10px rgba(217, 166, 52, 0.25);
+  transition-duration: 60ms;
+}
+
+.btn-start:focus-visible,
+.btn-secondary:focus-visible,
+.btn-key-slot:focus-visible,
+.btn-hud-pause:focus-visible {
+  outline: 2px solid #ffe28a;
+  outline-offset: 3px;
+}
+
+/* El botón principal "respira" para invitar a comenzar */
+.overlay-screen .btn-start {
+  animation: ctaGlow 2.8s var(--ease-smooth) 1.6s infinite;
+}
+
+@keyframes ctaGlow {
+  0%, 100% { box-shadow: 0 4px 0 #2b1a10, 0 0 16px rgba(217, 166, 52, 0.3); }
+  50%      { box-shadow: 0 4px 0 #2b1a10, 0 0 30px rgba(240, 195, 80, 0.6); }
+}
+
+.overlay-screen .btn-start:hover { animation-play-state: paused; }
+
+.btn-hud-pause {
+  transition: transform var(--dur-med) var(--ease-spring), background var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.btn-hud-pause:hover { transform: rotate(60deg) scale(1.08); }
+.btn-hud-pause:active { transform: rotate(90deg) scale(0.94); }
+
+/* ---------- HUD: corazones ---------- */
+.mask-node {
+  transition: transform var(--dur-med) var(--ease-spring), background var(--dur-med) ease, box-shadow var(--dur-med) ease, border-color var(--dur-med) ease;
+}
+
+/* Pérdida: el corazón se sacude, destella y se encoge */
+.mask-node.lost {
+  animation: heartLost 520ms var(--ease-out);
+}
+
+@keyframes heartLost {
+  0%   { transform: scale(1.35); background: #fff3e0; box-shadow: 0 0 18px rgba(255, 120, 90, 0.9); }
+  20%  { transform: scale(1.1) translateX(-3px) rotate(-8deg); }
+  40%  { transform: scale(1) translateX(3px) rotate(6deg); }
+  60%  { transform: scale(0.92) translateX(-2px) rotate(-3deg); }
+  100% { transform: scale(1) translateX(0) rotate(0); }
+}
+
+/* Curación: se rellena con un rebote */
+.mask-node.gained {
+  animation: heartGained 480ms var(--ease-spring) both;
+}
+
+@keyframes heartGained {
+  0%   { transform: scale(0.4); filter: brightness(1.8); }
+  60%  { transform: scale(1.22); filter: brightness(1.2); }
+  100% { transform: scale(1.04); filter: brightness(1); }
+}
+
+/* Con un solo corazón restante, late para advertir peligro */
+.mask-node.active:first-child:not(:has(+ .mask-node.active)) {
+  animation: heartDanger 1s var(--ease-smooth) infinite;
+}
+
+@keyframes heartDanger {
+  0%, 100% { transform: scale(1.04); }
+  15%      { transform: scale(1.22); }
+  30%      { transform: scale(1.0); }
+  45%      { transform: scale(1.14); }
+}
+
+/* ---------- HUD: casilleros de objetos ---------- */
+.item-slot {
+  transition: border-color var(--dur-med) ease, box-shadow var(--dur-med) ease, transform var(--dur-med) var(--ease-spring);
+}
+
+.item-slot.is-active {
+  border-color: #f0bf4c;
+  box-shadow: 0 2px 0 #2b1a10, 0 0 12px rgba(240, 191, 76, 0.45);
+}
+
+.item-slot.slot-pulse {
+  animation: slotPulse 520ms var(--ease-spring);
+}
+
+.item-slot.slot-pulse .slot-icon {
+  display: inline-block;
+  animation: iconHop 520ms var(--ease-spring);
+}
+
+@keyframes slotPulse {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.14); box-shadow: 0 2px 0 #2b1a10, 0 0 20px rgba(255, 220, 120, 0.8); }
+  100% { transform: scale(1); }
+}
+
+@keyframes iconHop {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  40%      { transform: translateY(-5px) rotate(-12deg); }
+}
+
+/* ---------- HUD: nombre de zona y minimapa ---------- */
+.zone-tag.zone-reveal {
+  animation: zoneReveal 900ms var(--ease-out) both;
+}
+
+@keyframes zoneReveal {
+  0%   { clip-path: inset(0 100% 0 0); letter-spacing: 5px; opacity: 0.4; }
+  60%  { opacity: 1; }
+  100% { clip-path: inset(0 0 0 0);    letter-spacing: 2.5px; opacity: 1; }
+}
+
+.map-cell {
+  transition: background var(--dur-med) ease, border-color var(--dur-med) ease, transform var(--dur-med) var(--ease-spring);
+}
+
+.map-cell.current {
+  animation: mapCurrent 1.8s var(--ease-smooth) infinite, mapArrive 500ms var(--ease-spring);
+}
+
+@keyframes mapCurrent {
+  0%, 100% { box-shadow: 0 0 5px rgba(240, 191, 76, 0.55); }
+  50%      { box-shadow: 0 0 12px rgba(255, 220, 120, 0.95); }
+}
+
+@keyframes mapArrive {
+  from { transform: scale(0.6); }
+  to   { transform: scale(1); }
+}
+
+/* ---------- Notas de Angelo (diálogo) ---------- */
+.dialog-box {
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+  transform-origin: 50% 100%;
+}
+
+.dialog-box.hidden {
+  transform: translate(-50%, 20px) scale(0.96);
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-in);
+}
+
+.dialog-box.dialog-pop {
+  animation: dialogPop 420ms var(--ease-spring);
+}
+
+@keyframes dialogPop {
+  0%   { transform: translate(-50%, 24px) scale(0.92) rotate(-0.6deg); opacity: 0; }
+  100% { transform: translate(-50%, 0) scale(1) rotate(0); opacity: 1; }
+}
+
+/* Texto restante del efecto máquina de escribir: ocupa lugar pero no se ve */
+.dialog-ghost {
+  visibility: hidden;
+}
+
+.dialog-hint {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+}
+
+.dialog-box.typed .dialog-hint {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dialog-box.typed .dialog-hint::after {
+  content: ' ▼';
+  display: inline-block;
+  margin-left: 4px;
+  color: #9e2b25;
+  animation: hintBounce 900ms var(--ease-smooth) infinite;
+}
+
+@keyframes hintBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(3px); }
+}
+
+/* ---------- Notificación emergente ---------- */
+.notification {
+  transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
+}
+
+.notification.hidden {
+  transform: translate(-50%, -14px) scale(0.95);
+  transition-timing-function: var(--ease-in);
+  transition-duration: 220ms;
+}
+
+.notification.notify-pop {
+  animation: notifyPop 480ms var(--ease-spring);
+}
+
+@keyframes notifyPop {
+  0%   { transform: translate(-50%, -18px) scale(0.85); opacity: 0; }
+  100% { transform: translate(-50%, 0) scale(1);        opacity: 1; }
+}
+
+/* ---------- Ventanas modales ---------- */
+.modal-overlay {
+  transition: opacity var(--dur-med) var(--ease-out), backdrop-filter var(--dur-med) var(--ease-out);
+}
+
+.modal-overlay.hidden {
+  backdrop-filter: blur(0);
+}
+
+.modal-card {
+  transition: transform 420ms var(--ease-spring), opacity var(--dur-med) var(--ease-out);
+}
+
+.modal-overlay.hidden .modal-card {
+  transform: translateY(14px) scale(0.94);
+  opacity: 0;
+  transition: transform var(--dur-fast) var(--ease-in), opacity var(--dur-fast) var(--ease-in);
+}
+
+/* Botones de pausa y filas de controles entran en cascada */
+.modal-overlay:not(.hidden) .pause-actions > *,
+.modal-overlay:not(.hidden) .control-row {
+  animation: riseIn 480ms var(--ease-out) both;
+}
+
+.modal-overlay:not(.hidden) .pause-actions > :nth-child(1) { animation-delay: 80ms; }
+.modal-overlay:not(.hidden) .pause-actions > :nth-child(2) { animation-delay: 140ms; }
+.modal-overlay:not(.hidden) .pause-actions > :nth-child(3) { animation-delay: 200ms; }
+
+.modal-overlay:not(.hidden) .control-row:nth-child(1) { animation-delay: 60ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(2) { animation-delay: 95ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(3) { animation-delay: 130ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(4) { animation-delay: 165ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(5) { animation-delay: 200ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(6) { animation-delay: 235ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(7) { animation-delay: 270ms; }
+.modal-overlay:not(.hidden) .control-row:nth-child(n+8) { animation-delay: 300ms; }
+
+.btn-key-slot {
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) ease, background var(--dur-fast) ease, box-shadow var(--dur-med) ease, color var(--dur-fast) ease;
+}
+
+.btn-key-slot:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+.btn-key-slot.listening {
+  animation: pulseKeySlot 0.8s var(--ease-smooth) infinite alternate;
+}
+
+/* ---------- Accesibilidad: respetar "reducir movimiento" ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+
+/* ===== Pantalla de inicio convencional (Claude, ronda 8) ===== */
+.overlay-screen .menu-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 36px;
+}
+.overlay-screen .menu-actions .btn-start,
+.overlay-screen .menu-actions .btn-secondary {
+  width: 260px;
+  justify-content: center;
+  text-align: center;
+}
+.overlay-screen .press-hint {
+  margin-top: 34px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  animation: pressHintBlink 1.6s ease-in-out infinite;
+}
+@keyframes pressHintBlink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.8; }
 }
