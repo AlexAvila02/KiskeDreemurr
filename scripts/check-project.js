@@ -40,7 +40,8 @@ if (!fs.existsSync(indexHtmlPath)) {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
   const scriptMatches = [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["']/gi)];
   for (const match of scriptMatches) {
-    const relPath = match[1];
+    const rawPath = match[1];
+    const relPath = rawPath.split('?')[0];
     const fullPath = path.join(root, relPath);
     if (fs.existsSync(fullPath)) {
       ok(`Script referenciado existe: ${relPath}`);
