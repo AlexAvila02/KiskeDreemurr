@@ -742,7 +742,6 @@
 
   const NIGHT_INK = hexToRgb('#0b0d1e');
   const DEFAULT_CYCLE_DURATION_MS = 180000; // 3 minutos de tiempo real de atardecer a noche cerrada
-  const ROOM_WORLD_STRIDE = 820;            // desplazamiento continuo de mundo entre salas para paralaje sin cortes
   const journey = {
     elapsedMs: 0,
     lastTick: null,
@@ -751,35 +750,16 @@
     durationMs: DEFAULT_CYCLE_DURATION_MS,
     loop: false, // false: se asienta en la noche estrellada; true: ciclo continuo
     camX: null,
-    camY: null,
-    velX: 0,
-    velY: 0
+    camY: null
   };
 
   /**
-   * Calcula coordenadas de cámara continuas y suavizadas (X e Y) a través de todo el mundo,
-   * evitando saltos bruscos del paisaje al cruzar de una sala a otra y añadiendo paralaje vertical
-   * cuando Ruben salta o escala hacia zonas altas (como el Altozano del Molino).
+   * Calcula coordenadas de cámara con suavizado sutil para el paralaje del fondo,
+   * manteniendo una sensación natural y contenida (sin desplazamientos exagerados).
    */
-  function getSmoothParallaxCamera(camera, width, height) {
-    const g = typeof window !== 'undefined' ? window.gameInstance : null;
-    let targetX = (camera && camera.x) || 0;
-    let targetY = (camera && camera.y) || 0;
-
-    if (g && g.world) {
-      const roomIdx = g.world.currentRoomIndex || 0;
-      // La sala 2 (Altozano del Molino) está arriba de la sala 1
-      const worldRoomX = roomIdx === 2 ? 1.35 : roomIdx;
-      const worldRoomY = roomIdx === 2 ? -180 : 0;
-      targetX += worldRoomX * ROOM_WORLD_STRIDE;
-      targetY += worldRoomY;
-
-      if (g.player) {
-        // Sutil respuesta vertical a la altura de Ruben dentro de la sala (saltos / plataformas altas)
-        const relY = ((g.player.y || 410) - 410) * 0.32;
-        targetY += relY;
-      }
-    }
+  function getSmoothParallaxCamera(camera) {
+    const targetX = (camera && camera.x) || 0;
+    const targetY = (camera && camera.y) || 0;
 
     if (journey.camX === null) {
       journey.camX = targetX;
@@ -788,24 +768,18 @@
 
     const dx = targetX - journey.camX;
     const dy = targetY - journey.camY;
-    // Si la distancia es razonable (misma sala o transición normal), interpolar con inercia sedosa
-    if (Math.abs(dx) < 2400) {
-      journey.camX += dx * 0.14;
-      journey.camY += dy * 0.12;
-      journey.velX = journey.velX * 0.82 + dx * 0.18;
-      journey.velY = journey.velY * 0.82 + dy * 0.18;
+    // Si es un movimiento dentro de la sala, suavizar; si cambió de sala, sincronizar sin barrido brusco
+    if (Math.abs(dx) < 360) {
+      journey.camX += dx * 0.18;
+      journey.camY += dy * 0.18;
     } else {
       journey.camX = targetX;
       journey.camY = targetY;
-      journey.velX = 0;
-      journey.velY = 0;
     }
 
     return {
       x: journey.camX,
-      y: journey.camY,
-      vx: journey.velX,
-      vy: journey.velY
+      y: journey.camY
     };
   }
 
@@ -873,11 +847,10 @@
     const sky = skyAt(t);
     const night = smoothstep(0.5, 0.92, t);
     const dusk = smoothstep(0.08, 0.45, t) * (1 - smoothstep(0.62, 0.85, t));
-    const pCam = getSmoothParallaxCamera(camera, width, height);
+    const pCam = getSmoothParallaxCamera(camera);
     const camX = pCam.x;
-    const camY = pCam.y;
-    const HOR = Math.round(330 - camY * 0.045); // horizonte con respuesta sutil de paralaje vertical
-    const valleyBase = width * 0.5 + 40;        // dónde se abre el valle del río
+    const HOR = 330;                           // línea del horizonte estable
+    const valleyBase = width * 0.5 + 40;       // centro del valle en coordenadas de mundo (x = 520)
 
     // ---- 1. Cielo
     const g = ctx.createLinearGradient(0, 0, 0, HOR + 10);
@@ -887,40 +860,37 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, width, height);
 
-    // ---- 2. Estrellas con paralaje multi-capa, vía láctea y estrellas fugaces
+    // ---- 2. Estrellas con paralaje sutil, vía láctea y estrellas fugaces
     if (night > 0.01) {
       ctx.save();
-      // Vía láctea tenue con levísimo desplazamiento celestial
-      const mwShiftX = -camX * 0.012;
-      const mwShiftY = -camY * 0.015;
+      const mwShiftX = -camX * 0.008;
       ctx.globalAlpha = night * 0.22;
-      const mw = ctx.createLinearGradient(0, 40 + mwShiftY, width, 260 + mwShiftY);
+      const mw = ctx.createLinearGradient(0, 40, width, 260);
       mw.addColorStop(0, 'rgba(180,190,255,0)');
       mw.addColorStop(0.5, 'rgba(200,205,255,0.55)');
       mw.addColorStop(1, 'rgba(180,190,255,0)');
       ctx.fillStyle = mw;
       ctx.beginPath();
-      ctx.moveTo(0, 210 + mwShiftY); ctx.quadraticCurveTo(width * 0.5 + mwShiftX * 0.3, 40 + mwShiftY, width, 60 + mwShiftY);
-      ctx.lineTo(width, 130 + mwShiftY); ctx.quadraticCurveTo(width * 0.5 + mwShiftX * 0.3, 120 + mwShiftY, 0, 290 + mwShiftY);
+      ctx.moveTo(0, 210); ctx.quadraticCurveTo(width * 0.5 + mwShiftX, 40, width, 60);
+      ctx.lineTo(width, 130); ctx.quadraticCurveTo(width * 0.5 + mwShiftX, 120, 0, 290);
       ctx.fill();
       ctx.globalAlpha = 1;
 
       for (const s of STARS) {
-        const starPar = s.par || 0.02;
+        const starPar = (s.par || 0.015) * 0.65;
         const sx = ((s.x - camX * starPar) % 1400 + 1400) % 1400 - 220;
-        const sy = s.y - camY * (starPar * 0.6);
-        if (sx < -4 || sx > width + 4 || sy < -4 || sy > HOR + 10) continue;
-        const fadeH = 1 - smoothstep(HOR - 120, HOR, sy);   // menos estrellas cerca del horizonte
+        if (sx < -4 || sx > width + 4) continue;
+        const fadeH = 1 - smoothstep(HOR - 120, HOR, s.y);   // menos estrellas cerca del horizonte
         const tw = 0.55 + 0.45 * Math.sin(time * 0.001 * s.sp + s.tw);
         const a = night * fadeH * tw;
         if (a < 0.03) continue;
         ctx.fillStyle = `rgba(255, 248, 230, ${a})`;
         if (s.r > 1.5) {
-          ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, 6.283); ctx.fill();
+          ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, 6.283); ctx.fill();
           ctx.fillStyle = `rgba(255, 248, 230, ${a * 0.35})`;
-          ctx.fillRect(sx - 5, sy - 0.5, 10, 1); ctx.fillRect(sx - 0.5, sy - 5, 1, 10);
+          ctx.fillRect(sx - 5, s.y - 0.5, 10, 1); ctx.fillRect(sx - 0.5, s.y - 5, 1, 10);
         } else {
-          ctx.fillRect(sx - s.r * 0.5, sy - s.r * 0.5, s.r * 1.4, s.r * 1.4);
+          ctx.fillRect(sx - s.r * 0.5, s.y - s.r * 0.5, s.r * 1.4, s.r * 1.4);
         }
       }
 
@@ -941,12 +911,11 @@
       ctx.restore();
     }
 
-    // ---- 3. Sol que desciende hacia el valle / luna que aparece (con paralaje 2D)
-    const valleyFar = ((valleyBase - camX * 0.028) % 1400 + 1400) % 1400 - 200;
-    const sunAnchorX = width * 0.52 - Math.sin(camX * 0.0005) * 45 - (camX % 1400) * 0.022;
+    // ---- 3. Sol que desciende hacia el valle / luna que aparece
+    const valleyFar = valleyBase - camX * 0.03;
     const sunT = smoothstep(0, 0.72, t);
-    const sunX = sunAnchorX + Math.sin(sunT * 1.4) * 18;
-    const sunY = 128 + sunT * (HOR + 68 - 128) - camY * 0.02;
+    const sunX = valleyFar + Math.sin(sunT * 1.4) * 14;
+    const sunY = 128 + sunT * (HOR + 68 - 128);
     const sunBreath = Math.sin(time * 0.0022) * 1.5;
     const sunR = 44 + sunT * 12 + sunBreath * 0.4;
     const sunVisible = sunY - sunR < HOR + 35;
@@ -1008,10 +977,10 @@
       ctx.restore();
     }
 
-    // Luna llena con cráteres suaves y paralaje celestial
+    // Luna llena con cráteres suaves
     const moonA = smoothstep(0.55, 0.85, t);
-    const moonX = width * 0.22 - (camX % 1800) * 0.022;
-    const moonY = 260 - moonA * 150 - camY * 0.02;
+    const moonX = width * 0.2 - camX * 0.02;
+    const moonY = 260 - moonA * 150;
     if (moonA > 0.01) {
       ctx.save();
       const mh = ctx.createRadialGradient(moonX, moonY, 10, moonX, moonY, 150);
@@ -1027,30 +996,26 @@
       ctx.restore();
     }
 
-    // ---- 4. Nubes en 3 planos de profundidad (altas lejanas, medias y bajas rápidas) + bandadas
+    // ---- 4. Nubes en planos suaves + bandadas de aves
     ctx.save();
     const cloudLit = mixRgb(sky.sun, sky.mid, 0.35);
     const cloudBody = mixRgb(sky.mid, sky.top, 0.55);
     const cloudNight = mixRgb(sky.top, [70, 80, 130], 0.35);
-    for (let i = 0; i < 8; i++) {
-      const depthBand = i / 7; // 0 = cirros altos lejanos, 1 = cúmulos bajos más cercanos
-      const cParX = 0.018 + depthBand * 0.055;
-      const cParY = 0.015 + depthBand * 0.035;
-      const driftSpeed = 0.0025 + depthBand * 0.0055;
-      const cw = (170 + (i * 71) % 150) * (0.78 + depthBand * 0.42);
-      const ch = (7 + (i % 3) * 2.5) * (0.8 + depthBand * 0.35);
-      const wrapW = width + 650;
-      const cx = (((i * 239 + time * driftSpeed) - camX * cParX) % wrapW + wrapW) % wrapW - 325;
-      const cy = 48 + depthBand * 165 + ((i * 37) % 28) - camY * cParY;
+    for (let i = 0; i < 6; i++) {
+      const depthBand = i / 5;
+      const cParX = 0.018 + depthBand * 0.025;
+      const cw = 210 + (i * 71) % 150;
+      const cx = (((i * 263 + time * 0.0035 * (1 + i % 3)) - camX * cParX) % (width + 600) + width + 600) % (width + 600) - 300;
+      const cy = 58 + (i * 47) % 165;
       const body = mixRgb(cloudBody, cloudNight, night);
-      ctx.fillStyle = rgba(body, (0.42 + depthBand * 0.2) - night * 0.18);
-      ctx.beginPath(); ctx.ellipse(cx, cy, cw * 0.5, ch, 0, 0, 6.283); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(cx - cw * 0.15, cy - ch * 0.65, cw * 0.28, ch * 0.85, 0, 0, 6.283); ctx.fill();
-      ctx.fillStyle = rgba(cloudLit, (0.78 - night * 0.7) * (1 - cy / 420));
-      ctx.beginPath(); ctx.ellipse(cx + 6, cy + ch * 0.45, cw * 0.42, Math.max(2.2, ch * 0.35), 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = rgba(body, 0.52 - night * 0.2);
+      ctx.beginPath(); ctx.ellipse(cx, cy, cw * 0.5, 9 + (i % 3) * 3, 0, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx - cw * 0.15, cy - 7, cw * 0.28, 8, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = rgba(cloudLit, (0.75 - night * 0.7) * (1 - cy / 400));
+      ctx.beginPath(); ctx.ellipse(cx + 6, cy + 5, cw * 0.42, 3.5, 0, 0, 6.283); ctx.fill();
     }
 
-    // Siluetas de aves en formación V con paralaje por plano de profundidad
+    // Siluetas de aves en formación V con paralaje sutil
     const birdAlpha = (1 - smoothstep(0.65, 0.85, t)) * 0.65;
     if (birdAlpha > 0.02) {
       ctx.strokeStyle = rgba(mixRgb(sky.land, NIGHT_INK, 0.5), birdAlpha);
@@ -1059,8 +1024,8 @@
         const sc = flock.scale || 1;
         ctx.lineWidth = 1.3 * sc;
         const wrapB = width + 520;
-        const fx = ((flock.x0 + time * flock.vx - camX * (flock.par || 0.04)) % wrapB + wrapB) % wrapB - 220;
-        const fy = flock.y0 - camY * (flock.parY || 0.02) + Math.sin(time * 0.0008 + flock.seed) * 14;
+        const fx = ((flock.x0 + time * flock.vx - camX * ((flock.par || 0.03) * 0.65)) % wrapB + wrapB) % wrapB - 220;
+        const fy = flock.y0 + Math.sin(time * 0.0008 + flock.seed) * 12;
         for (let b = 0; b < flock.count; b++) {
           const side = b % 2 === 0 ? 1 : -1;
           const rank = Math.ceil(b / 2);
@@ -1077,43 +1042,41 @@
     }
     ctx.restore();
 
-    // ---- 5. Cordilleras con perspectiva atmosférica (4 planos de profundidad + paralaje 2D)
-    const valleyWorldCenter = valleyBase + Math.sin(camX * 0.00065) * 95;
+    // ---- 5. Cordilleras con perspectiva atmosférica (factores de paralaje contenidos: 0.03 -> 0.12)
+    // El valle (valleyBase) está fijo en coordenadas de mundo de cada capa, por lo que las montañas
+    // nunca cambian de altura ni se deforman al mover la cámara.
     const layers = [
-      { par: 0.032, parY: 0.035, base: HOR + 2,  peak: 215, freq: 0.0026, seed: 7,  offset: -400, valleyW: 240, valleyMin: 0.16, haze: 0.54 },
-      { par: 0.068, parY: 0.060, base: HOR + 9,  peak: 175, freq: 0.0036, seed: 11, offset: 0,    valleyW: 270, valleyMin: 0.10, haze: 0.36 },
-      { par: 0.115, parY: 0.090, base: HOR + 16, peak: 135, freq: 0.0048, seed: 23, offset: 900,  valleyW: 305, valleyMin: 0.04, haze: 0.19 },
-      { par: 0.175, parY: 0.125, base: HOR + 24, peak: 98,  freq: 0.0062, seed: 37, offset: 2100, valleyW: 335, valleyMin: 0.0,  haze: 0.06 }
+      { par: 0.03, base: HOR + 5,  peak: 195, freq: 0.0030, seed: 11, offset: 0,    valleyW: 255, valleyMin: 0.12, haze: 0.44 },
+      { par: 0.07, base: HOR + 13, peak: 152, freq: 0.0044, seed: 23, offset: 900,  valleyW: 295, valleyMin: 0.05, haze: 0.23 },
+      { par: 0.12, base: HOR + 22, peak: 106, freq: 0.0058, seed: 37, offset: 2100, valleyW: 325, valleyMin: 0.0,  haze: 0.07 }
     ];
     const snowy = biomeKey === 'montana';
     for (let li = 0; li < layers.length; li++) {
       const L = layers[li];
-      const layerBaseY = L.base - camY * L.parY;
-      const layerCfg = { ...L, base: layerBaseY };
-      const vx = valleyWorldCenter - (camX % 960) * (L.par * 0.45);
       const shift = camX * L.par;
+      const vx = valleyBase - shift;
       const landC = mixRgb(sky.land, NIGHT_INK, night * 0.5 * (1 - L.haze));
       const col = mixRgb(landC, sky.hor, L.haze * (1 - night * 0.55));
       const pts = [];
-      for (let x = -10; x <= width + 10; x += 10) pts.push([x, ridgeY(x + shift, layerCfg, vx + shift)]);
+      for (let x = -10; x <= width + 10; x += 10) pts.push([x, ridgeY(x + shift, L, valleyBase)]);
 
       ctx.save();
       // Cuerpo con degradado vertical (más claro en las cumbres que miran al sol)
-      const mg = ctx.createLinearGradient(0, layerBaseY - L.peak, 0, layerBaseY + 30);
+      const mg = ctx.createLinearGradient(0, HOR - L.peak, 0, HOR + 30);
       mg.addColorStop(0, rgba(mixRgb(col, sky.sun, 0.18 * (1 - night))));
       mg.addColorStop(1, rgba(mixRgb(col, sky.hor, 0.25 * (1 - night))));
       ctx.fillStyle = mg;
       ctx.beginPath();
-      ctx.moveTo(-10, HOR + 90);
+      ctx.moveTo(-10, HOR + 60);
       for (const p of pts) ctx.lineTo(p[0], p[1]);
-      ctx.lineTo(width + 10, HOR + 90);
+      ctx.lineTo(width + 10, HOR + 60);
       ctx.closePath();
       ctx.fill();
 
       // Luz de borde: las laderas que miran al sol brillan
       if (night < 0.9) {
-        ctx.strokeStyle = rgba(sky.sun, (0.45 - li * 0.08) * (1 - night));
-        ctx.lineWidth = 1.2 + li * 0.15;
+        ctx.strokeStyle = rgba(sky.sun, (0.45 - li * 0.1) * (1 - night));
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         for (let i = 1; i < pts.length; i++) {
           const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
@@ -1123,18 +1086,18 @@
         ctx.stroke();
       }
       // Contorno de tinta (más visible en capas cercanas)
-      ctx.strokeStyle = rgba(hexToRgb(INK_DEFAULT), 0.14 + li * 0.14);
-      ctx.lineWidth = 0.9 + li * 0.4;
+      ctx.strokeStyle = rgba(hexToRgb(INK_DEFAULT), 0.18 + li * 0.18);
+      ctx.lineWidth = 1 + li * 0.5;
       ctx.beginPath();
       pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
       ctx.stroke();
 
       // Nieve en las cumbres altas
-      if ((snowy || li <= 1) && L.peak > 150) {
+      if ((snowy || li === 0) && L.peak > 140) {
         ctx.fillStyle = rgba(mixRgb([245, 236, 225], sky.hor, 0.35 + night * 0.4), snowy ? 0.9 : 0.55);
         for (let i = 1; i < pts.length - 1; i++) {
           const [px, py] = pts[i];
-          if (py < layerBaseY - L.peak * 0.62 && py <= pts[i - 1][1] && py <= pts[i + 1][1]) {
+          if (py < HOR - L.peak * 0.62 && py <= pts[i - 1][1] && py <= pts[i + 1][1]) {
             ctx.beginPath();
             ctx.moveTo(px, py); ctx.lineTo(px - 14, py + 16); ctx.lineTo(px - 5, py + 12);
             ctx.lineTo(px, py + 18); ctx.lineTo(px + 6, py + 11); ctx.lineTo(px + 14, py + 16);
@@ -1143,8 +1106,8 @@
         }
       }
       // Castillo lejano sobre la cordillera media
-      if (biomeKey === 'castillo' && li === 2) {
-        const kx = vx + 230, ky = ridgeY(kx + shift, layerCfg, vx + shift);
+      if (biomeKey === 'castillo' && li === 1) {
+        const kx = vx + 230, ky = ridgeY(kx + shift, L, valleyBase);
         ctx.fillStyle = rgba(mixRgb(col, NIGHT_INK, 0.25));
         ctx.fillRect(kx - 30, ky - 40, 60, 42);
         ctx.fillRect(kx - 38, ky - 62, 14, 64); ctx.fillRect(kx + 24, ky - 70, 14, 72);
@@ -1157,16 +1120,15 @@
       }
       ctx.restore();
 
-      // Bancos de bruma atmosférica en movimiento con paralaje propio entre cordilleras
-      const mistY = layerBaseY - 35;
-      const mist = ctx.createLinearGradient(0, mistY, 0, mistY + 68);
+      // Bruma entre capas
+      const mist = ctx.createLinearGradient(0, HOR - 40, 0, HOR + 30);
       mist.addColorStop(0, rgba(sky.hor, 0));
-      mist.addColorStop(1, rgba(sky.hor, (0.20 - li * 0.03) * (1 - night * 0.55)));
+      mist.addColorStop(1, rgba(sky.hor, 0.22 * (1 - night * 0.6)));
       ctx.fillStyle = mist;
-      ctx.fillRect(0, mistY, width, 68);
+      ctx.fillRect(0, HOR - 40, width, 70);
     }
 
-    // ---- 6. Llanura del valle con bandas de profundidad
+    // ---- 6. Llanura del valle
     const groundTop = HOR + 18;
     const gg = ctx.createLinearGradient(0, groundTop, 0, height);
     const nearLand = mixRgb(sky.land, NIGHT_INK, night * 0.45);
@@ -1175,16 +1137,12 @@
     ctx.fillStyle = gg;
     ctx.fillRect(0, groundTop, width, height - groundTop);
 
-    // ---- 7. Río con paralaje diferencial de perspectiva (lento en el horizonte, rápido en primer plano)
+    // ---- 7. Río que fluye hacia el atardecer (paralaje progresivo moderado: 0.03 en el horizonte -> 0.20 cerca)
     const riverAt = (y) => {
       const f = clamp01((y - groundTop) / (470 - groundTop));
-      const par = 0.028 + Math.pow(f, 1.45) * 0.34;
-      // El cauce serpentea con perspectiva verdadera al desplazarse la cámara
-      const worldPhase = camX * 0.0012;
-      const farAnchor = sunX + Math.sin(worldPhase) * 28;
-      const nearOffset = -((camX * par) % 520 - 260) * 0.38 * f;
-      const meander = Math.sin(f * 4.2 + 0.9 + worldPhase * 0.7) * (16 + 46 * f);
-      const cx = farAnchor + nearOffset + meander;
+      const par = 0.03 + f * 0.17;
+      const meander = Math.sin(f * 4.2 + 0.9) * 45 * f;
+      const cx = valleyBase - camX * par + meander;
       const w = 5 + Math.pow(f, 1.35) * 380;
       return { cx, w, f, par };
     };
@@ -1209,13 +1167,13 @@
     ctx.fill();
     ctx.clip();
 
-    // Columna de reflejo del sol (o de la luna) titilando sobre el agua con paralaje de superficie
+    // Columna de reflejo del sol (o de la luna) titilando sobre el agua
     const refl = night < 0.75 ? { x: sunX, c: sky.sun, a: (1 - smoothstep(0.45, 0.75, t)) } : { x: moonX, c: [235, 235, 255], a: moonA * 0.8 };
     for (let y = groundTop + 2; y < height; y += 3) {
       const r = riverAt(y);
       const spread = 6 + r.f * 70;
-      const rx = refl.x + (r.cx - sunX) * 0.62;
-      const shimmer = 0.5 + 0.5 * Math.sin(time * 0.006 + y * 0.9 - camX * 0.015 * r.f);
+      const rx = refl.x + (r.cx - valleyFar) * 0.6;
+      const shimmer = 0.5 + 0.5 * Math.sin(time * 0.006 + y * 0.9);
       const len = spread * (0.4 + shimmer * 0.9);
       const off = Math.sin(time * 0.002 + y * 0.31) * spread * 0.4;
       ctx.fillStyle = rgba(refl.c, refl.a * (0.25 + shimmer * 0.55) * (1 - r.f * 0.5));
@@ -1228,22 +1186,22 @@
         const s = STARS[i * 5];
         const y = groundTop + 6 + (s.y / 330) * (height - groundTop - 10);
         const r = riverAt(y);
-        const sx = r.cx + (((s.x - camX * r.par * 0.3) % 200 + 200) % 200 / 200 - 0.5) * r.w * 0.9;
+        const sx = r.cx + ((s.x % 200) / 200 - 0.5) * r.w * 0.9;
         const tw = 0.5 + 0.5 * Math.sin(time * 0.003 + s.tw);
         ctx.fillStyle = `rgba(255, 248, 230, ${night * 0.5 * tw})`;
         ctx.fillRect(sx, y, 1.5, 1);
       }
     }
 
-    // Ondas que avanzan hacia el horizonte con desplazamiento lateral de paralaje
+    // Ondas que avanzan hacia el horizonte (el río corre hacia el sol)
     const rippleCol = mixRgb(sky.hor, [255, 255, 255], 0.35);
-    const N = 36;
+    const N = 34;
     for (let i = 0; i < N; i++) {
       const s = ((i / N) + time * 0.00005) % 1;     // 0 = cerca → 1 = horizonte
       const f = Math.pow(1 - s, 1.4);
       const y = groundTop + f * (height - groundTop);
       const r = riverAt(y);
-      const lat = Math.sin(i * 12.9898 - camX * 0.0008 * f) * 0.38;
+      const lat = Math.sin(i * 12.9898) * 0.38;
       const x = r.cx + lat * r.w;
       const len = 6 + r.w * 0.12;
       ctx.strokeStyle = rgba(rippleCol, (0.15 + f * 0.35) * (1 - night * 0.5) * smoothstep(0, 0.15, s) * (1 - smoothstep(0.85, 1, s)));
@@ -1272,54 +1230,53 @@
     }
     ctx.restore();
 
-    // ---- 8. Doble capa de colinas y arboledas en paralaje (plano medio 0.24 y plano cercano 0.35)
+    // ---- 8. Dos planos suaves de colinas arboladas (0.15x y 0.21x) con árboles anclados a coordenadas de mundo
+    // Al usar `valleyBase` fijo en coordenadas de mundo de cada colina, la altura `gy` de cada árbol `i`
+    // es 100% constante e invariante frente a la cámara: ningún árbol aparece ni desaparece al caminar.
     const hillPlanes = [
-      { par: 0.23, parY: 0.16, base: HOR + 114, peak: 74, freq: 0.0042, seed: 53, offset: 2600, valleyW: 290, darkMix: 0.35, treeScale: 0.82, alpha: 0.92 },
-      { par: 0.34, parY: 0.24, base: HOR + 134, peak: 84, freq: 0.0048, seed: 59, offset: 3300, valleyW: 325, darkMix: 0.52, treeScale: 1.08, alpha: 1.0 }
+      { par: 0.15, base: HOR + 116, peak: 72, freq: 0.0042, seed: 53, offset: 2500, valleyW: 295, valleyMin: 0, darkMix: 0.34, treeScale: 0.84, alpha: 0.92 },
+      { par: 0.21, base: HOR + 130, peak: 82, freq: 0.0045, seed: 59, offset: 3300, valleyW: 310, valleyMin: 0, darkMix: 0.48, treeScale: 1.0,  alpha: 1.0 }
     ];
     const dense = biomeKey === 'bosque';
-    const riverMid = riverAt(HOR + 115);
 
     for (let hi = 0; hi < hillPlanes.length; hi++) {
       const hp = hillPlanes[hi];
-      const hillBaseY = hp.base - camY * hp.parY;
-      const hillLayer = { base: hillBaseY, peak: hp.peak, freq: hp.freq, seed: hp.seed, offset: hp.offset, valleyW: hp.valleyW, valleyMin: 0 };
       const hillShift = camX * hp.par;
-      const hillVX = riverMid.cx;
-      const hillC = mixRgb(mixRgb(sky.land, [26, 33, 21], hp.darkMix), NIGHT_INK, night * (0.48 + hi * 0.1));
+      const hillC = mixRgb(mixRgb(sky.land, [28, 34, 22], hp.darkMix), NIGHT_INK, night * (0.48 + hi * 0.08));
 
       ctx.save();
       ctx.fillStyle = rgba(hillC, hp.alpha);
-      ctx.strokeStyle = rgba(hexToRgb(INK_DEFAULT), 0.55 + hi * 0.2);
-      ctx.lineWidth = 1.6 + hi * 0.5;
+      ctx.strokeStyle = rgba(hexToRgb(INK_DEFAULT), 0.55 + hi * 0.18);
+      ctx.lineWidth = 1.6 + hi * 0.4;
       ctx.beginPath();
-      ctx.moveTo(-10, height + 20);
+      ctx.moveTo(-10, height + 10);
       const hillPts = [];
       for (let x = -10; x <= width + 10; x += 10) {
-        const y = ridgeY(x + hillShift, hillLayer, hillVX + hillShift);
+        const y = ridgeY(x + hillShift, hp, valleyBase);
         hillPts.push([x, y]);
         ctx.lineTo(x, y);
       }
-      ctx.lineTo(width + 10, height + 20);
+      ctx.lineTo(width + 10, height + 10);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Árboles en silueta sobre cada plano de colina con escala según cercanía
-      const treeC = mixRgb(hillC, NIGHT_INK, 0.3 + hi * 0.1);
+      // Árboles en silueta: posición y altura evaluadas estrictamente en coordenadas de mundo (wx)
+      const treeC = mixRgb(hillC, NIGHT_INK, 0.32 + hi * 0.08);
       ctx.fillStyle = rgba(treeC);
       const spacing = Math.round((dense ? 22 : 38) * hp.treeScale);
-      const startI = Math.floor(hillShift / spacing) - 1;
-      for (let i = startI; i < startI + width / spacing + 3; i++) {
+      const startI = Math.floor(hillShift / spacing) - 2;
+      const endI = Math.ceil((hillShift + width) / spacing) + 2;
+      for (let i = startI; i <= endI; i++) {
         const wx = i * spacing;
         const sx = wx - hillShift;
         const hash = Math.abs(Math.sin((i + hi * 31) * 91.7) * 1000) % 1;
-        if (hash < (dense ? 0.18 : 0.46)) continue;
-        const gy = ridgeY(sx + hillShift, hillLayer, hillVX + hillShift);
-        if (gy > hillLayer.base - 10) continue; // dejar despejado el cauce del río
-        const th = ((dense ? 38 : 25) + hash * 25) * hp.treeScale;
-        const windSway = Math.sin(time * 0.002 + i * 0.7) * (1.2 * hp.treeScale);
-        if (dense || hash > 0.68) {
+        if (hash < (dense ? 0.16 : 0.45)) continue;
+        const gy = ridgeY(wx, hp, valleyBase);
+        if (gy > hp.base - 10) continue; // no plantar en el cauce del valle (invariante en mundo)
+        const th = ((dense ? 40 : 26) + hash * 26) * hp.treeScale;
+        const windSway = Math.sin(time * 0.0018 + i * 0.7) * (1.0 * hp.treeScale);
+        if (dense || hash > 0.7) {
           ctx.beginPath();
           ctx.moveTo(sx + windSway, gy - th);
           ctx.lineTo(sx - th * 0.28, gy + 2);
@@ -1329,14 +1286,14 @@
         } else {
           ctx.fillRect(sx - 1.5 * hp.treeScale, gy - th * 0.5, 3 * hp.treeScale, th * 0.5 + 2);
           ctx.beginPath();
-          ctx.arc(sx + windSway * 0.6, gy - th * 0.62, th * 0.32, 0, 6.283);
+          ctx.arc(sx + windSway * 0.5, gy - th * 0.62, th * 0.32, 0, 6.283);
           ctx.fill();
         }
       }
 
       // Luz de borde del atardecer en las colinas
       if (night < 0.9) {
-        ctx.strokeStyle = rgba(sky.sun, (0.38 - hi * 0.08) * (1 - night));
+        ctx.strokeStyle = rgba(sky.sun, (0.35 - hi * 0.06) * (1 - night));
         ctx.lineWidth = 1.4;
         ctx.beginPath();
         hillPts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1] - 1.5) : ctx.moveTo(p[0], p[1] - 1.5)));
@@ -1345,54 +1302,15 @@
       ctx.restore();
     }
 
-    // ---- 8b. Juncos y espadañas de ribera en paralaje cercano (0.46x) mecidos por la brisa
-    const reedPar = 0.46;
-    const reedShift = camX * reedPar;
-    const reedBaseY = Math.min(height + 8, 472 - camY * 0.28);
-    const reedSpacing = 28;
-    const reedStart = Math.floor(reedShift / reedSpacing) - 1;
-    const reedColor = rgba(mixRgb(mixRgb(sky.land, [18, 24, 15], 0.68), NIGHT_INK, night * 0.65), 0.92);
-    ctx.save();
-    ctx.strokeStyle = reedColor;
-    ctx.fillStyle = reedColor;
-    ctx.lineCap = 'round';
-    const riverNear = riverAt(455);
-    for (let i = reedStart; i < reedStart + width / reedSpacing + 3; i++) {
-      const rx = i * reedSpacing - reedShift;
-      // Concentrar juncos cerca de las márgenes del río y bordes del valle
-      const distFromRiverCenter = Math.abs(rx - riverNear.cx);
-      if (distFromRiverCenter < riverNear.w * 0.28) continue;
-      const hHash = Math.abs(Math.sin(i * 47.3) * 1000) % 1;
-      if (hHash < 0.42) continue;
-      const stemH = 22 + hHash * 24;
-      const sway = Math.sin(time * 0.0026 + i * 0.9) * 4.5 - pCam.vx * 0.25;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(rx, reedBaseY);
-      ctx.quadraticCurveTo(rx + sway * 0.4, reedBaseY - stemH * 0.5, rx + sway, reedBaseY - stemH);
-      ctx.stroke();
-      // Espiga de totora / junco en algunos tallos
-      if (hHash > 0.68) {
-        const tipX = rx + sway * 0.82;
-        const tipY = reedBaseY - stemH * 0.78;
-        ctx.lineWidth = 3.6;
-        ctx.beginPath();
-        ctx.moveTo(tipX - sway * 0.08, tipY + 4);
-        ctx.lineTo(tipX + sway * 0.08, tipY - 5);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-
-    // ---- 8c. Luciérnagas de ribera con paralaje multi-capa que emergen al caer el crepúsculo
+    // ---- 8b. Luciérnagas de ribera con paralaje sutil que emergen al caer el crepúsculo
     const fireflyAlpha = smoothstep(0.38, 0.72, t);
     if (fireflyAlpha > 0.01) {
       ctx.save();
       for (let i = 0; i < AMBIENT_FIREFLIES.length; i++) {
         const ff = AMBIENT_FIREFLIES[i];
-        const fx = ((ff.x - camX * (ff.par || 0.25) + Math.sin(time * 0.0007 + ff.phase) * ff.driftX) % 1400 + 1400) % 1400 - 200;
+        const fx = ((ff.x - camX * ((ff.par || 0.22) * 0.75) + Math.sin(time * 0.0007 + ff.phase) * ff.driftX) % 1400 + 1400) % 1400 - 200;
         if (fx < -15 || fx > width + 15) continue;
-        const fy = ff.y - camY * (ff.parY || 0.08) + Math.cos(time * 0.0009 + ff.phase * 1.3) * ff.driftY;
+        const fy = ff.y + Math.cos(time * 0.0009 + ff.phase * 1.3) * ff.driftY;
         const pulse = 0.5 + 0.5 * Math.sin(time * ff.speed + ff.phase);
         const glowA = fireflyAlpha * Math.pow(pulse, 2.2);
         if (glowA < 0.05) continue;
@@ -1458,8 +1376,7 @@
         drawWindmill(ctx, 930 - camera.x, 160 - (camera.y || 0), time * 0.0007);
       }
       if (options.hasTower) {
-        const towerY = 470 - ((journey.camY || 0) * 0.18);
-        drawRuinedTower(ctx, 760 - camera.x * 0.3, towerY, { vines: true, broken: true, stoneColor: '#4e3f3a', stoneShadow: '#2a2026' });
+        drawRuinedTower(ctx, 760 - camera.x * 0.25, 470 - (camera.y || 0) * 0.25, { vines: true, broken: true, stoneColor: '#4e3f3a', stoneShadow: '#2a2026' });
       }
       drawVignette(ctx, width, height);
       drawParchmentTexture(ctx, width, height, 0.035);
