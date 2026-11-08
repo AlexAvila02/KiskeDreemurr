@@ -675,9 +675,10 @@
   // Fotogramas clave del cielo: t = 0 atardecer dorado → t = 1 noche estrellada
   const SKY_KEYS = [
     { t: 0.00, top: '#56508f', mid: '#e98f5e', hor: '#ffd98c', sun: '#fff3c4', land: '#5b4436' },
-    { t: 0.30, top: '#3b2f6c', mid: '#db6658', hor: '#ffb25c', sun: '#ffd27a', land: '#4a3133' },
-    { t: 0.55, top: '#251f50', mid: '#8f4068', hor: '#f27c4c', sun: '#ff8a46', land: '#33243a' },
-    { t: 0.78, top: '#121635', mid: '#382b5e', hor: '#9c4f6a', sun: '#ff6a3a', land: '#1e1a33' },
+    { t: 0.25, top: '#3b2f6c', mid: '#db6658', hor: '#ffb25c', sun: '#ffd27a', land: '#4a3133' },
+    { t: 0.50, top: '#251f50', mid: '#8f4068', hor: '#f27c4c', sun: '#ff7a3d', land: '#33243a' },
+    { t: 0.68, top: '#18193d', mid: '#522f66', hor: '#c95663', sun: '#ff5232', land: '#251c36' },
+    { t: 0.84, top: '#0e132c', mid: '#26244d', hor: '#663f66', sun: '#e04838', land: '#18162c' },
     { t: 1.00, top: '#060917', mid: '#111939', hor: '#283058', sun: '#ff6a3a', land: '#101327' }
   ].map(k => ({ t: k.t, top: hexToRgb(k.top), mid: hexToRgb(k.mid), hor: hexToRgb(k.hor), sun: hexToRgb(k.sun), land: hexToRgb(k.land) }));
 
@@ -703,27 +704,88 @@
     return list;
   })();
 
+  // Bandadas de aves regresando al nido al caer la tarde
+  const FLOCKS = [
+    { x0: 1120, y0: 115, vx: -0.024, vy: -0.002, count: 5, span: 18, seed: 1 },
+    { x0: 1480, y0: 165, vx: -0.019, vy: -0.001, count: 4, span: 14, seed: 2 }
+  ];
+
+  // Luciérnagas de fondo sobre la ribera y las colinas cuando cae la noche
+  const AMBIENT_FIREFLIES = (() => {
+    const rng = createRng(919);
+    const list = [];
+    for (let i = 0; i < 28; i++) {
+      list.push({
+        x: rng() * 1400,
+        y: 325 + rng() * 175,
+        phase: rng() * 6.283,
+        speed: 0.0018 + rng() * 0.0024,
+        driftX: 12 + rng() * 22,
+        driftY: 6 + rng() * 12,
+        size: 1.4 + rng() * 1.4
+      });
+    }
+    return list;
+  })();
+
   const NIGHT_INK = hexToRgb('#0b0d1e');
-  const journey = { max: 0, shown: null };
+  const DEFAULT_CYCLE_DURATION_MS = 180000; // 3 minutos de tiempo real de atardecer a noche cerrada
+  const journey = {
+    elapsedMs: 0,
+    lastTick: null,
+    wasPlaying: false,
+    shown: 0,
+    durationMs: DEFAULT_CYCLE_DURATION_MS,
+    loop: false // false: se asienta en la noche estrellada; true: ciclo continuo
+  };
 
   /**
-   * Progreso del viaje (0..1): sala actual + posición de Ruben dentro de ella.
-   * Solo avanza (el sol no vuelve a subir al retroceder).
+   * Progreso del atardecer basado en el tiempo real transcurrido (0..1).
+   * Avanza de forma orgánica y constante cada segundo sin depender de cuánto
+   * camine o retroceda el jugador, pausándose únicamente si la partida está en pausa.
    */
-  function getJourneyProgress(options) {
+  function getJourneyProgress(options = {}, time = Date.now()) {
     if (typeof options.progress === 'number') return clamp01(options.progress);
     if (typeof window !== 'undefined' && typeof window.SKY_PROGRESS === 'number') return clamp01(window.SKY_PROGRESS);
+
+    const now = typeof time === 'number' ? time : Date.now();
+    if (journey.lastTick === null) journey.lastTick = now;
+    const dt = Math.max(0, Math.min(250, now - journey.lastTick));
+    journey.lastTick = now;
+
     const g = typeof window !== 'undefined' ? window.gameInstance : null;
-    if (g && g.world && g.player) {
-      const rooms = g.world.rooms.filter(Boolean).sort((a, b) => a.id - b.id);
-      const room = g.world.getCurrentRoom();
-      const idx = Math.max(0, rooms.indexOf(room));
-      const fx = clamp01(g.player.x / (room.width || 960));
-      const raw = (idx + fx) / Math.max(1, rooms.length);
-      if (g.isPlaying) journey.max = Math.max(journey.max, raw);
+    const isPlaying = g ? Boolean(g.isPlaying) : true;
+    const isPaused = g ? Boolean(g.isPaused) : false;
+
+    // Al comenzar una partida nueva desde el menú principal, iniciar el atardecer fresco
+    if (isPlaying && !journey.wasPlaying) {
+      journey.elapsedMs = 0;
+      journey.shown = 0;
     }
-    if (journey.shown === null) journey.shown = journey.max;
-    journey.shown += (journey.max - journey.shown) * 0.03; // transición suave
+    journey.wasPlaying = isPlaying;
+
+    const duration = (typeof options.durationMs === 'number' && options.durationMs > 1000)
+      ? options.durationMs
+      : (typeof window !== 'undefined' && typeof window.SKY_DURATION_MS === 'number' ? window.SKY_DURATION_MS : journey.durationMs);
+
+    if (!isPaused) {
+      // En la pantalla de título avanza suavemente a menor velocidad para dar vida al fondo
+      const rate = isPlaying ? 1.0 : 0.35;
+      journey.elapsedMs += dt * rate;
+    }
+
+    let raw;
+    const shouldLoop = options.loop !== undefined ? options.loop : (typeof window !== 'undefined' && window.SKY_LOOP !== undefined ? window.SKY_LOOP : journey.loop);
+    if (shouldLoop) {
+      const cyclePos = (journey.elapsedMs % (duration * 2)) / duration;
+      raw = cyclePos <= 1 ? cyclePos : 2 - cyclePos;
+    } else {
+      raw = clamp01(journey.elapsedMs / duration);
+    }
+
+    // Curva orgánica: disfruta de la hora dorada y el crepúsculo con suavidad cinematográfica
+    const easedTarget = raw * 0.45 + smoothstep(0, 1, raw) * 0.55;
+    journey.shown += (easedTarget - journey.shown) * 0.08;
     return clamp01(journey.shown);
   }
 
@@ -737,9 +799,10 @@
   }
 
   function renderSunsetJourney(ctx, biomeKey, camera, width, height, time, options) {
-    const t = getJourneyProgress(options);
+    const t = getJourneyProgress(options, time);
     const sky = skyAt(t);
     const night = smoothstep(0.5, 0.92, t);
+    const dusk = smoothstep(0.08, 0.45, t) * (1 - smoothstep(0.62, 0.85, t));
     const camX = camera.x || 0;
     const HOR = 330;                           // línea del horizonte
     const valleyBase = width * 0.5 + 40;       // dónde se abre el valle del río
@@ -804,33 +867,69 @@
 
     // ---- 3. Sol que desciende hacia el valle / luna que aparece
     const valleyFar = valleyBase - camX * 0.04;
-    const sunT = smoothstep(0, 0.66, t);
-    const sunX = valleyFar;
-    const sunY = 140 + sunT * (HOR + 70 - 140);
-    const sunR = 44 + sunT * 10;
-    const sunVisible = sunY - sunR < HOR + 30;
+    const sunT = smoothstep(0, 0.72, t);
+    const sunX = valleyFar + Math.sin(sunT * 1.4) * 18;
+    const sunY = 128 + sunT * (HOR + 68 - 128);
+    const sunBreath = Math.sin(time * 0.0022) * 1.5;
+    const sunR = 44 + sunT * 12 + sunBreath * 0.4;
+    const sunVisible = sunY - sunR < HOR + 35;
     if (sunVisible) {
       ctx.save();
-      const glowR = 260 + sunT * 120;
-      const halo = ctx.createRadialGradient(sunX, sunY, sunR * 0.5, sunX, sunY, glowR);
-      halo.addColorStop(0, rgba(sky.sun, 0.75 * (1 - night)));
-      halo.addColorStop(0.25, rgba(sky.hor, 0.35 * (1 - night)));
+      const glowR = 270 + sunT * 140 + sunBreath * 8;
+      const halo = ctx.createRadialGradient(sunX, sunY, sunR * 0.45, sunX, sunY, glowR);
+      halo.addColorStop(0, rgba(sky.sun, 0.82 * (1 - night)));
+      halo.addColorStop(0.28, rgba(sky.hor, 0.42 * (1 - night)));
       halo.addColorStop(1, rgba(sky.hor, 0));
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, width, HOR + 40);
+
+      // Rayos crepusculares volumétricos (God Rays) emergiendo del sol hacia el cielo
+      const rayAlpha = (1 - smoothstep(0.58, 0.76, t)) * 0.11;
+      if (rayAlpha > 0.005) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const rayCount = 7;
+        for (let r = 0; r < rayCount; r++) {
+          const baseAng = -Math.PI * 0.88 + (r / (rayCount - 1)) * Math.PI * 0.76;
+          const sway = Math.sin(time * 0.00045 + r * 1.9) * 0.035;
+          const ang = baseAng + sway;
+          const spread = 0.042 + (r % 2) * 0.018;
+          const rayLen = 420 + (r % 3) * 90;
+          const rg = ctx.createRadialGradient(sunX, sunY, sunR * 0.6, sunX, sunY, rayLen);
+          rg.addColorStop(0, rgba(sky.sun, rayAlpha));
+          rg.addColorStop(0.55, rgba(sky.hor, rayAlpha * 0.45));
+          rg.addColorStop(1, 'rgba(255, 220, 160, 0)');
+          ctx.fillStyle = rg;
+          ctx.beginPath();
+          ctx.moveTo(sunX, sunY);
+          ctx.lineTo(sunX + Math.cos(ang - spread) * rayLen, sunY + Math.sin(ang - spread) * rayLen);
+          ctx.lineTo(sunX + Math.cos(ang + spread) * rayLen, sunY + Math.sin(ang + spread) * rayLen);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
       // Disco con contorno cálido
       ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, 6.283);
       const disc = ctx.createLinearGradient(0, sunY - sunR, 0, sunY + sunR);
-      disc.addColorStop(0, rgba(mixRgb(sky.sun, [255, 255, 235], 0.5)));
+      disc.addColorStop(0, rgba(mixRgb(sky.sun, [255, 255, 235], 0.55)));
       disc.addColorStop(1, rgba(sky.sun));
       ctx.fillStyle = disc; ctx.fill();
-      // Franjas de calor horizontales (estilo cartel años 50)
-      ctx.globalCompositeOperation = 'destination-out';
+      // Franjas de calor horizontales animadas (estilo cartel años 50)
+      // Se pintan con el color del cielo que rodea al sol y solo dentro del disco:
+      // 'destination-out' agujereaba todo el fondo y dejaba barras negras.
+      ctx.save();
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunR, 0, 6.283); ctx.clip();
+      const stripeC = mixRgb(sky.hor, sky.sun, 0.35);
+      const heatWave = (time * 0.00035) % 0.2;
       for (let i = 0; i < 4; i++) {
-        const by = sunY + sunR * (0.25 + i * 0.2);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
-        ctx.fillRect(sunX - sunR - 2, by, sunR * 2 + 4, 1.5 + i * 1.2);
+        const frac = 0.22 + ((i * 0.2 + heatWave) % 0.78);
+        const by = sunY + sunR * frac;
+        ctx.fillStyle = rgba(stripeC, 0.45 + frac * 0.45);
+        ctx.fillRect(sunX - sunR - 2, by, sunR * 2 + 4, 1.2 + frac * 2.8);
       }
+      ctx.restore();
       ctx.restore();
     }
 
@@ -853,7 +952,7 @@
       ctx.restore();
     }
 
-    // ---- 4. Nubes alargadas iluminadas desde abajo
+    // ---- 4. Nubes alargadas iluminadas desde abajo y bandadas de aves al atardecer
     ctx.save();
     const cloudLit = mixRgb(sky.sun, sky.mid, 0.35);
     const cloudBody = mixRgb(sky.mid, sky.top, 0.55);
@@ -868,6 +967,30 @@
       ctx.beginPath(); ctx.ellipse(cx - cw * 0.15, cy - 7, cw * 0.28, 8, 0, 0, 6.283); ctx.fill();
       ctx.fillStyle = rgba(cloudLit, (0.75 - night * 0.7) * (1 - cy / 400));
       ctx.beginPath(); ctx.ellipse(cx + 6, cy + 5, cw * 0.42, 3.5, 0, 0, 6.283); ctx.fill();
+    }
+
+    // Siluetas de aves en formación V regresando hacia el horizonte durante el crepúsculo
+    const birdAlpha = (1 - smoothstep(0.65, 0.85, t)) * 0.65;
+    if (birdAlpha > 0.02) {
+      ctx.strokeStyle = rgba(mixRgb(sky.land, NIGHT_INK, 0.5), birdAlpha);
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = 'round';
+      for (const flock of FLOCKS) {
+        const fx = ((flock.x0 + time * flock.vx - camX * 0.035) % (width + 500) + (width + 500)) % (width + 500) - 200;
+        const fy = flock.y0 + Math.sin(time * 0.0008 + flock.seed) * 14;
+        for (let b = 0; b < flock.count; b++) {
+          const side = b % 2 === 0 ? 1 : -1;
+          const rank = Math.ceil(b / 2);
+          const bx = fx + rank * flock.span;
+          const by = fy + side * rank * (flock.span * 0.42);
+          const flap = Math.sin(time * 0.009 + b * 1.1 + flock.seed) * 3.2;
+          ctx.beginPath();
+          ctx.moveTo(bx - 5, by - flap);
+          ctx.quadraticCurveTo(bx - 2, by - 2, bx, by);
+          ctx.quadraticCurveTo(bx + 2, by - 2, bx + 5, by - flap);
+          ctx.stroke();
+        }
+      }
     }
     ctx.restore();
 
@@ -1114,13 +1237,47 @@
     }
     ctx.restore();
 
-    // ---- 9. Velo nocturno azulado sobre todo el paisaje
+    // ---- 8b. Luciérnagas de ribera que emergen al caer el crepúsculo y la noche
+    const fireflyAlpha = smoothstep(0.38, 0.72, t);
+    if (fireflyAlpha > 0.01) {
+      ctx.save();
+      for (let i = 0; i < AMBIENT_FIREFLIES.length; i++) {
+        const ff = AMBIENT_FIREFLIES[i];
+        const fx = ((ff.x - camX * 0.25 + Math.sin(time * 0.0007 + ff.phase) * ff.driftX) % 1400 + 1400) % 1400 - 200;
+        if (fx < -15 || fx > width + 15) continue;
+        const fy = ff.y + Math.cos(time * 0.0009 + ff.phase * 1.3) * ff.driftY;
+        const pulse = 0.5 + 0.5 * Math.sin(time * ff.speed + ff.phase);
+        const glowA = fireflyAlpha * Math.pow(pulse, 2.2);
+        if (glowA < 0.05) continue;
+
+        const fg = ctx.createRadialGradient(fx, fy, 0, fx, fy, ff.size * 5.5);
+        fg.addColorStop(0, `rgba(255, 245, 165, ${glowA * 0.95})`);
+        fg.addColorStop(0.4, `rgba(215, 240, 95, ${glowA * 0.45})`);
+        fg.addColorStop(1, 'rgba(180, 220, 70, 0)');
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        ctx.arc(fx, fy, ff.size * 5.5, 0, 6.283);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(255, 255, 225, ${glowA})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, ff.size * 0.75, 0, 6.283);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ---- 9. Velo atmosférico (dorado al atardecer, azulado de noche)
+    if (dusk > 0.01) {
+      ctx.fillStyle = `rgba(255, 165, 85, ${dusk * 0.07})`;
+      ctx.fillRect(0, 0, width, height);
+    }
     if (night > 0) {
       ctx.fillStyle = `rgba(14, 20, 52, ${night * 0.18})`;
       ctx.fillRect(0, 0, width, height);
     }
 
-    journey.last = { t, night };
+    journey.last = { t, night, dusk };
     return journey.last;
   }
 
@@ -1131,8 +1288,8 @@
   function renderTimeOfDayTint(ctx, width = 960, height = 540) {
     const L = journey.last;
     if (!L) return;
-    const warm = smoothstep(0.1, 0.45, L.t) * (1 - L.night);
-    let c = mixRgb([255, 255, 255], [255, 214, 190], warm * 0.6);
+    const warm = smoothstep(0.05, 0.48, L.t) * (1 - L.night);
+    let c = mixRgb([255, 255, 255], [255, 208, 178], warm * 0.62);
     c = mixRgb(c, [118, 132, 196], L.night * 0.75);
     if (c[0] > 254 && c[2] > 254) return;
     ctx.save();
