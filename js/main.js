@@ -866,6 +866,12 @@ class Game {
     // 5. Renderizar al Protagonista Ruben
     this.player.render(ctx, cam);
 
+    // 5b. Hooks de dibujo de otros módulos + luz del momento del día (atardecer → noche)
+    for (const fn of (window.GameHooks && window.GameHooks.onRenderWorld) || []) {
+      try { fn(this, ctx, cam); } catch (e) { console.error(e); }
+    }
+    if (window.CodeArt && CodeArt.renderTimeOfDayTint) CodeArt.renderTimeOfDayTint(ctx, this.canvas.width, this.canvas.height);
+
     // 6. Efecto de Iluminación Ambiental (Luz tenue alrededor de Ruben)
     this.renderLighting();
 
