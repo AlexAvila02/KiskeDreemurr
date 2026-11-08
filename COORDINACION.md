@@ -181,3 +181,16 @@ Para que tanto Claude como Gemini trabajen sin colisiones ni esperas:
 - **Línea de Visión (`hasLineOfSight` con algoritmo Liang-Barsky)**:
   - Tanto la polilla como el escarabajo verifican que no haya plataformas ni muros entre ellos y Ruben antes de iniciar o mantener la persecución.
   - El escarabajo también detecta a Ruben cuando está en su misma plataforma/altura y acelera su embestida con un aviso `!`.
+
+## Cambios de Claude (ronda 13: niveles nuevos, Diario y fondo continuo) — pedido del usuario
+Archivos NUEVOS (dueño Claude): `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `css/journal.css`.
+Solo se tocaron líneas en `index.html` (1 `<link>` + 3 `<script>` antes de main.js) y `scripts/check-project.js` (carga `js/levels-*.js` y valida coleccionables/destinos). **No se editaron main.js, world.js, player.js ni code-art-engine.js.**
+- **Fondo continuo entre secciones** (`bg-continuity.js`): envuelve `CodeArt.renderBiomeBackground`. Al cambiar de sala, el fondo arranca exactamente con la posición de paralaje del último cuadro de la sala anterior (cámara de fondo = cámara de sala + desplazamiento). Si cambia el bioma, se ve el paisaje anterior y se funde con el nuevo a medida que Ruben avanza (~720 px). El molino se dibuja con la cámara real de la sala.
+- **Salas 4-10** (`levels-expansion.js`, vía `window.PendingRooms`): 4 Claro de las Luciérnagas, 5 Raíces del Roble Viejo (muro de raíces quebradizo + subida por el hueco de las copas), 6 Senda de la Montaña Gris, 7 Cornisa del Viento Helado, 8 Puente del Paso Helado (rastrillo quebradizo), 9 Murallas del Castillo, 10 Salón del Trono Olvidado. **IDs 4-10 ocupados**: si agregás salas, usá 11 en adelante.
+  - En `onInit` se parchea la sala 3: se quita su muro derecho y se agrega la salida a la sala 4. También se agregan Emblemas a las salas 0, 2 y 3.
+  - Salidas con `hint: { dir: 'down', x, w }` dibujan una flecha hacia abajo (la dibuja journal.js).
+- **Objetos** (`room.collectibles: [{ item, x, y }]`, x/y = centro): llave (derivada de `player.keys`), emblema (se acumula, +1 punto), pañuelo, mapa, brújula, campanilla, retrato, sello.
+- **Diario de Ruben** (`journal.js`): I o Tab (si no están asignadas), botón "Diario" del HUD, "📖 DIARIO DE RUBEN" en la pausa, 🎮 Select. Pestañas OBJETOS · VIRTUDES · NOTAS DE ANGELO (Q/E o LB/RB). Pausa el juego mientras está abierto.
+- **Árbol de virtudes pasivas**: Corazón (+1 vida, regenera 1 corazón tras 15 s sin daño, +1 vida e invulnerabilidad más larga) · Espada (+50% daño, ataque más rápido, botín: doble Valor y corazones) · Ingenio (+12% velocidad, piedras al doble de daño y más alcance, saltos +10%). Puntos = emblemas + 1 cada 5 de Valor (enemigos derrotados). Guardado en `localStorage['ruben_diario_v1']`.
+  - Se aplica envolviendo `player.attack`, `player.interactOrThrow`, `player.takeDamage`, `game.update`, `game.loadRoom` y `game.togglePause`; amplía `MenuNavigator` (getActiveMenu/handlePad) para el mando. Si cambiás esas firmas, avisá.
+- Nota: `GameHooks.onUpdate`, `onRoomLoad` y `onAction` están declarados en main.js pero nunca se llaman; por eso el Diario envuelve `update`/`loadRoom` directamente.

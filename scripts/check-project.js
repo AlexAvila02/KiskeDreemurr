@@ -90,7 +90,9 @@ try {
   sandbox.window.window = sandbox.window;
   vm.createContext(sandbox);
 
-  const loadOrder = ['enemies.js', 'world.js'];
+  // Archivos de salas extra (js/levels-*.js) que llenan window.PendingRooms antes de crear World
+  const levelFiles = fs.readdirSync(jsDir).filter(f => /^levels-.*\.js$/.test(f)).sort();
+  const loadOrder = ['enemies.js', 'world.js', ...levelFiles];
   for (const file of loadOrder) {
     const code = fs.readFileSync(path.join(jsDir, file), 'utf8');
     vm.runInContext(code, sandbox, { filename: `js/${file}` });
@@ -123,6 +125,16 @@ try {
     for (const exit of room.exits || []) {
       if (!world.rooms[exit.targetRoom]) {
         warn(`Sala ${room.id} tiene salida hacia targetRoom=${exit.targetRoom}, que aún no está registrada.`);
+      } else {
+        const t = world.rooms[exit.targetRoom];
+        if (exit.targetX < 0 || exit.targetX > t.width || exit.targetY < -60 || exit.targetY > t.height) {
+          warn(`Sala ${room.id}: la salida a ${exit.targetRoom} deja a Ruben fuera de la sala destino (${exit.targetX}, ${exit.targetY}).`);
+        }
+      }
+    }
+    for (const c of room.collectibles || []) {
+      if (typeof c.item !== 'string' || typeof c.x !== 'number' || typeof c.y !== 'number') {
+        fail(`Sala ${room.id} (${room.name}): objeto coleccionable mal definido (necesita { item, x, y }).`);
       }
     }
   }

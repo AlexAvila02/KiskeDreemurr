@@ -9,6 +9,8 @@ class World {
     this.currentRoomIndex = 0;
     this.rooms = [];
     this.biomes = World.BIOMES;
+    this._platformsBuffer = [];
+    this._doorCollider = { x: 0, y: 0, w: 0, h: 0, type: 'locked-door' };
     this.setupRooms();
     if (Array.isArray(window.PendingRooms)) {
       for (const cfg of window.PendingRooms) this.registerRoom(cfg);
@@ -126,6 +128,13 @@ class World {
       keyItem: null,
       ...roomConfig
     };
+    if (normalized.breakables) {
+      for (let i = 0; i < normalized.breakables.length; i++) {
+        const b = normalized.breakables[i];
+        b.type = 'breakable';
+        b.ref = b;
+      }
+    }
     this.rooms[normalized.id] = normalized;
     return normalized;
   }
@@ -332,24 +341,32 @@ class World {
 
   getPlatforms() {
     const room = this.getCurrentRoom();
-    const plats = [...room.platforms];
-    if (room.door && room.door.isLocked) {
-      plats.push({
-        x: room.door.x,
-        y: room.door.y,
-        w: room.door.width,
-        h: room.door.height,
-        type: 'locked-door'
-      });
+    const buf = this._platformsBuffer;
+    buf.length = 0;
+    if (!room) return buf;
+
+    const plats = room.platforms;
+    for (let i = 0; i < plats.length; i++) {
+      buf.push(plats[i]);
     }
+
+    if (room.door && room.door.isLocked) {
+      this._doorCollider.x = room.door.x;
+      this._doorCollider.y = room.door.y;
+      this._doorCollider.w = room.door.width;
+      this._doorCollider.h = room.door.height;
+      buf.push(this._doorCollider);
+    }
+
     if (room.breakables) {
-      for (const b of room.breakables) {
+      for (let i = 0; i < room.breakables.length; i++) {
+        const b = room.breakables[i];
         if (!b.broken) {
-          plats.push({ x: b.x, y: b.y, w: b.w, h: b.h, type: 'breakable', ref: b });
+          buf.push(b);
         }
       }
     }
-    return plats;
+    return buf;
   }
 
   // Permite romper muros agrietados o contrapesos al impactar una piedra lanzada

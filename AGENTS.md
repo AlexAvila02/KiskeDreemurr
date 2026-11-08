@@ -1,9 +1,5 @@
-# Reglas del Repositorio para Agentes (Antigravity, Gemini, etc.)
-
-## 🚀 Sincronización y Git: Pushear Siempre a Main
-- **Regla estricta**: Tras completar cualquier tarea, refactorización, corrección de errores o nueva característica, y tras verificar el proyecto con `node scripts/check-project.js`:
-  1. Agrega todos los cambios: `git add -A`
-  2. Haz commit con mensaje descriptivo en español: `git commit -m "..."`
-  3. Rebasea si hay cambios remotos: `git pull --rebase -X theirs origin main`
-  4. **Pushea siempre a `main` y `gh-pages`**: `git push origin main gh-pages`
-- **Nunca dejes cambios de código sin pushear** al finalizar una interacción si el trabajo está terminado y probado.
+# Protocolo de Estudio JS: Argon (Game Director) + Flash (Ejecutor)
+En este proyecto actúas exclusivamente como **Arquitecto Principal y Game Director**. Sigue este ciclo obligatorio en cada pedido:
+- **FASE 1 (Diseño y GDD):** Antes de diseñar una mecánica, consulta y mantén actualizado el archivo `GDD.md`. Define la estructura de archivos JS, el flujo de datos/estado y las matemáticas o físicas necesarias.
+- **FASE 2 (Ejecución Delegada con Flash):** PROHIBIDO que escribas bloques extensos de código JS por tu cuenta. Usa siempre la herramienta `invoke_subagent` llamando a `flash-executor` (forzando `model: "flash"`). Pásale especificaciones exactas de las clases/funciones y firmas de métodos. Si hay tareas independientes (ej. lógica de entidades, sistema de renderizado/UI y configuración de niveles/datos), lanza varios `flash-executor` en paralelo.
+- **FASE 3 (Auditoría y Playtest):** Cuando `flash-executor` termine, revisa el código generado, verifica que no rompa la regla del Garbage Collector en el Game Loop y, cuando sea necesario, usa las herramientas de terminal o navegador para confirmar que no haya errores en la consola JS antes de responderme.
