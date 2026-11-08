@@ -694,35 +694,47 @@
     };
   }
 
-  // Estrellas fijas (deterministas)
+  // Estrellas fijas con profundidad de paralaje (lejanas, medias y brillantes cercanas)
   const STARS = (() => {
     const rng = createRng(777);
     const list = [];
     for (let i = 0; i < 230; i++) {
-      list.push({ x: rng() * 1400, y: Math.pow(rng(), 1.5) * 330, r: rng() < 0.08 ? 1.8 : 0.6 + rng() * 0.9, tw: rng() * 6.28, sp: 0.8 + rng() * 2.2 });
+      const depth = rng(); // 0 = fondo profundo, 1 = estrella brillante más cercana
+      list.push({
+        x: rng() * 1400,
+        y: Math.pow(rng(), 1.5) * 330,
+        r: depth > 0.9 ? 1.85 : 0.55 + depth * 0.95,
+        tw: rng() * 6.28,
+        sp: 0.8 + rng() * 2.2,
+        par: 0.008 + depth * 0.024
+      });
     }
     return list;
   })();
 
-  // Bandadas de aves regresando al nido al caer la tarde
+  // Bandadas de aves regresando al nido en distintos planos de profundidad
   const FLOCKS = [
-    { x0: 1120, y0: 115, vx: -0.024, vy: -0.002, count: 5, span: 18, seed: 1 },
-    { x0: 1480, y0: 165, vx: -0.019, vy: -0.001, count: 4, span: 14, seed: 2 }
+    { x0: 1120, y0: 112, vx: -0.025, vy: -0.002, count: 5, span: 18, scale: 1.05, par: 0.055, parY: 0.025, seed: 1 },
+    { x0: 1480, y0: 162, vx: -0.018, vy: -0.001, count: 4, span: 13, scale: 0.78, par: 0.032, parY: 0.015, seed: 2 },
+    { x0: 780,  y0: 138, vx: -0.021, vy: -0.0015, count: 3, span: 15, scale: 0.88, par: 0.044, parY: 0.02, seed: 3 }
   ];
 
-  // Luciérnagas de fondo sobre la ribera y las colinas cuando cae la noche
+  // Luciérnagas de fondo con capas de profundidad sobre la ribera y las colinas
   const AMBIENT_FIREFLIES = (() => {
     const rng = createRng(919);
     const list = [];
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 30; i++) {
+      const depth = rng(); // 0 = lejana sobre el valle, 1 = cercana a las colinas
       list.push({
         x: rng() * 1400,
-        y: 325 + rng() * 175,
+        y: 320 + rng() * 180,
         phase: rng() * 6.283,
         speed: 0.0018 + rng() * 0.0024,
-        driftX: 12 + rng() * 22,
-        driftY: 6 + rng() * 12,
-        size: 1.4 + rng() * 1.4
+        driftX: 10 + depth * 24,
+        driftY: 5 + depth * 12,
+        size: 1.1 + depth * 1.6,
+        par: 0.16 + depth * 0.24,
+        parY: 0.06 + depth * 0.12
       });
     }
     return list;
@@ -730,14 +742,72 @@
 
   const NIGHT_INK = hexToRgb('#0b0d1e');
   const DEFAULT_CYCLE_DURATION_MS = 180000; // 3 minutos de tiempo real de atardecer a noche cerrada
+  const ROOM_WORLD_STRIDE = 820;            // desplazamiento continuo de mundo entre salas para paralaje sin cortes
   const journey = {
     elapsedMs: 0,
     lastTick: null,
     wasPlaying: false,
     shown: 0,
     durationMs: DEFAULT_CYCLE_DURATION_MS,
-    loop: false // false: se asienta en la noche estrellada; true: ciclo continuo
+    loop: false, // false: se asienta en la noche estrellada; true: ciclo continuo
+    camX: null,
+    camY: null,
+    velX: 0,
+    velY: 0
   };
+
+  /**
+   * Calcula coordenadas de cámara continuas y suavizadas (X e Y) a través de todo el mundo,
+   * evitando saltos bruscos del paisaje al cruzar de una sala a otra y añadiendo paralaje vertical
+   * cuando Ruben salta o escala hacia zonas altas (como el Altozano del Molino).
+   */
+  function getSmoothParallaxCamera(camera, width, height) {
+    const g = typeof window !== 'undefined' ? window.gameInstance : null;
+    let targetX = (camera && camera.x) || 0;
+    let targetY = (camera && camera.y) || 0;
+
+    if (g && g.world) {
+      const roomIdx = g.world.currentRoomIndex || 0;
+      // La sala 2 (Altozano del Molino) está arriba de la sala 1
+      const worldRoomX = roomIdx === 2 ? 1.35 : roomIdx;
+      const worldRoomY = roomIdx === 2 ? -180 : 0;
+      targetX += worldRoomX * ROOM_WORLD_STRIDE;
+      targetY += worldRoomY;
+
+      if (g.player) {
+        // Sutil respuesta vertical a la altura de Ruben dentro de la sala (saltos / plataformas altas)
+        const relY = ((g.player.y || 410) - 410) * 0.32;
+        targetY += relY;
+      }
+    }
+
+    if (journey.camX === null) {
+      journey.camX = targetX;
+      journey.camY = targetY;
+    }
+
+    const dx = targetX - journey.camX;
+    const dy = targetY - journey.camY;
+    // Si la distancia es razonable (misma sala o transición normal), interpolar con inercia sedosa
+    if (Math.abs(dx) < 2400) {
+      journey.camX += dx * 0.14;
+      journey.camY += dy * 0.12;
+      journey.velX = journey.velX * 0.82 + dx * 0.18;
+      journey.velY = journey.velY * 0.82 + dy * 0.18;
+    } else {
+      journey.camX = targetX;
+      journey.camY = targetY;
+      journey.velX = 0;
+      journey.velY = 0;
+    }
+
+    return {
+      x: journey.camX,
+      y: journey.camY,
+      vx: journey.velX,
+      vy: journey.velY
+    };
+  }
 
   /**
    * Progreso del atardecer basado en el tiempo real transcurrido (0..1).
@@ -952,7 +1022,7 @@
       ctx.restore();
     }
 
-    // ---- 4. Nubes alargadas iluminadas desde abajo y bandadas de aves al atardecer
+    // ---- 4. Nubes alargadas iluminadas desde abajo
     ctx.save();
     const cloudLit = mixRgb(sky.sun, sky.mid, 0.35);
     const cloudBody = mixRgb(sky.mid, sky.top, 0.55);
@@ -967,30 +1037,6 @@
       ctx.beginPath(); ctx.ellipse(cx - cw * 0.15, cy - 7, cw * 0.28, 8, 0, 0, 6.283); ctx.fill();
       ctx.fillStyle = rgba(cloudLit, (0.75 - night * 0.7) * (1 - cy / 400));
       ctx.beginPath(); ctx.ellipse(cx + 6, cy + 5, cw * 0.42, 3.5, 0, 0, 6.283); ctx.fill();
-    }
-
-    // Siluetas de aves en formación V regresando hacia el horizonte durante el crepúsculo
-    const birdAlpha = (1 - smoothstep(0.65, 0.85, t)) * 0.65;
-    if (birdAlpha > 0.02) {
-      ctx.strokeStyle = rgba(mixRgb(sky.land, NIGHT_INK, 0.5), birdAlpha);
-      ctx.lineWidth = 1.4;
-      ctx.lineCap = 'round';
-      for (const flock of FLOCKS) {
-        const fx = ((flock.x0 + time * flock.vx - camX * 0.035) % (width + 500) + (width + 500)) % (width + 500) - 200;
-        const fy = flock.y0 + Math.sin(time * 0.0008 + flock.seed) * 14;
-        for (let b = 0; b < flock.count; b++) {
-          const side = b % 2 === 0 ? 1 : -1;
-          const rank = Math.ceil(b / 2);
-          const bx = fx + rank * flock.span;
-          const by = fy + side * rank * (flock.span * 0.42);
-          const flap = Math.sin(time * 0.009 + b * 1.1 + flock.seed) * 3.2;
-          ctx.beginPath();
-          ctx.moveTo(bx - 5, by - flap);
-          ctx.quadraticCurveTo(bx - 2, by - 2, bx, by);
-          ctx.quadraticCurveTo(bx + 2, by - 2, bx + 5, by - flap);
-          ctx.stroke();
-        }
-      }
     }
     ctx.restore();
 
@@ -1237,47 +1283,13 @@
     }
     ctx.restore();
 
-    // ---- 8b. Luciérnagas de ribera que emergen al caer el crepúsculo y la noche
-    const fireflyAlpha = smoothstep(0.38, 0.72, t);
-    if (fireflyAlpha > 0.01) {
-      ctx.save();
-      for (let i = 0; i < AMBIENT_FIREFLIES.length; i++) {
-        const ff = AMBIENT_FIREFLIES[i];
-        const fx = ((ff.x - camX * 0.25 + Math.sin(time * 0.0007 + ff.phase) * ff.driftX) % 1400 + 1400) % 1400 - 200;
-        if (fx < -15 || fx > width + 15) continue;
-        const fy = ff.y + Math.cos(time * 0.0009 + ff.phase * 1.3) * ff.driftY;
-        const pulse = 0.5 + 0.5 * Math.sin(time * ff.speed + ff.phase);
-        const glowA = fireflyAlpha * Math.pow(pulse, 2.2);
-        if (glowA < 0.05) continue;
-
-        const fg = ctx.createRadialGradient(fx, fy, 0, fx, fy, ff.size * 5.5);
-        fg.addColorStop(0, `rgba(255, 245, 165, ${glowA * 0.95})`);
-        fg.addColorStop(0.4, `rgba(215, 240, 95, ${glowA * 0.45})`);
-        fg.addColorStop(1, 'rgba(180, 220, 70, 0)');
-        ctx.fillStyle = fg;
-        ctx.beginPath();
-        ctx.arc(fx, fy, ff.size * 5.5, 0, 6.283);
-        ctx.fill();
-
-        ctx.fillStyle = `rgba(255, 255, 225, ${glowA})`;
-        ctx.beginPath();
-        ctx.arc(fx, fy, ff.size * 0.75, 0, 6.283);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // ---- 9. Velo atmosférico (dorado al atardecer, azulado de noche)
-    if (dusk > 0.01) {
-      ctx.fillStyle = `rgba(255, 165, 85, ${dusk * 0.07})`;
-      ctx.fillRect(0, 0, width, height);
-    }
+    // ---- 9. Velo nocturno azulado sobre todo el paisaje
     if (night > 0) {
       ctx.fillStyle = `rgba(14, 20, 52, ${night * 0.18})`;
       ctx.fillRect(0, 0, width, height);
     }
 
-    journey.last = { t, night, dusk };
+    journey.last = { t, night };
     return journey.last;
   }
 
@@ -1288,8 +1300,8 @@
   function renderTimeOfDayTint(ctx, width = 960, height = 540) {
     const L = journey.last;
     if (!L) return;
-    const warm = smoothstep(0.05, 0.48, L.t) * (1 - L.night);
-    let c = mixRgb([255, 255, 255], [255, 208, 178], warm * 0.62);
+    const warm = smoothstep(0.1, 0.45, L.t) * (1 - L.night);
+    let c = mixRgb([255, 255, 255], [255, 214, 190], warm * 0.6);
     c = mixRgb(c, [118, 132, 196], L.night * 0.75);
     if (c[0] > 254 && c[2] > 254) return;
     ctx.save();
