@@ -8,6 +8,49 @@ function getEnemyPalette() {
   return (g && g.world && g.world.getCurrentBiome && g.world.getCurrentBiome().enemyPalette) || null;
 }
 
+// Utilidades de física y línea de visión compartidas por enemigos y objetos
+function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+// Comprueba si el segmento (x1,y1)->(x2,y2) intersecta un rectángulo (rx,ry,rw,rh)
+function segmentIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh) {
+  // Slab method (Liang-Barsky)
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  let t0 = 0;
+  let t1 = 1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1 - rx, rx + rw - x1, y1 - ry, ry + rh - y1];
+
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-8) {
+      if (q[i] < 0) return false;
+    } else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) {
+        if (t > t1) return false;
+        if (t > t0) t0 = t;
+      } else {
+        if (t < t0) return false;
+        if (t < t1) t1 = t;
+      }
+    }
+  }
+  return t0 <= t1;
+}
+
+// Verifica si hay línea de visión despejada entre dos puntos respecto a las plataformas
+function hasLineOfSight(world, x1, y1, x2, y2) {
+  const plats = world.getPlatforms();
+  for (const plat of plats) {
+    if (segmentIntersectsRect(x1, y1, x2, y2, plat.x, plat.y, plat.w, plat.h)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Objeto o Escombro Arrojable
 class ThrowableDebris {
   constructor(x, y) {
@@ -74,7 +117,7 @@ class ThrowableDebris {
         return;
       }
 
-      // Colisión con suelo / plataformas
+      // Colisión con suelo / plataformas / paredes
       for (const plat of world.getPlatforms()) {
         if (
           this.x < plat.x + plat.w &&
@@ -92,17 +135,39 @@ class ThrowableDebris {
         this.active = false;
       }
     } else {
-      // Gravedad leve si está en el suelo
-      this.vy += 0.3;
+      // Física suave en el suelo (por ejemplo cuando lo suelta un enemigo volador al morir)
+      const prevBottom = this.y + this.height;
+      this.vy = Math.min(10, this.vy + 0.35);
+      this.x += this.vx;
+      this.vx *= 0.85;
+      if (Math.abs(this.vx) < 0.05) this.vx = 0;
+
+      const room = world.getCurrentRoom();
+      const plats = world.getPlatforms();
+
+      // Colisión horizontal para que no atraviese muros al caer
+      for (const plat of plats) {
+        if (aabbOverlap(this.x, this.y, this.width, this.height, plat.x, plat.y, plat.w, plat.h)) {
+          if (this.vx > 0) this.x = plat.x - this.width;
+          else if (this.vx < 0) this.x = plat.x + plat.w;
+          this.vx = 0;
+        }
+      }
+      if (room) {
+        if (this.x < 0) { this.x = 0; this.vx = 0; }
+        if (this.x + this.width > room.width) { this.x = room.width - this.width; this.vx = 0; }
+      }
+
       this.y += this.vy;
       this.rot *= 0.8;
+      this.isGrounded = false;
 
-      for (const plat of world.getPlatforms()) {
+      for (const plat of plats) {
         if (
           this.x < plat.x + plat.w &&
           this.x + this.width > plat.x &&
           this.y + this.height >= plat.y &&
-          this.y + this.height <= plat.y + 15 &&
+          prevBottom <= plat.y + 16 &&
           this.vy >= 0
         ) {
           this.y = plat.y - this.height;
@@ -110,6 +175,10 @@ class ThrowableDebris {
           this.isGrounded = true;
           break;
         }
+      }
+
+      if (this.y > 1000) {
+        this.active = false;
       }
     }
   }
@@ -203,12 +272,20 @@ class CrawlerEnemy {
     this.height = 24;
     this.patrolDistance = patrolDistance;
     this.speed = 1.2;
+    this.chaseSpeed = 2.05;
     this.facing = 1; // 1 = derecha, -1 = izquierda
     this.hp = 30;
     this.maxHp = 30;
     this.alive = true;
     this.hitCooldown = 0;
     this.knockbackVx = 0;
+    this.vy = 0;
+    this.gravity = 0.45;
+    this.maxFallSpeed = 10;
+    this.isGrounded = false;
+    this.turnCooldown = 0;
+    this.alert = 0;
+    this.isChasing = false;
     // Animación (solo visual)
     this.animT = Math.random() * 10;
     this.sx = 1; this.vsx = 0;   // resorte de aplastamiento (giros y golpes)
@@ -221,6 +298,8 @@ class CrawlerEnemy {
     this.hp -= amount;
     this.hitCooldown = 15;
     this.knockbackVx = knockback;
+    this.vy = -2.6; // pequeño salto reactivo al recibir un golpe
+    this.isGrounded = false;
     this.sx = 0.7; this.vsx = 0;
     window.soundManager.playHit();
     window.particleSystem.createHitImpact(this.x + this.width / 2, this.y + this.height / 2, 10);
@@ -237,8 +316,36 @@ class CrawlerEnemy {
     window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height / 2, 12, '#c98a3a');
     // Suelta un escombro arrojable al morir
     if (window.gameInstance && window.gameInstance.debrisItems) {
-      window.gameInstance.debrisItems.push(new ThrowableDebris(this.x + 8, this.y - 4));
+      const drop = new ThrowableDebris(this.x + 8, this.y - 4);
+      drop.vy = -2.2;
+      window.gameInstance.debrisItems.push(drop);
     }
+  }
+
+  // Verifica si hay suelo firme un paso más adelante para no caer en precipicios ni salirse de plataformas
+  hasGroundAhead(world, dir) {
+    const probeX = dir > 0 ? (this.x + this.width + 3) : (this.x - 3);
+    const probeY = this.y + this.height + 4;
+    for (const plat of world.getPlatforms()) {
+      if (plat.type === 'ceiling' || plat.type === 'wall' || plat.type === 'locked-door') continue;
+      if (
+        probeX >= plat.x &&
+        probeX <= plat.x + plat.w &&
+        probeY >= plat.y &&
+        probeY <= plat.y + plat.h + 10
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  turnAround() {
+    if (this.turnCooldown > 0) return;
+    this.facing *= -1;
+    this.turnCooldown = 12;
+    this.sx = 0.82;
+    this.vsx = 0;
   }
 
   update(world, player) {
@@ -257,28 +364,133 @@ class CrawlerEnemy {
     }
 
     if (this.hitCooldown > 0) this.hitCooldown--;
+    if (this.turnCooldown > 0) this.turnCooldown--;
+    if (this.alert > 0) this.alert--;
 
-    if (Math.abs(this.knockbackVx) > 0.1) {
-      this.x += this.knockbackVx;
-      this.knockbackVx *= 0.85;
+    const room = world.getCurrentRoom();
+    const plats = world.getPlatforms();
+
+    // 1. Detectar si Ruben está cerca y en la misma plataforma/altura con visión directa
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+    const px = player.x + player.width / 2;
+    const py = player.y + player.height / 2;
+    const dx = px - cx;
+    const dy = py - cy;
+
+    const canSeePlayer =
+      !player.dead &&
+      Math.abs(dx) < 210 &&
+      Math.abs(dy) < 48 &&
+      Math.abs(px - this.startX) < this.patrolDistance + 90 &&
+      hasLineOfSight(world, cx, cy, px, py);
+
+    if (canSeePlayer) {
+      if (!this.isChasing) {
+        this.isChasing = true;
+        this.alert = 32;
+        this.sx = 0.84; this.vsx = 0;
+      }
+      const desiredFacing = Math.sign(dx);
+      if (desiredFacing !== 0 && desiredFacing !== this.facing && this.turnCooldown === 0 && Math.abs(dx) > 12) {
+        this.facing = desiredFacing;
+        this.turnCooldown = 14;
+        this.sx = 0.85; this.vsx = 0;
+      }
     } else {
-      // Patrullaje
-      this.x += this.speed * this.facing;
-      this.animT += this.speed * 0.22;
-      if (Math.abs(this.x - this.startX) > this.patrolDistance) {
-        this.facing *= -1;
-        this.sx = 0.82; this.vsx = 0; // pequeño "frenazo" al darse vuelta
+      this.isChasing = false;
+    }
+
+    // 2. Movimiento horizontal (knockback o patrullaje/embestida)
+    let moveVx = 0;
+    if (Math.abs(this.knockbackVx) > 0.1) {
+      moveVx = this.knockbackVx;
+      this.knockbackVx *= 0.82;
+      if (Math.abs(this.knockbackVx) <= 0.1) this.knockbackVx = 0;
+    } else {
+      const currentSpeed = this.isChasing ? this.chaseSpeed : this.speed;
+
+      // Antes de avanzar, comprobar si hay precipicio adelante
+      if (this.isGrounded && !this.hasGroundAhead(world, this.facing)) {
+        this.turnAround();
+        // Reanclar el centro de patrulla para no quedar atrapado contra un borde
+        this.startX = this.x + this.facing * Math.min(60, this.patrolDistance * 0.5);
+      } else if (!this.isChasing) {
+        // Solo voltear si se aleja más allá de su distancia de patrulla Y sigue caminando hacia afuera
+        const offset = this.x - this.startX;
+        if ((offset > this.patrolDistance && this.facing > 0) || (offset < -this.patrolDistance && this.facing < 0)) {
+          this.turnAround();
+        }
+      }
+
+      moveVx = currentSpeed * this.facing;
+      this.animT += currentSpeed * 0.22;
+    }
+
+    // Aplicar desplazamiento X y resolver colisiones con muros/plataformas
+    this.x += moveVx;
+    let hitWall = false;
+    for (const plat of plats) {
+      if (aabbOverlap(this.x, this.y, this.width, this.height, plat.x, plat.y, plat.w, plat.h)) {
+        if (moveVx > 0) {
+          this.x = plat.x - this.width;
+          hitWall = true;
+        } else if (moveVx < 0) {
+          this.x = plat.x + plat.w;
+          hitWall = true;
+        }
       }
     }
 
-    // Colisión dañina con el jugador
-    if (
-      this.x < player.x + player.width &&
-      this.x + this.width > player.x &&
-      this.y < player.y + player.height &&
-      this.y + this.height > player.y
-    ) {
-      player.takeDamage(1, this.facing * 6);
+    // Límites de la sala
+    if (room) {
+      if (this.x < 0) {
+        this.x = 0;
+        hitWall = true;
+      } else if (this.x + this.width > room.width) {
+        this.x = room.width - this.width;
+        hitWall = true;
+      }
+    }
+
+    if (hitWall) {
+      if (Math.abs(this.knockbackVx) > 0.1) {
+        this.knockbackVx = 0;
+      } else {
+        this.turnAround();
+        this.startX = this.x + this.facing * Math.min(60, this.patrolDistance * 0.5);
+      }
+    }
+
+    // 3. Gravedad y colisiones verticales (suelo y techo)
+    this.vy = Math.min(this.maxFallSpeed, this.vy + this.gravity);
+    this.y += this.vy;
+    this.isGrounded = false;
+
+    for (const plat of plats) {
+      if (aabbOverlap(this.x, this.y, this.width, this.height, plat.x, plat.y, plat.w, plat.h)) {
+        if (this.vy > 0) {
+          this.y = plat.y - this.height;
+          this.vy = 0;
+          this.isGrounded = true;
+        } else if (this.vy < 0) {
+          this.y = plat.y + plat.h;
+          this.vy = 0;
+        }
+      }
+    }
+
+    // Si por algún motivo cae al vacío, muere limpiamente
+    if (room && this.y > room.height + 60) {
+      this.alive = false;
+      this.dyingTimer = 0;
+      return;
+    }
+
+    // 4. Colisión dañina con el jugador
+    if (aabbOverlap(this.x, this.y, this.width, this.height, player.x, player.y, player.width, player.height)) {
+      const knockDir = Math.sign((player.x + player.width / 2) - (this.x + this.width / 2)) || this.facing;
+      player.takeDamage(1, knockDir * 6);
     }
   }
 
@@ -398,6 +610,24 @@ class CrawlerEnemy {
     }
 
     ctx.restore();
+
+    // Señal de alerta "!" cuando el escarabajo detecta a Ruben y carga
+    if (this.alive && this.alert > 0) {
+      const k = 1 - this.alert / 32;
+      const pop = k < 0.25 ? Math.sin((k / 0.25) * Math.PI * 0.5) * 1.2 : 1;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, this.alert / 10);
+      ctx.translate(cx, sy - 10);
+      ctx.scale(pop, pop);
+      ctx.font = '800 14px Cinzel, Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#3a2416';
+      ctx.fillStyle = '#ffe28a';
+      ctx.strokeText('!', 0, 0);
+      ctx.fillText('!', 0, 0);
+      ctx.restore();
+    }
   }
 }
 
@@ -413,9 +643,13 @@ class FlyingShadeEnemy {
     this.hp = 20;
     this.alive = true;
     this.hitCooldown = 0;
-    this.angle = 0;
-    this.speed = 1.6;
-    this.detectionRadius = 240;
+    this.angle = Math.random() * Math.PI * 2;
+    this.speed = 1.65;
+    this.returnSpeed = 1.25;
+    this.detectionRadius = 250;
+    this.leashRadius = 380; // distancia máxima que se aleja de su nido antes de regresar
+    this.vx = 0;
+    this.vy = 0;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
     // Animación (solo visual)
@@ -427,6 +661,7 @@ class FlyingShadeEnemy {
     this.DYING_FRAMES = 28;
     this.alert = 0;   // "¡!" breve al detectar a Ruben
     this.wasChasing = false;
+    this.loseSightTimer = 0; // memoria breve tras perder de vista a Ruben
   }
 
   takeDamage(amount, knockback = 0) {
@@ -449,7 +684,51 @@ class FlyingShadeEnemy {
     this.dyingTimer = this.DYING_FRAMES;
     window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height / 2, 10, '#e8c882');
     if (window.gameInstance && window.gameInstance.debrisItems) {
-      window.gameInstance.debrisItems.push(new ThrowableDebris(this.x + 6, this.y));
+      const drop = new ThrowableDebris(this.x + 6, this.y);
+      drop.vy = -1.5;
+      window.gameInstance.debrisItems.push(drop);
+    }
+  }
+
+  // Movimiento con resolución de colisiones por ejes (permite deslizarse por paredes y techos sin atravesarlos)
+  moveWithCollisions(world, dx, dy) {
+    const plats = world.getPlatforms();
+    const room = world.getCurrentRoom();
+
+    // Eje X
+    this.x += dx;
+    for (const plat of plats) {
+      if (aabbOverlap(this.x, this.y, this.width, this.height, plat.x, plat.y, plat.w, plat.h)) {
+        if (dx > 0) {
+          this.x = plat.x - this.width;
+        } else if (dx < 0) {
+          this.x = plat.x + plat.w;
+        }
+        this.vx = 0;
+        this.knockbackVx = 0;
+      }
+    }
+    if (room) {
+      if (this.x < 4) { this.x = 4; this.vx = 0; }
+      if (this.x + this.width > room.width - 4) { this.x = room.width - 4 - this.width; this.vx = 0; }
+    }
+
+    // Eje Y
+    this.y += dy;
+    for (const plat of plats) {
+      if (aabbOverlap(this.x, this.y, this.width, this.height, plat.x, plat.y, plat.w, plat.h)) {
+        if (dy > 0) {
+          this.y = plat.y - this.height;
+        } else if (dy < 0) {
+          this.y = plat.y + plat.h;
+        }
+        this.vy = 0;
+        this.knockbackVy = 0;
+      }
+    }
+    if (room) {
+      if (this.y < 22) { this.y = 22; this.vy = 0; }
+      if (this.y + this.height > room.height - 4) { this.y = room.height - 4 - this.height; this.vy = 0; }
     }
   }
 
@@ -457,8 +736,7 @@ class FlyingShadeEnemy {
     if (!this.alive) {
       if (this.dyingTimer > 0) {
         this.dyingTimer--;
-        this.y += 1.2; // cae en espiral
-        this.x += Math.sin(this.dyingTimer * 0.5) * 1.5;
+        this.moveWithCollisions(world, Math.sin(this.dyingTimer * 0.5) * 1.5, 1.4);
       }
       return;
     }
@@ -467,45 +745,86 @@ class FlyingShadeEnemy {
     if (this.alert > 0) this.alert--;
 
     let chasing = false;
-    if (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1) {
-      this.x += this.knockbackVx;
-      this.y += this.knockbackVy;
-      this.knockbackVx *= 0.88;
-      this.knockbackVy *= 0.88;
-    } else {
-      const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
-      const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
-      const dist = Math.hypot(dx, dy);
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+    const px = player.x + player.width / 2;
+    const py = player.y + player.height / 2;
 
-      if (dist > 0.5 && dist < this.detectionRadius) {
-        // Acechar y descender lentamente hacia Ruben
-        this.x += (dx / dist) * this.speed;
-        this.y += (dy / dist) * this.speed;
+    if (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1) {
+      this.moveWithCollisions(world, this.knockbackVx, this.knockbackVy);
+      this.knockbackVx *= 0.85;
+      this.knockbackVy *= 0.85;
+      if (Math.abs(this.knockbackVx) <= 0.1) this.knockbackVx = 0;
+      if (Math.abs(this.knockbackVy) <= 0.1) this.knockbackVy = 0;
+    } else {
+      const dx = px - cx;
+      const dy = py - cy;
+      const distToPlayer = Math.hypot(dx, dy);
+      const distFromOrigin = Math.hypot(cx - this.originX, cy - this.originY);
+
+      // Comprobar si Ruben está a la vista y dentro del rango
+      const hasSight =
+        !player.dead &&
+        distToPlayer < this.detectionRadius &&
+        distFromOrigin < this.leashRadius &&
+        hasLineOfSight(world, cx, cy, px, py);
+
+      if (hasSight) {
+        this.loseSightTimer = 35; // mantiene persecución unos instantes aunque cruce un borde pequeño
+      } else if (this.loseSightTimer > 0) {
+        this.loseSightTimer--;
+      }
+
+      if ((hasSight || this.loseSightTimer > 0) && !player.dead && distToPlayer > 0.5 && distFromOrigin < this.leashRadius) {
+        // Perseguir suavemente con inercia (sin teletransportación jamás)
+        const targetVx = (dx / distToPlayer) * this.speed;
+        const targetVy = (dy / distToPlayer) * this.speed + Math.sin(this.flapT * 0.5) * 0.25;
+        this.vx += (targetVx - this.vx) * 0.18;
+        this.vy += (targetVy - this.vy) * 0.18;
+        this.moveWithCollisions(world, this.vx, this.vy);
         chasing = true;
         this.lookX = Math.sign(dx) || this.lookX;
       } else {
-        // Flotación suave en su punto de origen
-        this.angle += 0.04;
-        this.y = this.originY + Math.sin(this.angle) * 16;
+        // Regresar de forma continua y suave hacia su posición de patrulla (en figura de 8 / onda suave)
+        this.angle += 0.035;
+        const patrolTargetX = this.originX + Math.sin(this.angle * 0.7) * 22;
+        const patrolTargetY = this.originY + Math.sin(this.angle * 1.4) * 14;
+        const toOrigX = patrolTargetX - this.x;
+        const toOrigY = patrolTargetY - this.y;
+        const distOrig = Math.hypot(toOrigX, toOrigY);
+
+        let targetVx = 0;
+        let targetVy = 0;
+        if (distOrig > 1.5) {
+          const spd = Math.min(this.returnSpeed, distOrig * 0.08);
+          targetVx = (toOrigX / distOrig) * spd;
+          targetVy = (toOrigY / distOrig) * spd;
+        }
+        this.vx += (targetVx - this.vx) * 0.15;
+        this.vy += (targetVy - this.vy) * 0.15;
+        this.moveWithCollisions(world, this.vx, this.vy);
+        if (Math.abs(this.vx) > 0.15) {
+          this.lookX = Math.sign(this.vx);
+        }
       }
     }
+
     if (chasing && !this.wasChasing) this.alert = 40;
     this.wasChasing = chasing;
 
-    // Inclinación según la velocidad horizontal y aleteo más rápido al perseguir
-    const vx = this.x - this.prevX;
+    // Inclinación según la velocidad horizontal real y aleteo más rápido al perseguir
+    const realVx = this.x - this.prevX;
     this.prevX = this.x;
-    this.tilt += (vx * 0.18 - this.tilt) * 0.15;
+    this.tilt += (realVx * 0.18 - this.tilt) * 0.15;
     this.flapT += chasing ? 0.42 : 0.28;
 
     // Colisión dañina con el jugador
-    if (
-      this.x < player.x + player.width &&
-      this.x + this.width > player.x &&
-      this.y < player.y + player.height &&
-      this.y + this.height > player.y
-    ) {
-      player.takeDamage(1, (Math.sign(player.x - this.x) || 1) * 6);
+    if (aabbOverlap(this.x, this.y, this.width, this.height, player.x, player.y, player.width, player.height)) {
+      const knockDir = Math.sign((player.x + player.width / 2) - (this.x + this.width / 2)) || 1;
+      player.takeDamage(1, knockDir * 6);
+      // Pequeño rebote hacia atrás tras picar a Ruben para no quedarse pegada encima de él
+      this.knockbackVx = -knockDir * 2.4;
+      this.knockbackVy = -1.8;
     }
   }
 

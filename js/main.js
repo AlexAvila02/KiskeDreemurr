@@ -179,6 +179,8 @@ class Game {
     // Instanciar enemigos y objetos de la sala
     this.enemies = room.spawnEnemies ? room.spawnEnemies() : [];
     this.debrisItems = room.spawnDebris ? room.spawnDebris() : [];
+    this.activeNote = null;
+    if (this.dialogBox) this.hideDialog();
     // Si Ruben llevaba una piedra, la lleva consigo a la nueva sala
     if (this.player.carriedItem) this.debrisItems.push(this.player.carriedItem);
     window.particleSystem.particles && (window.particleSystem.particles.length = 0);
@@ -311,8 +313,10 @@ class Game {
     const dialogOpen = !this.dialogBox.classList.contains('hidden');
 
     // Con una nota abierta, saltar o interactuar la cierra; lo demás se ignora
-    if (dialogOpen) {
-      if (action === 'jump' || action === 'interact') this.closeDialog();
+    // Una nota visible no bloquea nada: se abre y se cierra sola por cercanía.
+    // Solo "interactuar" sobre una nota que se está escribiendo la muestra completa.
+    if (dialogOpen && action === 'interact' && this.dialogTyping) {
+      this.finishTyping();
       return;
     }
 
@@ -430,7 +434,10 @@ class Game {
 
     const modalOpen = this.controlsManager && this.controlsManager.isModalOpen && this.controlsManager.isModalOpen();
 
-    if (modalOpen) {
+    // Menús (inicio, pausa, controles): navegación con stick/cruceta, A elige, B vuelve (js/menu-nav.js)
+    if (this.menuNav && this.menuNav.handlePad(pressed, this.padPrev)) {
+      // el menú consumió el mando
+    } else if (modalOpen) {
       // Con el menú de controles abierto, B o Start lo cierran
       if (justPressed(1) || justPressed(9)) {
         this.controlsManager.closeModal();
@@ -466,18 +473,54 @@ class Game {
     } catch (e) { /* sin vibración */ }
   }
 
+  // Muestra la nota de Angelo cuando Ruben pasa por encima y la oculta al alejarse
+  updateNearbyNote() {
+    const room = this.world.getCurrentRoom();
+    const px = this.player.x + this.player.width / 2;
+    const py = this.player.y + this.player.height / 2;
+
+    let near = null;
+    if (!this.player.dead) {
+      for (const tab of room.tablets || []) {
+        if (Math.abs(px - (tab.x + 11)) < 38 && Math.abs(py - (tab.y + 17)) < 46) { near = tab; break; }
+      }
+    }
+
+    if (near) {
+      if (near !== this.activeNote) {
+        this.activeNote = near;
+        this.showDialog(near.speaker, near.text, true);
+      }
+      return;
+    }
+
+    // El mensaje del portón también se cierra solo al alejarse
+    if (this.activeNote && this.activeNote === room.door) {
+      const d = room.door;
+      const nx = Math.max(d.x, Math.min(px, d.x + d.width));
+      const ny = Math.max(d.y, Math.min(py, d.y + d.height));
+      if (Math.hypot(px - nx, py - ny) < 90) return;
+    }
+
+    if (this.activeNote) {
+      this.activeNote = null;
+      this.hideDialog();
+    }
+  }
+
+  hideDialog() {
+    if (this.typeInterval) clearInterval(this.typeInterval);
+    this.dialogTyping = false;
+    this.dialogBox.classList.add('hidden');
+  }
+
   checkInteractions() {
     const room = this.world.getCurrentRoom();
     const px = this.player.x + this.player.width / 2;
     const py = this.player.y + this.player.height / 2;
 
     // 1. Revisar notas de Angelo
-    for (const tab of room.tablets) {
-      if (Math.hypot(px - (tab.x + 11), py - (tab.y + 17)) < 55) {
-        this.showDialog(tab.speaker, tab.text);
-        return;
-      }
-    }
+    // (Las notas de Angelo se muestran solas al pasar por encima: ver updateNearbyNote)
 
     // 2. Revisar puerta sellada
     if (room.door && room.door.isLocked) {
@@ -492,6 +535,7 @@ class Game {
           this.triggerScreenShake(8, 250);
           this.showNotification("¡El Portón Norte se abrió!");
         } else {
+          this.activeNote = room.door;
           this.showDialog(
             "Portón Cerrado",
             "El Portón Norte está trabado con candado. Angelo dejó la llave en lo alto del molino."
@@ -540,9 +584,13 @@ class Game {
     this.updateHUD();
   }
 
-  showDialog(speaker, text) {
+  showDialog(speaker, text, auto = false) {
+    // Las notas usan el mismo lugar que los avisos: ocultar el aviso para que no se encimen
+    if (this.notificationTimer) clearTimeout(this.notificationTimer);
+    this.notification.classList.add('hidden');
     this.dialogSpeaker.textContent = speaker;
     this.dialogBox.classList.remove('hidden', 'typed');
+    this.dialogBox.classList.toggle('auto', !!auto);
     this.retriggerClass(this.dialogBox, 'dialog-pop');
     window.soundManager.playPickup();
 
@@ -713,7 +761,7 @@ class Game {
     if (!this.isPlaying || this.isPaused) return;
     if (this.irisOpen > 0) this.irisOpen = Math.max(0, this.irisOpen - 1 / this.IRIS_FRAMES);
     // El mundo se congela mientras se lee una nota
-    if (!this.dialogBox.classList.contains('hidden')) return;
+    // (Las notas ya no pausan el juego: se leen mientras Ruben sigue moviéndose)
 
     // Animación de muerte: el mundo sigue de fondo, Ruben no se controla
     if (this.deathTimer > 0) {
@@ -741,6 +789,9 @@ class Game {
     const p = this.player;
     if (p.x < 0) { p.x = 0; p.vx = 0; }
     if (p.x + p.width > room.width) { p.x = room.width - p.width; p.vx = 0; }
+
+    // Notas de Angelo por cercanía
+    this.updateNearbyNote();
 
     // Las salidas se revisan antes que la caída, para no morir al cruzar un borde
     const roomBefore = this.world.currentRoomIndex;

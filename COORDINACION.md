@@ -157,3 +157,27 @@ Para que tanto Claude como Gemini trabajen sin colisiones ni esperas:
 - **Pogo**: tajo hacia abajo en el aire que conecta → `vy = -8.6` y recupera el doble salto.
 - **Render**: `swordAng` y la estela (`renderSlashTrail`) se rotan por `attackAim`.
 - **Mando**: stick izq. vertical / cruceta arriba-abajo → `keys.PadUp/PadDown` (con soporte de mandos no estándar).
+
+## Cambios de Claude (ronda 11): notas con el mismo cuadro que los avisos (pedido del usuario)
+- **style.css** (bloque al final): `.dialog-box` ahora usa el estilo de `.notification`: cápsula oscura `rgba(48,30,18,.94)`, borde `#d9a634`, radio 20px, texto `#fff2d0`, arriba al centro (`top: 76px`), máx. 560px. Se mantienen el efecto máquina de escribir, la pausa y la forma de cerrar.
+- **main.js `showDialog()`**: oculta el aviso activo para que no se encime con la nota.
+- Cualquier texto nuevo del juego (carteles, diálogos, avisos) debe usar este mismo estilo.
+
+## Cambios de Claude (ronda 12): notas automáticas y sin pausa (pedido del usuario)
+- Las notas de Angelo **se muestran solas** al pasar por encima (`updateNearbyNote()`, se llama cada cuadro en `update`) y **se ocultan al alejarse**. No hace falta apretar E.
+- **El juego ya no se congela** con un texto abierto: se quitó la pausa de `update()` y `doAction()` ya no bloquea acciones con la nota visible.
+- El mensaje del "Portón Cerrado" (con E) también se oculta solo al alejarse (`activeNote = room.door`).
+- `showDialog(speaker, text, auto)`: con `auto = true` no se muestra "Presiona E para cerrar". `hideDialog()` lo oculta.
+- **No volver a pausar el juego por los textos.**
+
+## Mejora de Lógica y Física de Enemigos (`js/enemies.js` - Gemini)
+- **Física y Colisión con Paredes / Plataformas (`aabbOverlap`, `moveWithCollisions`)**:
+  - Ningún enemigo ni objeto arrojable puede atravesar paredes, suelos, techos, muros quebradizos ni el portón cerrado.
+  - `FlyingShadeEnemy` (Polilla) resuelve colisiones separadas en ejes X e Y, deslizándose suavemente por paredes y plataformas en lugar de atravesarlas.
+  - `CrawlerEnemy` (Escarabajo) tiene gravedad real, detección de suelo firme un paso adelante (`hasGroundAhead`) para no caer al vacío ni flotar fuera de plataformas, y rebota/gira limpiamente al tocar muros o bordes de sala.
+- **Cero Teletransportación (`FlyingShadeEnemy` y `CrawlerEnemy`)**:
+  - Eliminado el bug en `FlyingShadeEnemy` donde al salir Ruben del radio de detección se asignaba `this.y = this.originY + Math.sin(...)` directamente, causando un teletransporte instantáneo de regreso a su altura de origen. Ahora regresa volando suavemente con velocidad e inercia (`this.vx`, `this.vy`) hacia su ruta de patrulla.
+  - Eliminado el bucle de giro infinito en `CrawlerEnemy` tras ser empujado por knockback fuera de su `patrolDistance`.
+- **Línea de Visión (`hasLineOfSight` con algoritmo Liang-Barsky)**:
+  - Tanto la polilla como el escarabajo verifican que no haya plataformas ni muros entre ellos y Ruben antes de iniciar o mantener la persecución.
+  - El escarabajo también detecta a Ruben cuando está en su misma plataforma/altura y acelera su embestida con un aviso `!`.
