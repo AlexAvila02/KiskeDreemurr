@@ -40,7 +40,7 @@ class Player {
     this.attackTimer = 0;
     this.attackDuration = 12;
     this.attackCooldown = 0;
-    this.attackBox = { x: 0, y: 0, w: 46, h: 42 };
+    this.attackBox = { x: 0, y: 0, w: 51, h: 46 };
 
     // Mecánica de Agarre / Lanzamiento
     this.carriedItem = null;
@@ -121,13 +121,13 @@ class Player {
     window.soundManager.playSlash();
     let connected = false;
 
-    // Actualizar hitbox de ataque según la dirección
-    // Caja de golpe centrada a ~32 px del cuerpo en la dirección del tajo
+    // Actualizar hitbox de ataque según la dirección (+10% de rango)
+    // Caja de golpe centrada a ~37.4 px del cuerpo en la dirección del tajo
     const vertical = Math.abs(dirY) > 0.9;
-    this.attackBox.w = vertical ? 50 : 46;
-    this.attackBox.h = vertical ? 46 : 42;
-    const bcx = this.x + this.width / 2 + dirX * 34;
-    const bcy = this.y + this.height / 2 + dirY * 36;
+    this.attackBox.w = vertical ? 55 : 51;
+    this.attackBox.h = vertical ? 51 : 46;
+    const bcx = this.x + this.width / 2 + dirX * 37.4;
+    const bcy = this.y + this.height / 2 + dirY * 39.6;
     this.attackBox.x = bcx - this.attackBox.w / 2;
     this.attackBox.y = bcy - this.attackBox.h / 2;
 
@@ -607,7 +607,7 @@ class Player {
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(hx, hy);
-    ctx.lineTo(hx + f * Math.cos(swordAng) * 15, hy + Math.sin(swordAng) * 15);
+    ctx.lineTo(hx + f * Math.cos(swordAng) * 16.5, hy + Math.sin(swordAng) * 16.5);
     ctx.stroke();
     ctx.strokeStyle = OUT;
     ctx.lineWidth = 1;
@@ -737,9 +737,9 @@ class Player {
     const tail = from + (to - from) * ease((p - 0.3) / 0.7) + aimA;
     if (Math.abs(head - tail) < 0.05) return;
 
-    const ox = bodyX + f * 8 * Math.cos(aimA);
-    const oy = oyBase + 8 * Math.sin(aimA);
-    const R = 31;
+    const ox = bodyX + f * 8.8 * Math.cos(aimA);
+    const oy = oyBase + 8.8 * Math.sin(aimA);
+    const R = 34.1;
     const N = 14;
     const outer = [], inner = [];
     for (let i = 0; i <= N; i++) {
