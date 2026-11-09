@@ -15,7 +15,18 @@ class ParticleSystem {
 
     // Pre-alojar todas las instancias de partícula en el constructor para evitar GC
     for (let i = 0; i < this.MAX_PARTICLES; i++) {
-      this.pool[i] = {
+      this.pool[i] = this._makeParticle();
+    }
+
+    this.activeCount = 0;
+    this.particles = this.pool; // Referencia compatible para scripts externos
+    this.ambientMotes = [];
+    this.currentBiome = 'pradera';
+    this.initAmbientMotes(55);
+  }
+
+  _makeParticle() {
+    return {
         type: 'dot',
         x: 0,
         y: 0,
@@ -35,13 +46,28 @@ class ParticleSystem {
         spin: 0,
         life: 0
       };
-    }
+  }
 
+  /** Apaga todas las partículas activas (al cambiar de sala) sin destruir el pool. */
+  clear() {
     this.activeCount = 0;
-    this.particles = this.pool; // Referencia compatible para scripts externos
-    this.ambientMotes = [];
-    this.currentBiome = 'pradera';
-    this.initAmbientMotes(55);
+    this._repairPool();
+  }
+
+  /**
+   * Si algún script vació o recortó `particles` (p. ej. `particles.length = 0`),
+   * vuelve a llenar el pool para que nunca haya huecos `undefined`.
+   */
+  _repairPool() {
+    const pool = this.pool;
+    if (pool.length === this.MAX_PARTICLES && pool[this.MAX_PARTICLES - 1]) return;
+    const kept = pool.length;
+    if (kept < this.activeCount) this.activeCount = kept;
+    pool.length = this.MAX_PARTICLES;
+    for (let i = 0; i < this.MAX_PARTICLES; i++) {
+      if (!pool[i]) pool[i] = this._makeParticle();
+    }
+    if (this.activeCount > this.MAX_PARTICLES) this.activeCount = this.MAX_PARTICLES;
   }
 
   setBiome(biome = 'pradera') {
@@ -67,6 +93,7 @@ class ParticleSystem {
 
   // Obtiene una partícula reciclada del pool sin instanciar objetos nuevos
   acquire() {
+    if (this.pool.length !== this.MAX_PARTICLES) this._repairPool();
     let p;
     if (this.activeCount < this.MAX_PARTICLES) {
       p = this.pool[this.activeCount];
@@ -268,6 +295,7 @@ class ParticleSystem {
   }
 
   update() {
+    if (this.pool.length !== this.MAX_PARTICLES) this._repairPool();
     // Actualizar partículas dinámicas activas del pool
     for (let i = this.activeCount - 1; i >= 0; i--) {
       const p = this.pool[i];

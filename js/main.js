@@ -183,7 +183,9 @@ class Game {
     if (this.dialogBox) this.hideDialog();
     // Si Ruben llevaba una piedra, la lleva consigo a la nueva sala
     if (this.player.carriedItem) this.debrisItems.push(this.player.carriedItem);
-    window.particleSystem.particles && (window.particleSystem.particles.length = 0);
+    // Apagar partículas de la sala anterior sin vaciar el pool (vaciarlo crasheaba el juego)
+    if (window.particleSystem.clear) window.particleSystem.clear();
+    else if (window.particleSystem.particles) window.particleSystem.particles.length = 0;
     if (window.particleSystem.setBiome) window.particleSystem.setBiome(room.biome || 'pradera');
     if (window.soundManager.setBiomeAmbience) window.soundManager.setBiomeAmbience(room.biome || 'pradera');
 
