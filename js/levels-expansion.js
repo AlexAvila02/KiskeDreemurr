@@ -368,9 +368,107 @@
     addCollectible(3, { item: 'emblema', x: 340, y: 324 });   // rama baja del bosque
   }
 
+  // ==========================================================
+  // Llegada a una sala de arriba (salas 2 y 6): Ruben sale disparado desde abajo
+  // por el hueco del suelo, da una voltereta y aterriza en la plataforma de al lado.
+  // Se activa al entrar por una salida con hint 'up' a una sala con salida hint 'down'.
+  // ==========================================================
+  const EMPTY_KEYS = Object.freeze({});
+  const rise = { t: -1, hold: 8, dur: 30, x0: 0, y0: 0, x1: 0, y1: 0, h: 110, prevX: 0, prevY: 0 };
+  const RISE_START_Y = 545;     // fuera de cámara, debajo del hueco
+
+  function risePos(s) {
+    // Tiro parabólico: y cuadrática en el tiempo; x con arranque y frenada suaves
+    const e = s * s * (3 - 2 * s);
+    return {
+      x: rise.x0 + (rise.x1 - rise.x0) * e,
+      y: rise.y0 + (rise.y1 - rise.y0) * s - rise.h * 4 * s * (1 - s)
+    };
+  }
+
+  function installRiseArrival(game) {
+    const p = game.player;
+    const rising = () => rise.t >= 0;
+
+    const origLoad = game.loadRoom.bind(game);
+    game.loadRoom = (index, sx = null, sy = null) => {
+      const prev = game.world.rooms[game.world.currentRoomIndex];
+      const viaUp = sx !== null && prev && prev.exits &&
+        prev.exits.some(e => e.targetRoom === index && e.hint && e.hint.dir === 'up');
+      rise.t = -1;
+      origLoad(index, sx, sy);
+      if (!viaUp) return;
+      const room = game.world.getCurrentRoom();
+      const hole = room && room.exits && room.exits.find(e => e.hint && e.hint.dir === 'down');
+      if (!hole) return;
+      // Arranca escondido bajo el hueco y termina justo en el punto de aparición de siempre
+      rise.x0 = hole.hint.x + hole.hint.w / 2 - p.width / 2;
+      rise.y0 = RISE_START_Y;
+      rise.x1 = p.x;
+      rise.y1 = p.y;
+      rise.t = 0;
+      p.facing = rise.x1 >= rise.x0 ? 1 : -1;
+      p.x = rise.x0; p.y = rise.y0;
+      p.vx = 0; p.vy = 0;
+      p.isGrounded = false;
+      rise.prevX = p.x; rise.prevY = p.y;
+    };
+
+    // Mientras sube no se revisan salidas (el hueco es la salida hacia abajo)
+    const origExits = game.checkRoomExits.bind(game);
+    game.checkRoomExits = () => { if (!rising()) origExits(); };
+
+    // Sin saltar, atacar ni agarrar durante la animación
+    const origDoAction = game.doAction.bind(game);
+    game.doAction = (action) => { if (!rising()) origDoAction(action); };
+
+    const origPlayerUpdate = p.update.bind(p);
+    p.update = (world, keys, cm) => {
+      if (!rising() || p.dead) { if (p.dead) rise.t = -1; return origPlayerUpdate(world, keys, cm); }
+      // La física corre igual (bufanda, resortes), pero la posición la guía la curva
+      origPlayerUpdate(world, EMPTY_KEYS, cm);
+      const t = rise.t++;
+      if (t < rise.hold) {
+        p.x = rise.x0; p.y = rise.y0; p.vx = 0; p.vy = 0; p.isGrounded = false;
+        return;
+      }
+      const s = Math.min(1, (t - rise.hold + 1) / rise.dur);
+      if (t === rise.hold) {
+        // Despegue: estirón, sonido y polvo saliendo del hueco
+        p.anim.sy = 1.32; p.anim.vsy = 0;
+        if (window.soundManager && window.soundManager.playJump) window.soundManager.playJump();
+        if (window.particleSystem) {
+          window.particleSystem.createDust(rise.x0 + p.width / 2, 462, 10);
+          if (window.particleSystem.createShockwave) {
+            window.particleSystem.createShockwave(rise.x0 + p.width / 2, 462, 22, 'rgba(255, 236, 196, 0.7)', 2);
+          }
+        }
+      }
+      // Voltereta al pasar el borde del hueco (termina antes de aterrizar)
+      if (s >= 0.22 && s - 1 / rise.dur < 0.22) p.anim.flip = 1;
+      const pos = risePos(s);
+      p.x = pos.x; p.y = pos.y;
+      // Velocidades coherentes con la curva: inclinación y bufanda reaccionan bien
+      p.vx = p.x - rise.prevX;
+      p.vy = p.y - rise.prevY;
+      p.isGrounded = false;
+      rise.prevX = p.x; rise.prevY = p.y;
+      if (s >= 1) {
+        // Fin de la curva: la física normal hace el aterrizaje (polvo y aplastón)
+        rise.t = -1;
+        p.vx = 0;
+        p.canDoubleJump = true;
+        p.hasUsedDoubleJump = false;
+      }
+    };
+  }
+
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
   window.GameHooks.onInit = window.GameHooks.onInit || [];
   window.GameHooks.onInit.push((game) => patchOriginalRooms(game.world));
+  window.GameHooks.onInit.push((game) => {
+    try { installRiseArrival(game); } catch (e) { console.error('[Salas] llegada desde abajo:', e); }
+  });
   // "Reiniciar juego" crea un World nuevo: volver a aplicar los parches de las salas 0-3
   window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
   window.GameHooks.onRestartGame.push((game) => patchOriginalRooms(game.world));

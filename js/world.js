@@ -310,7 +310,7 @@ class World {
       platforms: [
         { x: 0, y: 460, w: 1280, h: 80, type: 'ground' },
         { x: 0, y: 0, w: 1280, h: 20, type: 'ceiling' },
-        { x: 0, y: 0, w: 30, h: 540, type: 'wall' },
+        // Sin pared a la izquierda: el sendero sigue abierto de vuelta al Portón Norte
         { x: 1250, y: 0, w: 30, h: 540, type: 'wall' },
         { x: 260, y: 360, w: 160, h: 22, type: 'ruins' },
         { x: 520, y: 280, w: 220, h: 24, type: 'ruins' },
@@ -325,7 +325,8 @@ class World {
         }
       ],
       exits: [
-        { x: 35, y: 360, w: 45, h: 100, targetRoom: 1, targetX: 1120, targetY: 410 }
+        // Pegada al borde: se sale caminando (o saltando) hacia la izquierda, como en las demás salas
+        { x: 0, y: 340, w: 40, h: 120, targetRoom: 1, targetX: 1120, targetY: 410 }
       ],
       spawnEnemies: () => [
         new CrawlerEnemy(380, 436, 130),
