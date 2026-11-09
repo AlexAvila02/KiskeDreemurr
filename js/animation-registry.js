@@ -631,10 +631,17 @@
   // FX: Arco caligráfico de tajo ('slash-crescent')
   defineFX('slash-crescent', {
     duration: 12,
+    // Viaja pegado a Ruben: si ataca corriendo, el arco no queda atrás (Claude, pedido del usuario)
+    update(fx) {
+      const t = fx.follow;
+      if (!t) return;
+      fx.x = t.x + t.width / 2 + fx.offX;
+      fx.y = t.y + t.height / 2 + fx.offY;
+    },
     render(fx, ctx, camera, sx, sy) {
       const p = fx.frame / fx.maxFrames;
       const ease = 1 - Math.pow(1 - p, 2);
-      const alpha = Math.max(0, 1 - p * p);
+      const alpha = Math.max(0, 1 - p * p) * 0.8;
       const reach = (24 + ease * 22) * fx.scale;
       const swingDir = fx.extra || 1;
 
@@ -891,7 +898,12 @@
         const dirY = Math.sin(aim);
         const arcX = player.x + player.width / 2 + dirX * 26;
         const arcY = player.y + player.height / 2 + dirY * 26;
-        spawnFX('slash-crescent', arcX, arcY, fillOpts(0, 0, player.facing, Math.atan2(dirY, dirX), 1, '#f2d29b', 12, (player.anim && player.anim.swingDir) || 1));
+        const crescent = spawnFX('slash-crescent', arcX, arcY, fillOpts(0, 0, player.facing, Math.atan2(dirY, dirX), 1, '#f2d29b', 12, (player.anim && player.anim.swingDir) || 1));
+        if (crescent) {
+          crescent.follow = player;
+          crescent.offX = dirX * 26;
+          crescent.offY = dirY * 26;
+        }
       }
       playerPrevTimer = player.attackTimer;
     }

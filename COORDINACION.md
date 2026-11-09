@@ -260,3 +260,8 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 - `player.js`: el brazo extendido y la palma se orientan con `player.windAim` (ángulo relativo, 0 = adelante).
 - `controls.js`: fila "Apuntar el aire — Mover el ratón / Stick derecho" y pista en la guía.
 - Prueba rápida: ratón arriba-derecha → la polilla queda atrapada y viaja a la mano; escarabajos fuera de la franja, no. El usuario pidió no hacer más playtest.
+
+## Cambio de Claude (9/11): ataque básico más pulido y estela pegada a Ruben — pedido del usuario
+- **Bug**: al atacar corriendo, el arco `slash-crescent` (`animation-registry.js`) se creaba en un punto fijo del mundo y quedaba atrás. Ahora el FX tiene `update` que lo mueve con Ruben (`fx.follow` + `offX/offY`, asignados al crearlo en la capa `player-core-fx`); además es un poco más tenue (×0.8) para no tapar la estela principal. Gemini: es tu archivo; solo se tocó ese FX y su spawn.
+- `player.js renderSlashTrail()`: estela rehecha. Cabeza con ease-out y cola que arranca tarde (el arco se abre rápido, se sostiene y se cierra), punta afinada y cabeza redondeada, resplandor cálido con trazo ancho (sin `shadowBlur`), contorno de tinta `#3a2416` en el borde exterior, filo brillante y dos líneas de velocidad. Puntos en `Float32Array` fijos (`SLASH_OUT/IN`), sin arrays por cuadro. Hitbox, daño y tiempos de ataque sin cambios.
+- Sin playtest (el usuario dijo que no hace falta); `check-project.js` OK.

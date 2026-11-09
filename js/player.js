@@ -2,6 +2,19 @@
  * Clase Ruben - El Protagonista
  * Manejo de física fluida, doble salto, combate cuerpo a cuerpo y agarre/lanzamiento de escombros.
  */
+// Búferes fijos para la estela del tajo (sin basura por cuadro): N + 1 puntos (x, y)
+const SLASH_N = 18;
+const SLASH_OUT = new Float32Array((SLASH_N + 1) * 2);
+const SLASH_IN = new Float32Array((SLASH_N + 1) * 2);
+// Traza la media luna completa (borde exterior y vuelta por el interior)
+function slashShape(ctx) {
+  ctx.beginPath();
+  ctx.moveTo(SLASH_OUT[0], SLASH_OUT[1]);
+  for (let i = 1; i <= SLASH_N; i++) ctx.lineTo(SLASH_OUT[i * 2], SLASH_OUT[i * 2 + 1]);
+  for (let i = SLASH_N; i >= 0; i--) ctx.lineTo(SLASH_IN[i * 2], SLASH_IN[i * 2 + 1]);
+  ctx.closePath();
+}
+
 class Player {
   constructor(x, y) {
     this.x = x;
@@ -773,58 +786,113 @@ class Player {
     if (this.isAttacking && !this.dead) this.renderSlashTrail(ctx, cx + lungeX, sy + 21 + bob);
   }
 
-  // Estela del tajo: la cabeza sigue a la espada y la cola la persigue con retraso,
-  // así el arco crece rápido y luego se cierra (como un "smear" de animación clásica).
+  // Estela del tajo ("smear" de animación clásica). Se dibuja cada cuadro con la posición
+  // ACTUAL de Ruben, así viaja pegada a él aunque ataque corriendo o saltando.
+  // La cabeza sigue a la hoja (arranque explosivo) y la cola la persigue con retraso:
+  // el arco se abre rápido, se sostiene un instante y se cierra afinándose.
   renderSlashTrail(ctx, bodyX, oyBase) {
     const a = this.anim;
     const f = this.facing;
     const p = 1 - this.attackTimer / this.attackDuration;
-    const ease = (v) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 4);
     const UP = -1.9, DOWN = 1.1;
     const from = a.swingDir === 1 ? UP : DOWN;
     const to = a.swingDir === 1 ? DOWN : UP;
     const aimA = this.attackAim || 0;
-    const head = from + (to - from) * ease(p) + aimA;
-    const tail = from + (to - from) * ease((p - 0.3) / 0.7) + aimA;
-    if (Math.abs(head - tail) < 0.05) return;
+    // Cabeza: ease-out cuártico (igual que la espada). Cola: arranca tarde y acelera.
+    const hp = Math.min(1, p);
+    const tp = Math.max(0, Math.min(1, (p - 0.22) / 0.78));
+    const headE = 1 - Math.pow(1 - hp, 4);
+    const tailE = tp * tp * (3 - 2 * tp);
+    const head = from + (to - from) * headE + aimA;
+    const tail = from + (to - from) * tailE + aimA;
+    const span = head - tail;
+    if (Math.abs(span) < 0.04) return;
 
-    const ox = bodyX + f * 8.8 * Math.cos(aimA);
-    const oy = oyBase + 8.8 * Math.sin(aimA);
-    const R = 34.1;
-    const N = 14;
-    const outer = [], inner = [];
+    const ca = Math.cos(aimA), sa = Math.sin(aimA);
+    const ox = bodyX + f * 8.8 * ca;
+    const oy = oyBase + 8.8 * sa;
+    // El arco se expande apenas al abrirse (sensación de impulso) y se adelgaza al final
+    const R = 33 + 3 * Math.sin(Math.min(1, p * 1.4) * Math.PI * 0.5);
+    const maxT = 12 * (1 - 0.45 * p);
+    const N = SLASH_N;
     for (let i = 0; i <= N; i++) {
-      const k = i / N;                       // 0 = cola, 1 = cabeza
-      const ang = tail + (head - tail) * k;
-      const thick = 2 + 9 * Math.sin(k * Math.PI * 0.5); // más grueso cerca de la hoja
-      outer.push([ox + f * Math.cos(ang) * R, oy + Math.sin(ang) * R]);
-      inner.push([ox + f * 4 * Math.cos(aimA) + f * Math.cos(ang) * (R - thick), oy + 4 * Math.sin(aimA) + Math.sin(ang) * (R - thick)]);
+      const k = i / N;                                  // 0 = cola, 1 = cabeza
+      const ang = tail + span * k;
+      // Grosor: cola en punta, panza ancha y cabeza redondeada junto a la hoja
+      const body = Math.sin(Math.min(1, k * 1.08) * Math.PI * 0.5);
+      const thick = 0.6 + maxT * body * body * (k > 0.92 ? 1 - (k - 0.92) * 4 : 1);
+      const c = Math.cos(ang), s = Math.sin(ang);
+      SLASH_OUT[i * 2] = ox + f * c * R;
+      SLASH_OUT[i * 2 + 1] = oy + s * R;
+      SLASH_IN[i * 2] = ox + f * c * (R - thick);
+      SLASH_IN[i * 2 + 1] = oy + s * (R - thick);
     }
 
+    // Opacidad: llena mientras corta, se apaga rápido al terminar
+    const alpha = p < 0.55 ? 1 : Math.max(0, 1 - (p - 0.55) / 0.45);
+    if (alpha <= 0.02) return;
+
     ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, 1.5 - p * 1.3));
-    const grad = ctx.createLinearGradient(outer[0][0], outer[0][1], outer[N][0], outer[N][1]);
-    grad.addColorStop(0, 'rgba(255, 214, 120, 0)');
-    grad.addColorStop(0.55, 'rgba(255, 236, 190, 0.65)');
-    grad.addColorStop(1, 'rgba(255, 252, 240, 0.98)');
-    ctx.fillStyle = grad;
-    ctx.shadowColor = '#ffcf6b';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.moveTo(outer[0][0], outer[0][1]);
-    for (let i = 1; i <= N; i++) ctx.lineTo(outer[i][0], outer[i][1]);
-    for (let i = N; i >= 0; i--) ctx.lineTo(inner[i][0], inner[i][1]);
-    ctx.closePath();
-    ctx.fill();
-    // Filo brillante en el borde exterior
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 250, 0.9)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    const start = Math.floor(N * 0.45);
-    ctx.moveTo(outer[start][0], outer[start][1]);
-    for (let i = start + 1; i <= N; i++) ctx.lineTo(outer[i][0], outer[i][1]);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = alpha;
+
+    // 1. Resplandor cálido suave (trazo ancho translúcido, más barato que shadowBlur)
+    slashShape(ctx);
+    ctx.strokeStyle = 'rgba(255, 200, 110, 0.22)';
+    ctx.lineWidth = 6;
     ctx.stroke();
+
+    // 2. Relleno: la cola se desvanece, la cabeza es casi blanca
+    const hx = SLASH_OUT[N * 2], hy = SLASH_OUT[N * 2 + 1];
+    const grad = ctx.createLinearGradient(SLASH_OUT[0], SLASH_OUT[1], hx, hy);
+    grad.addColorStop(0, 'rgba(255, 214, 130, 0)');
+    grad.addColorStop(0.45, 'rgba(255, 228, 170, 0.55)');
+    grad.addColorStop(0.85, 'rgba(255, 246, 222, 0.95)');
+    grad.addColorStop(1, 'rgba(255, 255, 248, 1)');
+    ctx.fillStyle = grad;
+    slashShape(ctx);
+    ctx.fill();
+
+    // 3. Contorno de tinta en el borde exterior (estilo años 50), solo en la mitad delantera
+    const start = Math.floor(N * 0.4);
+    ctx.strokeStyle = 'rgba(58, 36, 22, 0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(SLASH_OUT[start * 2], SLASH_OUT[start * 2 + 1]);
+    for (let i = start + 1; i <= N; i++) ctx.lineTo(SLASH_OUT[i * 2], SLASH_OUT[i * 2 + 1]);
+    // cierra la punta redondeada hacia el borde interior
+    ctx.lineTo(SLASH_IN[N * 2], SLASH_IN[N * 2 + 1]);
+    ctx.stroke();
+
+    // 4. Filo brillante justo por dentro del contorno
+    ctx.strokeStyle = 'rgba(255, 255, 252, 0.95)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    const s2 = Math.floor(N * 0.55);
+    for (let i = s2; i <= N; i++) {
+      const x = SLASH_OUT[i * 2] + (SLASH_IN[i * 2] - SLASH_OUT[i * 2]) * 0.18;
+      const y = SLASH_OUT[i * 2 + 1] + (SLASH_IN[i * 2 + 1] - SLASH_OUT[i * 2 + 1]) * 0.18;
+      if (i === s2) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // 5. Líneas de velocidad: dos trazos finos que persiguen a la cabeza por fuera
+    ctx.strokeStyle = 'rgba(255, 238, 200, 0.7)';
+    ctx.lineWidth = 1;
+    for (let j = 0; j < 2; j++) {
+      const r = R + 4 + j * 4;
+      const a1 = head - span * (0.08 + j * 0.06);
+      const a0 = head - span * (0.45 + j * 0.12);
+      ctx.globalAlpha = alpha * (0.7 - j * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(ox + f * Math.cos(a0) * r, oy + Math.sin(a0) * r);
+      ctx.quadraticCurveTo(
+        ox + f * Math.cos((a0 + a1) / 2) * (r + 1.5), oy + Math.sin((a0 + a1) / 2) * (r + 1.5),
+        ox + f * Math.cos(a1) * r, oy + Math.sin(a1) * r
+      );
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }
