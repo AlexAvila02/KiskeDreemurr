@@ -217,7 +217,7 @@ class World {
           y: 415,
           style: 'aire', // pergamino azul transparente (recuerdo del aire)
           speaker: "Nota de Angelo",
-          text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salta dos veces puede llegar. Búscala arriba hacia el oeste. — A.»"
+          text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salta dos veces puede llegar. Búscala arriba hacia el oeste. Si te plantas firme, mantén Abajo + F (o L2) para jalar el aire y atraer a las criaturas hacia ti. — A.»"
         }
       ],
       exits: [

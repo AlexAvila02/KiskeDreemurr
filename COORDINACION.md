@@ -213,6 +213,7 @@ Formato: `- [pendiente | en curso | hecha — falta playtest | cerrada] Título 
 ## Cambios de Gemini — falta playtest
 Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y lo marca ✅ o anota el problema.
 - [8/11] Confirmación en dos pasos para aprender virtudes con mando/teclado (pedido del usuario): apretar A sobre el nodo de la virtud mueve el foco al botón APRENDER; un segundo A sobre APRENDER la compra y devuelve el foco al nodo, o B/Esc cancela y vuelve al nodo · `js/journal.js` · abrir Diario (Select / I) → pestaña VIRTUDES → seleccionar virtud disponible con A → confirmar en APRENDER con A (o cancelar con B).
+- [8/11] Habilidad "Jalar el Aire" bloqueada hasta leer el pergamino de aire en Sala 1 (pedido del usuario): al iniciar una partida la habilidad está inactiva; al leer la nota celeste en la sala 1 (El Portón Norte) se desbloquea con fanfarria sonora, partículas y aviso; persiste en guardado y se resetea al reiniciar partida · js/wind-pull.js, js/world.js · iniciar juego en sala 0 → intentar Abajo+F (no debe hacer nada) → ir a sala 1 → leer nota celeste → recibir aviso de habilidad aprendida → probar Abajo+F (debe jalar el aire normalmente).
 
 ## Propuestas de Gemini
 - (ninguna por ahora)
@@ -238,3 +239,18 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 
 ## Cambios de Claude (8/11 22:54): Pergamino de aire en Sala 1 — pedido del usuario
 - `world.js`: la nota de Angelo en la Sala 1 (El Portón Norte) ahora lleva `style: 'aire'`, dibujándose como un pergamino celeste translúcido con brillo y sello azul claro, representando el recuerdo del aire. Colisiones y lectura intactas.
+
+## Cambio de Claude (8/11 23:05): ganancia de virtudes 80% menor — pedido del usuario
+- `journal.js`: los puntos de virtud ahora salen de "fragmentos": Emblema = 5, enemigo derrotado = 1 (2 con Botín del Cazador), **25 fragmentos = 1 punto** (antes: Emblema = 1 punto, 5 enemigos = 1 punto). El subtítulo del Diario muestra "PRÓXIMO PUNTO x/25". Las virtudes ya aprendidas en partidas guardadas se conservan.
+
+## Cambio de Claude (8/11 23:40): habilidad "Jalar el Aire" — pedido del usuario
+- Nuevo `js/wind-pull.js` (dueño Claude, cargado antes de main.js). Mantener **Abajo + L2** (mando) o **Abajo + F / Shift izq.** (teclado, acción `windPull` reasignable en Controles): Ruben se planta y jala el aire. Aparece una franja de viento en forma de embudo (hasta 360 px, con corrientes, hojas/copos según la zona y remolino en la palma). Los insectos (escarabajos y polillas) que entran quedan atrapados en el aire, sin IA ni daño por contacto, y son arrastrados lentamente hasta flotar frente a la mano. Al soltar quedan mareados ~1,3 s (caen, estrellitas): momento para el tajo. Se corta al recibir un golpe, sin suelo, con piedra en la mano o al cambiar de sala. Sonido de viento con ruido filtrado (Web Audio), sin basura por cuadro.
+- `player.js`: pose `player.windPose` (0..1): agachado, inclinado hacia atrás, piernas abiertas, espada baja atrás, brazo libre extendido con la palma abierta y dedos en abanico, boca en "O" aspirando, bufanda empujada hacia atrás, leve temblor por el esfuerzo.
+- `controls.js`: acción `windPull` (F / Shift izq.), `PadL2` en `isActive`, fila "Jalar el Aire — Abajo + L2" en Ratón y mando y línea en la guía de controles. `ui-icons.js`: ícono `wind`.
+- Envuelve `game.update`, `game.doAction` (plantado no salta/ataca/agarra), `game.loadRoom` y `player.update`; a los atrapados les pone `update`/`render` propios (se quitan al soltar).
+- Playtest: atrapar polilla + escarabajo en pradera y montaña, soltar y golpear al mareado, golpe recibido corta la habilidad, Diario/pausa la congelan y apagan el sonido, cruzar de sala y reiniciar sala ok; sin errores de consola.
+
+## Arreglo de Claude (8/11 23:50): insectos atrapados por el viento atravesaban el suelo — pedido del usuario
+- `wind-pull.js`: los insectos atrapados y mareados ahora se mueven con colisión real (`moveCollide`) contra suelo, techos, muros, portón cerrado y muros quebradizos, y `unstick` los saca si quedaron metidos en una plataforma. Antes la polilla mareada bajaba 0,35 px por cuadro sin chocar (se hundía en el suelo) y el arrastre ignoraba las plataformas.
+- Playtest: arrastre en el suelo y desde una ruina, soltar y dejar caer/flotar → ningún insecto queda dentro de una plataforma. También probado el desbloqueo de Gemini (con la nota `1:0` leída la habilidad funciona) ✅.
+- (8/11 23:58, Claude, pedido del usuario) Jalar el Aire: se quitaron las líneas discontinuas del borde y el relleno con forma de embudo; ahora la franja es una bruma suave sin bordes (manchas radiales) más las corrientes, hojas/copos y el remolino. La zona de captura no cambió.

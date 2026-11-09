@@ -4,8 +4,7 @@
  * - Objetos coleccionables en las salas (`room.collectibles: [{ item, x, y }]`).
  * - Menú "Diario" con tres pestañas: OBJETOS · VIRTUDES · NOTAS DE ANGELO.
  * - Árbol de virtudes PASIVAS (3 ramas x 3 niveles) que se compran con puntos:
- *     ✦ cada Emblema del Reino encontrado = 1 punto
- *     ✦ cada 5 de Valor (enemigos derrotados) = 1 punto
+ *     ✦ (desde 8/11: 80% menos) 25 fragmentos = 1 punto; Emblema = 5, enemigo = 1
  * - Progreso guardado en localStorage ('ruben_diario_v1').
  *
  * Abrir / cerrar: I o Tab (si no están asignadas a otra acción) · botón del HUD ·
@@ -22,7 +21,11 @@
 
   const SAVE_KEY = 'ruben_diario_v1';
   const INK = '#3a2416';
-  const VALOR_PER_POINT = 5;
+  // Ganancia de virtudes reducida un 80% (pedido del usuario, 8/11): un punto ahora cuesta
+  // 5 veces más. Se cuenta en "fragmentos": cada Emblema = 5 fragmentos, cada enemigo = 1
+  // fragmento (2 con Botín del Cazador) y 25 fragmentos = 1 punto de virtud.
+  const FRAGMENTS_PER_POINT = 25;
+  const FRAGMENTS_PER_EMBLEM = 5;
   const REGEN_FRAMES = 900;          // 15 s sin recibir daño (Respiro del Prado)
 
   // ------------------------------------------------------------------
@@ -36,7 +39,7 @@
     },
     emblema: {
       name: 'Emblema del Reino',
-      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo: +1 punto de virtud.',
+      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo: vale una quinta parte de un punto de virtud.',
       kind: 'Reliquia · se acumula',
       stack: true
     },
@@ -474,7 +477,8 @@
     emblemCount() {
       return Object.values(this.save.collected).filter(v => v === 'emblema').length;
     }
-    totalPoints() { return this.emblemCount() + Math.floor(this.save.valor / VALOR_PER_POINT); }
+    fragments() { return this.emblemCount() * FRAGMENTS_PER_EMBLEM + this.save.valor; }
+    totalPoints() { return Math.floor(this.fragments() / FRAGMENTS_PER_POINT); }
     spentPoints() {
       return Object.keys(this.save.skills).reduce((s, id) => s + (this.save.skills[id] && SKILLS[id] ? SKILLS[id].cost : 0), 0);
     }
@@ -682,7 +686,7 @@
         this.hearts.push({ x: cx, y: cy - 10, restY: Math.min(cy, 440), vy: -3, life: 540, t: 0 });
       }
       if (this.totalPoints() > before) {
-        this.game.showNotification(`✦ ¡Tu Valor creció! +1 punto de virtud · abrí el Diario (${this.openKeyLabel()})`);
+        this.game.showNotification(`✦ ¡Nuevo punto de virtud! · abrí el Diario (${this.openKeyLabel()})`);
         if (window.soundManager && window.soundManager.playUnlockAbility) window.soundManager.playUnlockAbility();
       }
       this.refreshHud();
@@ -699,7 +703,9 @@
       const sm = window.soundManager;
       if (c.item === 'emblema') {
         if (sm && sm.playPickup) sm.playPickup();
-        this.game.showNotification(`Emblema del Reino · +1 punto de virtud (${this.openKeyLabel()})`);
+        const pointsBefore = Math.floor((this.fragments() - FRAGMENTS_PER_EMBLEM) / FRAGMENTS_PER_POINT);
+        if (this.totalPoints() > pointsBefore) this.game.showNotification(`Emblema del Reino · ✦ ¡nuevo punto de virtud! (${this.openKeyLabel()})`);
+        else this.game.showNotification(`Emblema del Reino · progreso de virtud ${this.fragments() % FRAGMENTS_PER_POINT}/${FRAGMENTS_PER_POINT}`);
       } else {
         if (sm && sm.playUnlockAbility) sm.playUnlockAbility();
         this.game.showNotification(`Encontraste: ${info.name} · miralo en el Diario (${this.openKeyLabel()})`);
@@ -953,11 +959,11 @@
     refreshHeader() {
       if (!this.modal) return;
       const pts = this.availablePoints();
-      const v = this.save.valor % VALOR_PER_POINT;
+      const v = this.fragments() % FRAGMENTS_PER_POINT;
       this.modal.querySelector('#journal-points').innerHTML =
         `<span class="pts-num">${pts}</span><span class="pts-star">✦</span><span class="pts-label">puntos<br>de virtud</span>`;
       this.modal.querySelector('#journal-subtitle').textContent =
-        `VALOR ${v}/${VALOR_PER_POINT} PARA EL PRÓXIMO PUNTO · EMBLEMAS ${this.emblemCount()}/${this.worldCount('emblema')}`;
+        `PRÓXIMO PUNTO ${v}/${FRAGMENTS_PER_POINT} · EMBLEMAS ${this.emblemCount()}/${this.worldCount('emblema')} · VALOR ${this.save.valor}`;
       const fk = this.modal.querySelector('#journal-footer-key');
       if (fk) fk.textContent = this.openKeyLabel();
     }

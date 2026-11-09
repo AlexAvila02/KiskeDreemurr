@@ -53,6 +53,12 @@ class ControlsManager {
         defaultKeys: ['KeyK', 'KeyC']
       },
       {
+        id: 'windPull',
+        name: 'Jalar el Aire (mantener junto con Abajo)',
+        icon: (window.UIIcons ? UIIcons.svg('wind') : ''),
+        defaultKeys: ['KeyF', 'ShiftLeft']
+      },
+      {
         id: 'interact',
         name: 'Interactuar / Leer / Abrir',
         icon: (window.UIIcons ? UIIcons.svg('scroll') : ''),
@@ -166,6 +172,7 @@ class ControlsManager {
     if (actionId === 'moveRight' && activeKeys['PadRight']) return true;
     if (actionId === 'aimUp' && activeKeys['PadUp']) return true;
     if (actionId === 'aimDown' && activeKeys['PadDown']) return true;
+    if (actionId === 'windPull' && activeKeys['PadL2']) return true;
     return false;
   }
 
@@ -517,6 +524,7 @@ class ControlsManager {
       ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
       ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B · LB'],
       ['scroll', 'Interactuar / Leer', null, 'Y'],
+      ['wind', 'Jalar el Aire', null, 'Abajo + L2'],
       ['book', 'Diario de Ruben', null, 'Select'],
       ['gear', 'Pausa', null, 'Start'],
       ['gamepad', 'En menús: elegir / volver', 'Clic', 'A / B']
@@ -554,6 +562,8 @@ class ControlsManager {
       const attack = this.getDisplayKeysText('attack');
       const grab = this.getDisplayKeysText('grab');
       const interact = this.getDisplayKeysText('interact');
+      const down = this.getPrimaryDisplayKey ? this.getPrimaryDisplayKey('aimDown') : 'S';
+      const wind = this.getPrimaryDisplayKey ? this.getPrimaryDisplayKey('windPull') : 'F';
 
       guide.innerHTML = `
         <div class="control-key"><span>${leftRight}</span> Moverse</div>
@@ -561,6 +571,7 @@ class ControlsManager {
         <div class="control-key"><span>${attack} / Clic Izq</span> Golpear (Ataque)</div>
         <div class="control-key"><span>${grab} / Clic Der</span> Agarrar / Lanzar Objeto</div>
         <div class="control-key"><span>${interact}</span> Interactuar / Leer / Abrir Puertas</div>
+        <div class="control-key"><span>${down} + ${wind}</span> Jalar el Aire (mantener) · mando: <span>Abajo + L2</span></div>
         <div class="control-key">${window.UIIcons ? UIIcons.svg('gamepad', 'ui-inline') : ''} <span>Stick / Cruceta</span> Moverse · <span>A</span> Saltar · <span>X</span> Atacar · <span>B</span> Agarrar · <span>Y</span> Leer/Abrir</div>
       `;
     }

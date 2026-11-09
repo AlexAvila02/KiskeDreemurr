@@ -33,7 +33,8 @@
     'arrow-right': '<path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5"/>',
     'arrow-up': '<path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"/>',
     'arrow-down': '<path d="M12 5v14M6.5 13.5 12 19l5.5-5.5"/>',
-    close: '<path d="M6 6l12 12M18 6 6 18"/>'
+    close: '<path d="M6 6l12 12M18 6 6 18"/>',
+    wind: '<path d="M3 8h10.5a3 3 0 1 0-3-3"/><path d="M3 12.5h15a3 3 0 1 1-3 3"/><path d="M3 17h6"/>'
   };
 
   function svg(name, extraClass) {

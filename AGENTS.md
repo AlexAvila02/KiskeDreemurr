@@ -48,3 +48,8 @@ Claude (Opus) trabaja en esta misma carpeta al mismo tiempo que vos. Estas regla
 8. **Canvas:** nunca uses `globalCompositeOperation = 'destination-out'` (o `'copy'`, `'xor'`) sobre el canvas principal: borra el fondo y deja agujeros negros. Si necesitás recortar, hacelo en un canvas aparte o con `ctx.clip()`.
 9. **Documentar solo lo que existe.** No describas en `CLAUDE.md`, `AGENTS.md` o `COORDINACION.md` archivos o APIs que todavía no están en la carpeta (p. ej. `js/animation-registry.js`). Si es un plan, marcalo como **(pendiente)**.
 10. **IDs de salas:** 0-10 están ocupados. Salas nuevas desde el id 11.
+
+---
+
+## 📝 Nota sobre modelos y roles de Gemini (decisión del usuario)
+- **Gemini 3.8 Flash** puede asumir plenamente las peticiones dirigidas a **Argon** (rol de director/coordinador) y desplegar a su vez subagentes ejecutores basados en Gemini 3.8 Flash (`flash` / `inherit`, como `flash-executor`) para realizar tareas puntuales y delimitadas.

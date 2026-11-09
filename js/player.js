@@ -434,7 +434,8 @@ class Player {
     anchor.x = this.x + this.width / 2 - this.facing * 3;
     anchor.y = this.y + 17;
 
-    const speed = Math.min(1, Math.abs(this.vx) / this.speed);
+    // El viento que jala Ruben empuja la bufanda hacia atrás
+    const speed = Math.max(Math.min(1, Math.abs(this.vx) / this.speed), (this.windPose || 0) * 0.95);
     const back = -this.facing;
     const t = Date.now() * 0.008;
     for (let i = 1; i < this.capePoints.length; i++) {
@@ -469,11 +470,16 @@ class Player {
     const f = this.facing;
     const flash = a.hurtFlash > 0 && Math.floor(a.hurtFlash / 2) % 2 === 0;
     const idle = this.isGrounded && Math.abs(this.vx) < 0.3 && !this.isAttacking;
+    // Pose "Jalar el Aire" (js/wind-pull.js): 0 = normal, 1 = agachado, inclinado hacia atrás,
+    // piernas abiertas y la mano libre extendida con la palma abierta tirando del viento
+    const wp = this.windPose || 0;
+    const windTremble = wp ? Math.sin(t * 47) * 0.5 * wp : 0;
 
     // Squash & stretch: resorte (aterrizaje/salto/golpe) + estirón por velocidad vertical
     let stretchY = a.sy;
     if (!this.isGrounded && !this.dead) stretchY *= 1 + Math.min(0.12, Math.abs(this.vy) * 0.011);
     if (idle) stretchY *= 1 + Math.sin(t * 2.6) * 0.018; // respiración en reposo
+    if (wp) stretchY *= 1 - 0.1 * wp;                   // se agacha para afirmarse
     const scaleY = stretchY * (1 + (1 - a.sx) * 0.5);
     const scaleX = a.sx / stretchY;
 
@@ -519,8 +525,8 @@ class Player {
     }
 
     // Escalado desde los pies (squash & stretch) + inclinación + avance del tajo
-    ctx.translate(cx + lungeX, feetY);
-    ctx.rotate(a.lean);
+    ctx.translate(cx + lungeX + windTremble, feetY);
+    ctx.rotate(a.lean - f * 0.17 * wp);
     ctx.scale(scaleX, scaleY);
     ctx.translate(-cx, -feetY);
 
@@ -559,7 +565,7 @@ class Player {
       const airSpread = this.isGrounded || rising ? 0 : k * 1.5;
       const footAng = this.walkPhase ? -Math.sin(ph) * 0.25 * f : 0; // la punta acompaña el paso
       ctx.beginPath();
-      ctx.ellipse(cx + k * 4 + stepX + airSpread + f * 0.8, feetY - 3 - lift - airTuck, 5, 3.5, footAng, 0, Math.PI * 2);
+      ctx.ellipse(cx + k * (4 + 3.2 * wp) + stepX + airSpread + f * 0.8, feetY - 3 - lift - airTuck, 5, 3.5, footAng, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
     }
 
@@ -600,6 +606,8 @@ class Player {
       // Reposo: la espada respira y acompaña el paso
       swordAng = -1.25 + Math.sin(this.walkPhase) * 0.15 + (idle ? Math.sin(t * 2.6) * 0.04 : 0);
     }
+    // Jalando el aire: la espada baja y queda atrás
+    if (wp) swordAng += (2.05 - swordAng) * wp;
     const hx = shoulderX + f * Math.cos(swordAng * 0.5) * 5;
     const hy = shoulderY + Math.sin(swordAng * 0.5) * 5 + 2;
     // Hoja
@@ -627,6 +635,38 @@ class Player {
     ctx.beginPath();
     ctx.arc(hx, hy, 3, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
+
+    // 4b. Brazo libre extendido hacia adelante con la palma abierta (Jalar el Aire)
+    if (wp > 0.02) {
+      const reach = 6 + 9 * wp;
+      const ax0 = cx + f * 1, ay0 = sy + 20;
+      const ax1 = cx + f * reach, ay1 = sy + 18.5 + Math.sin(t * 21) * 0.5 * wp;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 6.5;
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      ctx.strokeStyle = TUNIC;
+      ctx.lineWidth = 3.8;
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      // Dedos abiertos (abanico) y palma
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 1.2;
+      for (let i = -1.5; i <= 1.5; i += 1) {
+        const ang = i * 0.42;
+        const fx = ax1 + f * (2.2 + Math.cos(ang) * 4.2), fy = ay1 + Math.sin(ang) * 4.2;
+        ctx.strokeStyle = OUT; ctx.lineWidth = 3.4;
+        ctx.beginPath(); ctx.moveTo(ax1 + f * 2, ay1); ctx.lineTo(fx, fy); ctx.stroke();
+        ctx.strokeStyle = SKIN; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(ax1 + f * 2, ay1); ctx.lineTo(fx, fy); ctx.stroke();
+      }
+      ctx.fillStyle = SKIN;
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(ax1 + f * 1.5, ay1, 2.8, 3.4, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 2;
+    }
 
     // 5. Nudo de la bufanda al cuello
     ctx.fillStyle = SCARF;
@@ -706,7 +746,13 @@ class Player {
     ctx.arc(ex + 6, headY + 5, 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = 1.3;
-    if (this.isAttacking || hurt || this.dead) {
+    if (wp > 0.35 && !hurt && !this.dead) {
+      // Boca en "O": está aspirando el aire con fuerza
+      ctx.fillStyle = '#5a2418';
+      ctx.beginPath();
+      ctx.ellipse(ex + f * 1.5, headY + 6, 1.6 + wp * 0.4, 2 + wp * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    } else if (this.isAttacking || hurt || this.dead) {
       ctx.fillStyle = '#5a2418';
       ctx.beginPath();
       ctx.ellipse(ex + f, headY + 6, 1.8, this.isAttacking ? 2.2 : 1.4, 0, 0, Math.PI * 2);
