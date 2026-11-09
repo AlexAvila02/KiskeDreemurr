@@ -7,11 +7,13 @@ subagent: true
 mainAgent: false
 model: flash
 # Sin `tools`, Antigravity no le da NINGUNA herramienta al subagente (default []): no podía leer
-# ni editar archivos y el trabajo terminaba haciéndolo Argon. Nombres tomados de la documentación
-# oficial (antigravity.google/docs/subagents). Agregá el de "crear archivo" solo si confirmás su nombre exacto.
+# ni editar archivos y el trabajo terminaba haciéndolo Argon.
+# write_file / edit_file: nombres confirmados por Argon (8/11). view_file / grep_search / run_command:
+# nombres de la documentación oficial. Si el subagente se cuelga, pedile a Argon la lista exacta de todas sus herramientas.
 tools:
   - view_file
-  - replace_file_content
+  - write_file
+  - edit_file
   - grep_search
   - run_command
 ---
