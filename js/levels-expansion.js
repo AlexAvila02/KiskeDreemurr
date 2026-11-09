@@ -113,7 +113,7 @@
     exits: [
       { x: 0, y: 340, w: 40, h: 120, targetRoom: 4, targetX: 1680, targetY: 410 },
       // Pasaje hacia arriba por el hueco de las copas (igual que la sala 1)
-      { x: 0, y: -400, w: 1440, h: 390, targetRoom: 6, targetX: 120, targetY: 410,
+      { x: 0, y: -400, w: 1440, h: 390, targetRoom: 6, targetX: 145, targetY: 410,
         hint: { dir: 'up', x: 1180, w: 120 } }
     ],
     spawnEnemies: () => [
@@ -135,7 +135,9 @@
     width: 1600,
     height: 540,
     platforms: [
-      ground(0, 700), ground(860, 740),
+      // Hueco en el suelo (x 30-130) junto a la pared: por ahí se sube desde el roble
+      // y por ahí se baja de vuelta dejándose caer
+      ground(130, 570), ground(860, 740),
       ceiling(0, 1600),
       wall(0),
       ruin(300, 370, 130), ruin(500, 290, 120),
@@ -154,9 +156,9 @@
       { item: 'brujula', x: 1270, y: 184 }
     ],
     exits: [
-      // Bajada de vuelta a las ramas del roble
-      { x: 40, y: 400, w: 60, h: 60, targetRoom: 5, targetX: 1220, targetY: 96,
-        hint: { dir: 'down', x: 40, w: 60 } },
+      // Caer por el hueco del suelo → baja por el hueco de las copas de la sala 5
+      { x: 30, y: 470, w: 100, h: 80, targetRoom: 5, targetX: 1225, targetY: 60,
+        hint: { dir: 'down', x: 30, w: 100 } },
       { x: 1560, y: 340, w: 40, h: 120, targetRoom: 7, targetX: 60, targetY: 410 }
     ],
     spawnEnemies: () => [

@@ -270,3 +270,7 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 - `wind-pull.js` (`millStep`, `WindPull.getMillAngle()`): en salas con `hasWindmill` (sala 2, Altozano del Molino), si Ruben **sopla** (Arriba + F/L2) y la franja alcanza las aspas (eje en 930, 78; radio 56), las aspas aceleran. El sentido sale del torque: el viento que pasa por debajo del eje las gira al revés que el que pasa por arriba. Velocidad máx. 0,32 rad/cuadro; al dejar de soplar vuelven solas, con inercia, al giro de siempre (0,0117 rad/cuadro). Girando rápido, sueltan polvillo desde la punta de las aspas.
 - `bg-continuity.js`: el molino se dibuja con `WindPull.getMillAngle()` (si no existe, el `time * 0.0007` de antes).
 - Sin playtest (el usuario dijo que no hace falta); `check-project.js` OK.
+
+## Cambio de Claude (9/11): salir de las salas de arriba bajando por un hueco — pedido del usuario
+- Salas 2 (Altozano del Molino, `world.js`) y 6 (Senda de la Montaña Gris, `levels-expansion.js`): antes, para volver había que caminar hacia la pared izquierda hasta una caja de salida. Ahora el suelo tiene un hueco en x 30-130, junto a la pared. Ruben aparece al lado (x 145) y para volver se deja caer por el hueco (salida `{ x: 30, y: 470, w: 100, h: 80 }` con flecha `hint: 'down'`). Cae por el hueco de las copas de la sala de abajo (sala 1: x 330, y 60 · sala 5: x 1225, y 60).
+- Sin commit ni push (el usuario los hace con otra IA); `check-project.js` OK.

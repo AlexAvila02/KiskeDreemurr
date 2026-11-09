@@ -224,7 +224,7 @@ class World {
         { x: 0, y: 350, w: 40, h: 110, targetRoom: 0, targetX: 1200, targetY: 410 },
         // Pasaje hacia arriba: se activa al atravesar el hueco del techo
         // (toda la franja por encima del techo, para que nunca quede atrapado arriba)
-        { x: 0, y: -400, w: 1440, h: 390, targetRoom: 2, targetX: 100, targetY: 410,
+        { x: 0, y: -400, w: 1440, h: 390, targetRoom: 2, targetX: 145, targetY: 410,
           hint: { dir: 'up', x: 280, w: 130 } },
         { x: 1390, y: 360, w: 50, h: 100, targetRoom: 3, targetX: 70, targetY: 410 }
       ],
@@ -258,7 +258,9 @@ class World {
       width: 1120,
       height: 540,
       platforms: [
-        { x: 0, y: 460, w: 1120, h: 80, type: 'ground' },
+        // Hueco en el suelo (x 30-130) junto a la pared: por ahí se sube desde el
+        // Portón Norte y por ahí se baja de vuelta dejándose caer
+        { x: 130, y: 460, w: 990, h: 80, type: 'ground' },
         { x: 0, y: 0, w: 1120, h: 20, type: 'ceiling' },
         { x: 0, y: 0, w: 30, h: 540, type: 'wall' },
         { x: 1090, y: 0, w: 30, h: 540, type: 'wall' },
@@ -276,7 +278,9 @@ class World {
         }
       ],
       exits: [
-        { x: 40, y: 400, w: 60, h: 60, targetRoom: 1, targetX: 290, targetY: 96 }
+        // Caer por el hueco del suelo → baja por el hueco de las copas de la sala 1
+        { x: 30, y: 470, w: 100, h: 80, targetRoom: 1, targetX: 330, targetY: 60,
+          hint: { dir: 'down', x: 30, w: 100 } }
       ],
       keyItem: {
         x: 920,
