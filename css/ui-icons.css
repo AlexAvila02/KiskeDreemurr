@@ -1,0 +1,74 @@
+/* Íconos SVG de interfaz (js/ui-icons.js): trazo de tinta que hereda el color del texto */
+.ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  vertical-align: -0.2em;
+}
+.ui-icon > .ui-svg,
+.ui-icon.ui-svg { width: 100%; height: 100%; display: block; }
+.ui-inline { width: 1.1em; height: 1.1em; vertical-align: -0.2em; display: inline-block; }
+
+/* HUD */
+.item-slot .slot-icon.ui-icon { width: 15px; height: 15px; color: #e6b85c; }
+.btn-hud-pause .ui-icon { width: 18px; height: 18px; vertical-align: middle; }
+.btn-hud-pause { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Botones de menú: ícono + texto alineados */
+.pause-actions .btn-start,
+.pause-actions .btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.pause-actions .ui-icon { width: 17px; height: 17px; color: #e6b85c; }
+.pause-actions .btn-start .ui-icon { color: currentColor; }
+.pause-actions .btn-start .ui-svg path { fill: currentColor; }
+
+/* Confirmación de "Reiniciar juego" */
+#btn-pause-newgame.btn-confirm {
+  border-color: #d9534f;
+  color: #ffd6d6;
+  background: linear-gradient(180deg, #5a221c 0%, #3a1611 100%);
+}
+#btn-pause-newgame.btn-confirm .ui-icon { color: #ff9b8f; }
+
+/* Lista de controles: íconos de acción */
+.action-icon .ui-svg { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; color: #e6b85c; }
+.press-hint .ui-icon,
+.pause-hint .ui-icon,
+.aux-badge .ui-icon { color: #e6b85c; }
+/* Los badges de ayuda estilizan todos sus <span> como teclas: el ícono no es una tecla */
+.aux-badge span.ui-icon,
+.control-key span.ui-icon {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-right: 2px;
+  box-shadow: none;
+}
+
+/* Controles: filas de ratón y mando, con el mismo formato que las teclas (no se reasignan) */
+.controls-subheader {
+  margin-top: 8px;
+}
+.control-row-fixed .btn-key-slot.fixed {
+  cursor: default;
+  font-size: 11.5px;
+}
+.control-row-fixed .btn-key-slot.fixed:hover {
+  transform: none;
+  border-color: #8a623e;
+  background: linear-gradient(180deg, #3d291b 0%, #291b12 100%);
+  box-shadow: 0 2px 0 #1e130c;
+  color: #fff2d0;
+}
+.control-row-fixed .btn-key-slot.fixed.empty:hover {
+  border-color: #8a623e;
+  background: rgba(28, 18, 11, 0.6);
+  color: #7d654f;
+}

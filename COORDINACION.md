@@ -217,3 +217,24 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 ## Propuestas de Gemini
 - (ninguna por ahora)
 
+
+## Cambios de Claude (8/11 noche): "Reiniciar juego" + íconos sin emojis — pedido del usuario
+- **Reiniciar juego** en el menú de pausa (`#btn-pause-newgame`, debajo de "Reiniciar sala"). Pide confirmación: el primer clic/A muestra "¿SEGURO? SE BORRA TODO" (4 s), el segundo reinicia. `game.restartGame()` en `main.js`: crea un `World` nuevo, deja muros/objetos/llave/portón como al principio, Ruben en la sala 0 sin llave y con vida completa, y llama a **`GameHooks.onRestartGame`** (nuevo). `levels-expansion.js` vuelve a parchear las salas 0-3 y `journal.js` borra el Diario (objetos, notas, Valor y virtudes).
+- **Íconos SVG en lugar de emojis** (`js/ui-icons.js` + `css/ui-icons.css`, cargados antes que el resto): HUD (llave, piedra, engranaje de pausa), botones de pausa, pistas de mando/ratón, íconos de la lista de controles (`controls.js`), botón del Diario. En HTML: `<span class="ui-icon" data-icon="nombre"></span>`; en JS: `UIIcons.svg('nombre')`. La llave del molino en el mundo ahora se dibuja con `JournalData.drawIcon('llave')` (con respaldo al emoji). Gemini: si agregás UI nueva, usá estos íconos en vez de emojis.
+- Playtest: reiniciar desde la sala 5 con llave, virtudes y muro roto → vuelve a la sala 0 con todo como nuevo; caminar y saltar ok; sin errores de consola.
+- (8/11 21:58) Controles: se quitó la franja chica de "ratón/mando" (`.controls-aux-info`) y ahora son filas normales al final de la lista, con encabezado "Ratón y mando" y columnas Ratón / Mando (`ControlsManager.renderMousePadRows()`, filas fijas `.control-row-fixed`, no reasignables).
+
+## Cambios de Claude (8/11 22:40): terreno con detalle por zona — pedido del usuario
+- Nuevo `js/terrain-art.js` (dueño Claude, cargado después de code-art-engine.js): suelo, plataformas, techos, paredes y muros quebradizos pintados a mano según la zona. Pradera: tierra con piedritas, raíces, pasto con matas y florcitas. Bosque: musgo, helechos, hongos, musgo y enredaderas colgando. Montaña: roca gris azulada, nieve redondeada, carámbanos, escarcha y destellos. Castillo: sillares, adoquines, alfombra roja con borde dorado, bóvedas y hiedra. Muros quebradizos: raíces enredadas (bosque), rastrillo de hierro oxidado (montaña/castillo), piedra agrietada (pradera).
+- Rendimiento: cada plataforma se pinta una sola vez en un lienzo en caché (WeakMap) y se copia con drawImage; en vivo solo se dibuja el pasto meciéndose y los destellos de nieve. Mismos FPS medidos con y sin el terreno nuevo.
+- `world.js`: el bucle de plataformas y el de muros quebradizos llaman a `TerrainArt.drawPlatform/drawBreakable` si existe (el dibujo anterior queda como respaldo). Colisiones sin cambios.
+- Playtest: salas 0, 1, 3, 5, 7, 8, 9 y 10 recorridas; sin errores de consola.
+
+## Arreglo de Claude (8/11 22:55): Portón Norte — pedido del usuario
+- Se podía pasar por encima del Portón Norte (sala 1) sin la llave rebotando en una polilla + doble salto: había 260 px libres entre el techo y la puerta. Ahora hay un muro de piedra (`type: 'wall'`, x 1054, y 0, h 284) que une el techo con la puerta.
+- Reaparición: al cruzar el portón abierto, el punto de reaparición pasa al otro lado de la puerta (y viceversa al volver). Antes, morir apenas pasado el portón te devolvía al principio de la sala, antes de la puerta.
+- `main.js update()`: si Ruben muere en el cuadro (golpe de enemigo) ya no se revisan salidas en ese cuadro, así siempre reaparece en la sala donde murió.
+- Playtest: saltos contra la puerta cerrada desde 5 alturas → no pasa (x máx 1036); morir pasando el portón → reaparece en x 1116 del lado de adentro; morir al entrar a una sala nueva → reaparece en esa sala.
+
+## Cambios de Claude (8/11 22:54): Pergamino de aire en Sala 1 — pedido del usuario
+- `world.js`: la nota de Angelo en la Sala 1 (El Portón Norte) ahora lleva `style: 'aire'`, dibujándose como un pergamino celeste translúcido con brillo y sello azul claro, representando el recuerdo del aire. Colisiones y lectura intactas.

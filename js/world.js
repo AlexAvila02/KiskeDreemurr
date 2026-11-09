@@ -201,6 +201,9 @@ class World {
         // Techo de copas con un hueco (x 280-410) para subir al molino con doble salto
         { x: 0, y: 0, w: 280, h: 20, type: 'ceiling' },
         { x: 410, y: 0, w: 1030, h: 20, type: 'ceiling' },
+        // Muro sobre el Portón Norte: cierra el hueco entre el techo y la puerta
+        // (antes se podía pasar por arriba rebotando en una polilla + doble salto)
+        { x: 1054, y: 0, w: 44, h: 284, type: 'wall' },
         { x: 440, y: 390, w: 85, h: 20, type: 'ruins' },
         { x: 535, y: 320, w: 75, h: 20, type: 'ruins' },
         { x: 200, y: 330, w: 120, h: 20, type: 'ruins' },
@@ -212,6 +215,7 @@ class World {
         {
           x: 350,
           y: 415,
+          style: 'aire', // pergamino azul transparente (recuerdo del aire)
           speaker: "Nota de Angelo",
           text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salta dos veces puede llegar. Búscala arriba hacia el oeste. — A.»"
         }
@@ -520,6 +524,14 @@ class World {
 
       if (sx + plat.w < 0 || sx > 960) continue;
 
+      // Terreno con detalle pintado a mano por zona (js/terrain-art.js)
+      if (window.TerrainArt) {
+        ctx.save();
+        window.TerrainArt.drawPlatform(ctx, plat, sx, sy, room.biome, biome);
+        ctx.restore();
+        continue;
+      }
+
       ctx.save();
       const stoneGrad = ctx.createLinearGradient(sx, sy, sx, sy + plat.h);
       stoneGrad.addColorStop(0, biome.stoneTop);
@@ -556,6 +568,12 @@ class World {
         if (b.broken) continue;
         const bx = b.x - camera.x;
         const by = b.y - camera.y;
+        if (window.TerrainArt) {
+          ctx.save();
+          window.TerrainArt.drawBreakable(ctx, b, bx, by, room.biome, biome);
+          ctx.restore();
+          continue;
+        }
         ctx.save();
         ctx.fillStyle = '#755c44';
         ctx.strokeStyle = OUT;
@@ -578,19 +596,21 @@ class World {
       const sy = tab.y - camera.y;
 
       ctx.save();
-      ctx.shadowColor = '#ffe29a';
-      ctx.shadowBlur = 10;
+      // Pergamino del aire: azul celeste translúcido, como el aire
+      const isAire = tab.style === 'aire';
+      ctx.shadowColor = isAire ? '#9fd8ff' : '#ffe29a';
+      ctx.shadowBlur = isAire ? 14 : 10;
 
-      ctx.fillStyle = '#f5e2ba';
-      ctx.strokeStyle = OUT;
+      ctx.fillStyle = isAire ? 'rgba(150, 205, 255, 0.45)' : '#f5e2ba';
+      ctx.strokeStyle = isAire ? 'rgba(200, 235, 255, 0.85)' : OUT;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.roundRect(sx, sy + 6, 20, 24, 3);
       ctx.fill();
       ctx.stroke();
 
-      // Sello lacrado rojo de Angelo
-      ctx.fillStyle = '#b83b3b';
+      // Sello lacrado de Angelo (rojo; azul claro en el pergamino del aire)
+      ctx.fillStyle = isAire ? 'rgba(225, 245, 255, 0.8)' : '#b83b3b';
       ctx.beginPath();
       ctx.arc(sx + 10, sy + 18, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -607,8 +627,13 @@ class World {
       ctx.save();
       ctx.shadowColor = '#ffd700';
       ctx.shadowBlur = 16;
-      ctx.font = '22px sans-serif';
-      ctx.fillText('🗝️', kx, ky);
+      if (window.JournalData && window.JournalData.drawIcon) {
+        // Llave dibujada a mano con el mismo estilo que los objetos del Diario
+        window.JournalData.drawIcon(ctx, 'llave', kx + 11, ky - 8, 26);
+      } else {
+        ctx.font = '22px sans-serif';
+        ctx.fillText('🗝️', kx, ky);
+      }
       ctx.restore();
     }
 

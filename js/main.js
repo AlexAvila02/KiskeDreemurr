@@ -50,6 +50,7 @@ class Game {
     this.btnPauseControls = document.getElementById('btn-pause-controls');
     this.btnPauseRestart = document.getElementById('btn-pause-restart');
     this.btnPauseMenu = document.getElementById('btn-pause-menu');
+    this.btnPauseNewGame = document.getElementById('btn-pause-newgame');
 
     // Gestor de Controles Personalizados
     this.controlsManager = new ControlsManager(this);
@@ -87,6 +88,7 @@ class Game {
       onRenderHUD: [],
       onAction: []
     };
+    window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
 
     // Cargar sala inicial
     this.loadRoom(0);
@@ -142,6 +144,30 @@ class Game {
         this.togglePause(false);
         this.restartRoom();
       });
+    }
+
+    // Reiniciar juego: pide confirmación (segundo clic / segundo A) porque borra todo el progreso
+    if (this.btnPauseNewGame) {
+      const label = this.btnPauseNewGame.querySelector('.btn-label') || this.btnPauseNewGame;
+      const disarm = () => {
+        this.newGameArmedUntil = 0;
+        this.btnPauseNewGame.classList.remove('btn-confirm');
+        label.textContent = 'REINICIAR JUEGO';
+      };
+      this.btnPauseNewGame.addEventListener('click', () => {
+        if (Date.now() < (this.newGameArmedUntil || 0)) {
+          disarm();
+          this.togglePause(false);
+          this.restartGame();
+          return;
+        }
+        this.newGameArmedUntil = Date.now() + 4000;
+        this.btnPauseNewGame.classList.add('btn-confirm');
+        label.textContent = '¿SEGURO? SE BORRA TODO';
+        clearTimeout(this.newGameDisarmTimer);
+        this.newGameDisarmTimer = setTimeout(disarm, 4000);
+      });
+      this.disarmNewGame = disarm;
     }
 
     if (this.btnPauseMenu) {
@@ -286,6 +312,7 @@ class Game {
       this.isPaused = !this.isPaused;
     }
 
+    if (this.disarmNewGame) this.disarmNewGame();
     if (this.isPaused) {
       if (this.pauseModal) this.pauseModal.classList.remove('hidden');
     } else {
@@ -339,7 +366,7 @@ class Game {
     window.addEventListener('gamepadconnected', (e) => {
       this.padIndex = e.gamepad.index;
       this.padPrev = [];
-      this.showNotification('🎮 Mando conectado');
+      this.showNotification('Mando conectado');
     });
     window.addEventListener('gamepaddisconnected', (e) => {
       if (e.gamepad.index === this.padIndex) {
@@ -379,7 +406,8 @@ class Game {
       return;
     }
     const name = String(pad.id || '').replace(/\(.*?\)/g, '').trim().slice(0, 40) || 'Mando';
-    this.padBadge.textContent = '🎮 ' + name + (pad.mapping === 'standard' ? '' : ' · modo compatibilidad');
+    this.padBadge.textContent = name + (pad.mapping === 'standard' ? '' : ' · modo compatibilidad');
+    if (window.UIIcons) this.padBadge.insertAdjacentHTML('afterbegin', UIIcons.svg('gamepad', 'ui-inline') + ' ');
     this.padBadge.style.opacity = '1';
     clearTimeout(this.padBadgeTimer);
     this.padBadgeTimer = setTimeout(() => { if (this.padBadge) this.padBadge.style.opacity = '0'; }, 4000);
@@ -569,6 +597,42 @@ class Game {
     window.soundManager.playHit();
     this.triggerScreenShake(9, 300);
     this.updateHUD();
+  }
+
+  // Reinicia la partida completa: mundo nuevo (llave, portón y muros como al principio),
+  // Ruben en la primera sala y GameHooks.onRestartGame para que los módulos borren su progreso
+  restartGame() {
+    this.world = new World();
+    // Las salas de window.PendingRooms reutilizan sus objetos: dejar muros y objetos como nuevos
+    for (const room of this.world.rooms) {
+      if (!room) continue;
+      for (const br of room.breakables || []) br.broken = false;
+      for (const c of room.collectibles || []) c.collected = false;
+      if (room.keyItem) room.keyItem.collected = false;
+      if (room.door && room.door.requiredKeys) room.door.isLocked = true;
+    }
+    const hooks = window.GameHooks && window.GameHooks.onRestartGame;
+    const p = this.player;
+    if (p.carriedItem) { p.carriedItem.isCarried = false; p.carriedItem = null; }
+    p.keys = 0;
+    p.dead = false;
+    p.vx = 0;
+    p.vy = 0;
+    p.facing = 1;
+    p.isAttacking = false;
+    p.attackTimer = 0;
+    p.attackCooldown = 0;
+    p.invulnerableTimer = 60;
+    this.deathTimer = 0;
+    this.hitStopFrames = 0;
+    this.deathCause = null;
+    this.visitedRooms = new Set();
+    if (hooks) for (const fn of hooks) { try { fn(this); } catch (e) { console.error(e); } }
+    p.hp = p.maxHp;
+    this.loadRoom(0, 80, 410);
+    this.irisOpen = 1;
+    this.updateHUD();
+    this.showNotification('Nueva partida · Seguí las notas de Angelo...');
   }
 
   // Reinicia la sala actual: enemigos y piedras vuelven a su lugar, Ruben con vida completa
@@ -818,6 +882,24 @@ class Game {
 
     // Actualizar Partículas
     window.particleSystem.update();
+
+    // Si Ruben murió en este cuadro (golpe de un enemigo), no cambiar de sala:
+    // tiene que reaparecer en la sala donde murió
+    if (this.deathTimer > 0) return;
+
+    // Punto de reaparición después de cruzar un portón abierto: si muere del otro
+    // lado, reaparece pasando la puerta y no al principio de la sala
+    const door = room.door;
+    if (door && !door.isLocked && this.player.isGrounded && !this.player.dead) {
+      const pcx = this.player.x + this.player.width / 2;
+      const past = door.x + door.width;
+      const rp = this.respawnPoint;
+      if (rp.x < door.x && pcx > past + 40) {
+        this.respawnPoint = { x: past + 24, y: this.player.y };
+      } else if (rp.x > past && pcx < door.x - 40) {
+        this.respawnPoint = { x: door.x - 24 - this.player.width, y: this.player.y };
+      }
+    }
 
     // Comprobar transiciones de sala y llaves
     this.checkRoomExits();

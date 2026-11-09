@@ -699,7 +699,7 @@
       const sm = window.soundManager;
       if (c.item === 'emblema') {
         if (sm && sm.playPickup) sm.playPickup();
-        this.game.showNotification(`🛡️ Emblema del Reino · +1 punto de virtud (${this.openKeyLabel()})`);
+        this.game.showNotification(`Emblema del Reino · +1 punto de virtud (${this.openKeyLabel()})`);
       } else {
         if (sm && sm.playUnlockAbility) sm.playUnlockAbility();
         this.game.showNotification(`Encontraste: ${info.name} · miralo en el Diario (${this.openKeyLabel()})`);
@@ -793,7 +793,8 @@
       // Botón en el menú de pausa
       const actions = document.querySelector('#pause-modal .pause-actions');
       if (actions) {
-        const b = el('button', 'btn-secondary', '📖 DIARIO DE RUBEN');
+        const b = el('button', 'btn-secondary', 'DIARIO DE RUBEN');
+        if (window.UIIcons) b.insertAdjacentHTML('afterbegin', window.UIIcons.svg('book', 'ui-icon'));
         b.id = 'btn-pause-journal';
         b.type = 'button';
         const resume = document.getElementById('btn-pause-resume');
@@ -831,7 +832,7 @@
             <div class="journal-notes" id="journal-notes"></div>
           </div>
           <div class="journal-footer">
-            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · 🎮 <b>A</b> aprender · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
+            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> aprender · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
             <button class="journal-reset" id="journal-reset" type="button">Borrar diario</button>
           </div>
         </div>`;
@@ -1199,6 +1200,20 @@
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
   window.GameHooks.onInit = window.GameHooks.onInit || [];
   window.GameHooks.onRenderWorld = window.GameHooks.onRenderWorld || [];
+  // "Reiniciar juego" (menú de pausa): el diario vuelve a empezar en blanco
+  window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
+  window.GameHooks.onRestartGame.push((game) => {
+    const j = game.journal;
+    if (!j) return;
+    j.hearts.length = 0;
+    j.sinceHurt = 0;
+    j.save = { collected: {}, notes: {}, valor: 0, skills: {} };
+    j.persist();
+    j.syncRoomsWithSave();
+    j.applyPassives();
+    j.refreshHud();
+    if (window.BgContinuity) window.BgContinuity.reset();
+  });
   window.GameHooks.onInit.push((game) => {
     try {
       game.journal = new Journal(game);

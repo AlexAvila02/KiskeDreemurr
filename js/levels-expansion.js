@@ -369,5 +369,8 @@
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
   window.GameHooks.onInit = window.GameHooks.onInit || [];
   window.GameHooks.onInit.push((game) => patchOriginalRooms(game.world));
+  // "Reiniciar juego" crea un World nuevo: volver a aplicar los parches de las salas 0-3
+  window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
+  window.GameHooks.onRestartGame.push((game) => patchOriginalRooms(game.world));
   window.LevelsExpansion = { patchOriginalRooms };
 })();

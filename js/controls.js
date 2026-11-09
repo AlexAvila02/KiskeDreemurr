@@ -13,49 +13,49 @@ class ControlsManager {
       {
         id: 'moveLeft',
         name: 'Mover Izquierda',
-        icon: '←',
+        icon: (window.UIIcons ? UIIcons.svg('arrow-left') : '←'),
         defaultKeys: ['KeyA', 'ArrowLeft']
       },
       {
         id: 'moveRight',
         name: 'Mover Derecha',
-        icon: '→',
+        icon: (window.UIIcons ? UIIcons.svg('arrow-right') : '→'),
         defaultKeys: ['KeyD', 'ArrowRight']
       },
       {
         id: 'jump',
         name: 'Saltar / Doble Salto',
-        icon: '🦘',
+        icon: (window.UIIcons ? UIIcons.svg('jump') : ''),
         defaultKeys: ['Space', 'KeyX']
       },
       {
         id: 'aimUp',
         name: 'Apuntar Arriba (mantener + atacar)',
-        icon: '↑',
+        icon: (window.UIIcons ? UIIcons.svg('arrow-up') : '↑'),
         defaultKeys: ['KeyW', 'ArrowUp']
       },
       {
         id: 'aimDown',
         name: 'Apuntar Abajo (mantener + atacar)',
-        icon: '↓',
+        icon: (window.UIIcons ? UIIcons.svg('arrow-down') : '↓'),
         defaultKeys: ['KeyS', 'ArrowDown']
       },
       {
         id: 'attack',
         name: 'Atacar (Espada)',
-        icon: '⚔️',
+        icon: (window.UIIcons ? UIIcons.svg('sword') : ''),
         defaultKeys: ['KeyJ', 'KeyZ']
       },
       {
         id: 'grab',
         name: 'Agarrar / Lanzar',
-        icon: '🪨',
+        icon: (window.UIIcons ? UIIcons.svg('grab') : ''),
         defaultKeys: ['KeyK', 'KeyC']
       },
       {
         id: 'interact',
         name: 'Interactuar / Leer / Abrir',
-        icon: '📜',
+        icon: (window.UIIcons ? UIIcons.svg('scroll') : ''),
         defaultKeys: ['KeyE', 'Enter']
       }
     ];
@@ -497,6 +497,50 @@ class ControlsManager {
       row.appendChild(slotsDiv);
       this.listContainer.appendChild(row);
     }
+
+    this.renderMousePadRows();
+  }
+
+  /**
+   * Ratón y mando: mismas filas que el resto de la lista (fijas, no se reasignan)
+   */
+  renderMousePadRows() {
+    const icon = (n) => (window.UIIcons ? window.UIIcons.svg(n) : '');
+    const head = document.createElement('div');
+    head.className = 'controls-table-header controls-subheader';
+    head.innerHTML = '<span>Ratón y mando</span><div class="slot-titles"><span>Ratón</span><span>Mando</span></div>';
+    this.listContainer.appendChild(head);
+
+    const rows = [
+      ['arrow-right', 'Moverse', null, 'Stick / Cruceta'],
+      ['jump', 'Saltar / Doble Salto', null, 'A'],
+      ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
+      ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B · LB'],
+      ['scroll', 'Interactuar / Leer', null, 'Y'],
+      ['book', 'Diario de Ruben', null, 'Select'],
+      ['gear', 'Pausa', null, 'Start'],
+      ['gamepad', 'En menús: elegir / volver', 'Clic', 'A / B']
+    ];
+    for (const [ic, name, mouse, pad] of rows) {
+      const row = document.createElement('div');
+      row.className = 'control-row control-row-fixed';
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'control-label';
+      labelDiv.innerHTML = `<span class="action-icon">${icon(ic)}</span><span class="action-name"></span>`;
+      labelDiv.querySelector('.action-name').textContent = name;
+      row.appendChild(labelDiv);
+      const slotsDiv = document.createElement('div');
+      slotsDiv.className = 'control-slots';
+      for (const val of [mouse, pad]) {
+        const slot = document.createElement('div');
+        slot.className = 'btn-key-slot fixed' + (val ? '' : ' empty');
+        slot.textContent = val || '—';
+        slot.title = val || '';
+        slotsDiv.appendChild(slot);
+      }
+      row.appendChild(slotsDiv);
+      this.listContainer.appendChild(row);
+    }
   }
 
   /**
@@ -517,7 +561,7 @@ class ControlsManager {
         <div class="control-key"><span>${attack} / Clic Izq</span> Golpear (Ataque)</div>
         <div class="control-key"><span>${grab} / Clic Der</span> Agarrar / Lanzar Objeto</div>
         <div class="control-key"><span>${interact}</span> Interactuar / Leer / Abrir Puertas</div>
-        <div class="control-key">🎮 <span>Stick / Cruceta</span> Moverse · <span>A</span> Saltar · <span>X</span> Atacar · <span>B</span> Agarrar · <span>Y</span> Leer/Abrir</div>
+        <div class="control-key">${window.UIIcons ? UIIcons.svg('gamepad', 'ui-inline') : ''} <span>Stick / Cruceta</span> Moverse · <span>A</span> Saltar · <span>X</span> Atacar · <span>B</span> Agarrar · <span>Y</span> Leer/Abrir</div>
       `;
     }
 

@@ -648,11 +648,12 @@ class Player {
     const tuft = Math.sin(t * 9) * (Math.abs(this.vx) / this.speed) * 1.2 + Math.max(-2, Math.min(2, this.vy * 0.25));
     ctx.fillStyle = HAIR;
     ctx.beginPath();
-    ctx.moveTo(hcx - 10, headY - 1);
-    ctx.quadraticCurveTo(hcx - 9, headY - 13, hcx + 1, headY - 11);
-    ctx.quadraticCurveTo(hcx + 6 * f + 6, headY - 16 - tuft, hcx + f * 5, headY - 7);
-    ctx.quadraticCurveTo(hcx + 10, headY - 6, hcx + 10, headY - 1);
-    ctx.quadraticCurveTo(hcx, headY - 6, hcx - 10, headY - 1);
+    // Todas las coordenadas X se espejan con f para que el peinado se vea igual a ambos lados
+    ctx.moveTo(hcx - 10 * f, headY - 1);
+    ctx.quadraticCurveTo(hcx - 9 * f, headY - 13, hcx + 1 * f, headY - 11);
+    ctx.quadraticCurveTo(hcx + 12 * f, headY - 16 - tuft, hcx + 5 * f, headY - 7);
+    ctx.quadraticCurveTo(hcx + 10 * f, headY - 6, hcx + 10 * f, headY - 1);
+    ctx.quadraticCurveTo(hcx, headY - 6, hcx - 10 * f, headY - 1);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
 
