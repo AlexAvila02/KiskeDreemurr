@@ -40,11 +40,19 @@ Kisukedreemurr/
     ├── player.js               # Física de Ruben, ataque en 8 direcciones, pogo, doble salto y agarre
     ├── world.js                # Salas 0 a 3, biomas, puertas, llaves, notas y colisiones Zero-GC
     ├── menu-nav.js             # Navegación de menús con teclado, ratón y mando
+    ├── animation-registry.js   # Sistema desacoplado de animaciones, skins, capas y VFX con Object Pool
     ├── bg-continuity.js        # Continuidad de paralaje y transición suave de fondo entre salas/biomas
     ├── levels-expansion.js     # Salas 4 a 10 (Bosque, Montaña Gris y Castillo) vía window.PendingRooms
     ├── journal.js              # Diario de Ruben (Reliquias, Notas de Angelo y Árbol de Virtudes pasivas)
     └── main.js                 # Bucle principal (60 Hz), cámara, transiciones, Gamepad API y GameHooks
 ```
+
+### 3.1 Arquitectura Desacoplada de Animaciones (`js/animation-registry.js`)
+Para que cualquier agente pueda agregar, modificar o reemplazar animaciones sin tocar la física ni los archivos base (`player.js`, `enemies.js`, `world.js`, `main.js`), el motor expone `window.AnimationRegistry`:
+- **Detección Automática de Estado (`getEntityState`):** Deduce el estado actual de cualquier entidad (`'idle'`, `'walk'`, `'jump'`, `'doubleJump'`, `'fall'`, `'attack'`, `'carry'`, `'hurt'`, `'death'`) leyendo sus propiedades físicas en modo solo-lectura.
+- **Capas de Animación Aditivas (`registerLayer(target, layerId, { before, after })`):** Permite inyectar efectos detrás o delante de `'player'`, `'crawler'`, `'moth'` o `'debris'` sin alterar su `render()` original.
+- **Skins / Reemplazo Seguro (`registerSkin(target, skinId, renderFn)` y `setSkin(target, skinId)`):** Permite cambiar por completo el dibujo de una entidad por estado; incluye *fallback* automático con `try/catch` al render original si ocurre algún error.
+- **Object Pool de Efectos Animados (`defineFX` / `spawnFX`):** Pool pre-alojado de 64 efectos (`afterimage`, `slash-burst`, `landing-ring`, `strain-drop`, `sword-glint`) con reciclaje *swap-and-pop* $O(1)$ y cero Garbage Collector.
 
 ---
 
