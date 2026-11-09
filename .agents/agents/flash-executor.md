@@ -4,7 +4,16 @@ description: >-
   Ingeniero de implementación rápida para juegos en JavaScript. Úsalo SIEMPRE para escribir código JS/HTML/CSS, 
   crear módulos, refactorizar sistemas y verificar errores en consola/terminal.
 subagent: true
+mainAgent: false
 model: flash
+# Sin `tools`, Antigravity no le da NINGUNA herramienta al subagente (default []): no podía leer
+# ni editar archivos y el trabajo terminaba haciéndolo Argon. Nombres tomados de la documentación
+# oficial (antigravity.google/docs/subagents). Agregá el de "crear archivo" solo si confirmás su nombre exacto.
+tools:
+  - view_file
+  - replace_file_content
+  - grep_search
+  - run_command
 ---
 Eres el programador ejecutor de JavaScript bajo las órdenes del Arquitecto Principal (**Gemini 4 Argon**) o de **Claude Opus** (cuando despliegue subagentes durante el Playtest o desarrollo).
 Tu única misión es implementar especificaciones técnicas al pie de la letra:
