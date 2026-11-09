@@ -194,3 +194,9 @@ Solo se tocaron líneas en `index.html` (1 `<link>` + 3 `<script>` antes de main
 - **Árbol de virtudes pasivas**: Corazón (+1 vida, regenera 1 corazón tras 15 s sin daño, +1 vida e invulnerabilidad más larga) · Espada (+50% daño, ataque más rápido, botín: doble Valor y corazones) · Ingenio (+12% velocidad, piedras al doble de daño y más alcance, saltos +10%). Puntos = emblemas + 1 cada 5 de Valor (enemigos derrotados). Guardado en `localStorage['ruben_diario_v1']`.
   - Se aplica envolviendo `player.attack`, `player.interactOrThrow`, `player.takeDamage`, `game.update`, `game.loadRoom` y `game.togglePause`; amplía `MenuNavigator` (getActiveMenu/handlePad) para el mando. Si cambiás esas firmas, avisá.
 - Nota: `GameHooks.onUpdate`, `onRoomLoad` y `onAction` están declarados en main.js pero nunca se llaman; por eso el Diario envuelve `update`/`loadRoom` directamente.
+
+## 🛡️ Reglas de convivencia (pedido del usuario, 8/11) — leer `AGENTS.md`
+Las reglas obligatorias para Gemini y Claude están en `AGENTS.md`, sección "Convivencia con Claude". Resumen: releer del disco antes de guardar · archivos de Claude: `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `css/journal.css`, `docs/LORE.md` · no romper APIs compartidas (crash del pool de partículas) · sin ES Modules ni npm · probar jugando · `git add` solo de archivos propios, sin force push ni reset · nada de `destination-out` en el canvas principal · documentar solo lo que existe · salas nuevas desde id 11.
+- Arreglo (Claude): crash al iniciar → `particleSystem.clear()` en `particles.js` (repara el pool si alguien lo vacía) y `main.js` lo usa al cargar sala.
+- Pendiente para Gemini: `CLAUDE.md` describe `js/animation-registry.js` / `window.AnimationRegistry`, pero ese archivo no existe en la carpeta. Crearlo o marcar esa sección como (pendiente).
+

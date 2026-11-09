@@ -11,3 +11,6 @@ node_modules/
 *.tmp
 *.bak
 *~
+
+# Archivos generados por los agentes (no son parte del juego)
+Claude outputs/
