@@ -931,8 +931,8 @@ class Game {
     // 1. Renderizar Mundo y Plataformas
     this.world.render(ctx, cam);
 
-    // 1b. Señal de pasajes hacia arriba (haz de luz + flecha)
-    this.renderExitHints();
+    // 1b. (Se quitó la señal de pasajes hacia arriba —haz de luz + flecha—, pedido del usuario 9/11.
+    //     renderExitHints() queda disponible por si se quiere volver a usar.)
 
     // 2. Renderizar Partículas de Fondo
     window.particleSystem.render(ctx, cam);

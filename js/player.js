@@ -31,12 +31,11 @@ class Player {
     this.gravity = 0.48;
     this.maxFallSpeed = 12;
 
-    // Habilidades de Salto
-    this.jumpForce = -9.6;
-    this.doubleJumpForce = -9.2;
+    // Salto (sin doble salto, pedido del usuario 9/11). Más fuerte que antes (-9.6) para que
+    // un solo salto alcance lo que antes pedía doble salto: sube ~144 px (antes 91 + 84 = 175),
+    // suficiente para los huecos de las copas (~131 px) sin abrir atajos nuevos.
+    this.jumpForce = -12;
     this.isGrounded = false;
-    this.canDoubleJump = true;
-    this.hasUsedDoubleJump = false;
     this.coyoteTime = 0;
     this.squashTimer = 0;
     this.walkPhase = 0;   // ciclo de caminata (avanza con la velocidad)
@@ -89,22 +88,25 @@ class Player {
       this.vy = this.jumpForce;
       this.isGrounded = false;
       this.coyoteTime = 0;
-      this.canDoubleJump = true;
+      this.jumpHolding = true;   // salto regulable: soltar antes corta la subida
       // Estirón de despegue (el resorte vuelve solo a la forma normal)
       this.anim.sy = 1.28; this.anim.vsy = 0;
       window.soundManager.playJump();
       window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height, 8);
-    } else if (this.canDoubleJump) {
-      this.vy = this.doubleJumpForce;
-      this.canDoubleJump = false;
-      this.hasUsedDoubleJump = true;
-      // Voltereta completa en el aire + estirón
-      this.anim.flip = 1;
-      this.anim.sy = 1.2; this.anim.vsy = 0;
-      window.soundManager.playDoubleJump();
-      window.particleSystem.createDoubleJumpSparks(this.x + this.width / 2, this.y + this.height);
-      if (window.gameInstance) window.gameInstance.triggerScreenShake(2, 60);
     }
+  }
+
+  // ¿Sigue apretado el botón de salto? (teclado reasignable o botón A del mando)
+  isJumpHeld(keys, cm) {
+    if (cm && cm.isActive) {
+      if (cm.isActive('jump', keys)) return true;
+    } else if (keys && (keys['Space'] || keys['KeyX'])) {
+      return true;
+    }
+    const g = window.gameInstance;
+    const pad = g && g.getPad ? g.getPad() : null;
+    const b = pad && pad.buttons && pad.buttons[0];
+    return !!(b && b.pressed);
   }
 
   attack(enemies, aim = {}) {
@@ -163,10 +165,9 @@ class Player {
     }
     if (connected) {
       if (dirY > 0.5 && !this.isGrounded) {
-        // Pogo: el tajo hacia abajo rebota a Ruben y le devuelve el doble salto
+        // Pogo: el tajo hacia abajo rebota a Ruben
         this.vy = -8.6;
-        this.canDoubleJump = true;
-        this.hasUsedDoubleJump = false;
+        this.jumpHolding = false;
         this.coyoteTime = 0;
       } else if (Math.abs(dirX) > 0.5) {
         // Retroceso sutil al golpear de frente
@@ -294,6 +295,17 @@ class Player {
       if (this.attackTimer === 0) this.isAttacking = false;
     }
 
+    // Salto regulable: si se suelta el botón mientras sube, la subida se corta
+    // (toque corto = saltito, mantener = salto completo)
+    if (this.jumpHolding) {
+      if (this.vy >= 0) {
+        this.jumpHolding = false;
+      } else if (!this.isJumpHeld(keys, controlsManager)) {
+        this.vy *= 0.5;
+        this.jumpHolding = false;
+      }
+    }
+
     // Gravedad
     this.vy += this.gravity;
     if (this.vy > this.maxFallSpeed) this.vy = this.maxFallSpeed;
@@ -319,8 +331,6 @@ class Player {
       this.anim.sy = 1 - (0.12 + impact * 0.26); this.anim.vsy = 0;
       this.anim.flip = 0;
       this.squashTimer = 6;
-      this.canDoubleJump = true;
-      this.hasUsedDoubleJump = false;
     }
 
     if (wasGrounded && !this.isGrounded) {

@@ -1105,19 +1105,7 @@
           }
         }
       }
-      // Castillo lejano sobre la cordillera media
-      if (biomeKey === 'castillo' && li === 1) {
-        const kx = vx + 230, ky = ridgeY(kx + shift, L, valleyBase);
-        ctx.fillStyle = rgba(mixRgb(col, NIGHT_INK, 0.25));
-        ctx.fillRect(kx - 30, ky - 40, 60, 42);
-        ctx.fillRect(kx - 38, ky - 62, 14, 64); ctx.fillRect(kx + 24, ky - 70, 14, 72);
-        ctx.beginPath(); ctx.moveTo(kx - 40, ky - 62); ctx.lineTo(kx - 31, ky - 80); ctx.lineTo(kx - 22, ky - 62); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(kx + 22, ky - 70); ctx.lineTo(kx + 31, ky - 90); ctx.lineTo(kx + 40, ky - 70); ctx.fill();
-        if (night > 0.3) {
-          ctx.fillStyle = `rgba(255, 200, 110, ${night * 0.9})`;
-          ctx.fillRect(kx - 5, ky - 28, 4, 6); ctx.fillRect(kx + 29, ky - 54, 3, 5);
-        }
-      }
+      // (Se quitó el castillo lejano sobre la cordillera media: pedido del usuario, 9/11)
       ctx.restore();
 
       // Bruma entre capas

@@ -198,7 +198,7 @@ class World {
       platforms: [
         { x: 0, y: 460, w: 420, h: 80, type: 'ground' },
         { x: 620, y: 460, w: 820, h: 80, type: 'ground' },
-        // Techo de copas con un hueco (x 280-410) para subir al molino con doble salto
+        // Techo de copas con un hueco (x 280-410) para subir al molino saltando desde la ruina alta
         { x: 0, y: 0, w: 280, h: 20, type: 'ceiling' },
         { x: 410, y: 0, w: 1030, h: 20, type: 'ceiling' },
         // Muro sobre el Portón Norte: cierra el hueco entre el techo y la puerta
@@ -217,7 +217,7 @@ class World {
           y: 415,
           style: 'aire', // pergamino azul transparente (recuerdo del aire)
           speaker: "Nota de Angelo",
-          text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salta dos veces puede llegar. Búscala arriba hacia el oeste. Si te plantas firme, mantén Abajo + F (o L2) para jalar el aire y atraer a las criaturas hacia ti. — A.»"
+          text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salte bien alto puede llegar. Búscala arriba hacia el oeste. Si te plantas firme, mantén Abajo + F (o L2) para jalar el aire y atraer a las criaturas hacia ti. — A.»"
         }
       ],
       exits: [
@@ -419,7 +419,8 @@ class World {
         Date.now(),
         {
           hasWindmill: !!room.hasWindmill,
-          hasTower: room.biome === 'pradera' || room.biome === 'castillo'
+          // Sin la torre/castillo del fondo (pedido del usuario, 9/11)
+          hasTower: false
         }
       );
     } else {

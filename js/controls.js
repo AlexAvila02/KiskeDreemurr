@@ -24,7 +24,7 @@ class ControlsManager {
       },
       {
         id: 'jump',
-        name: 'Saltar / Doble Salto',
+        name: 'Saltar (mantener = más alto)',
         icon: (window.UIIcons ? UIIcons.svg('jump') : ''),
         defaultKeys: ['Space', 'KeyX']
       },
@@ -520,7 +520,7 @@ class ControlsManager {
 
     const rows = [
       ['arrow-right', 'Moverse', null, 'Stick / Cruceta'],
-      ['jump', 'Saltar / Doble Salto', null, 'A'],
+      ['jump', 'Saltar', null, 'A'],
       ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
       ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B · LB'],
       ['scroll', 'Interactuar / Leer', null, 'Y'],
@@ -568,7 +568,7 @@ class ControlsManager {
 
       guide.innerHTML = `
         <div class="control-key"><span>${leftRight}</span> Moverse</div>
-        <div class="control-key"><span>${jump}</span> Saltar & Doble Salto</div>
+        <div class="control-key"><span>${jump}</span> Saltar</div>
         <div class="control-key"><span>${attack} / Clic Izq</span> Golpear (Ataque)</div>
         <div class="control-key"><span>${grab} / Clic Der</span> Agarrar / Lanzar Objeto</div>
         <div class="control-key"><span>${interact}</span> Interactuar / Leer / Abrir Puertas</div>

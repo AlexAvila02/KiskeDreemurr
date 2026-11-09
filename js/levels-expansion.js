@@ -457,8 +457,6 @@
         // Fin de la curva: la física normal hace el aterrizaje (polvo y aplastón)
         rise.t = -1;
         p.vx = 0;
-        p.canDoubleJump = true;
-        p.hasUsedDoubleJump = false;
       }
     };
   }

@@ -102,7 +102,7 @@
     i2: { name: 'Brazo de Molinero', icon: 'piedra', cost: 1, req: 'i1', branch: 'ingenio',
       desc: 'Las piedras lanzadas vuelan más lejos y hacen el doble de daño.' },
     i3: { name: 'Pluma del Viento', icon: 'pluma', cost: 2, req: 'i2', branch: 'ingenio',
-      desc: 'Saltos y doble salto un 10% más potentes.' }
+      desc: 'Saltos un 10% más potentes.' }
   };
 
   // ------------------------------------------------------------------
@@ -431,7 +431,7 @@
       const p = game.player;
       this.base = {
         maxHp: p.maxHp, speed: p.speed,
-        jumpForce: p.jumpForce, doubleJumpForce: p.doubleJumpForce
+        jumpForce: p.jumpForce
       };
 
       this.syncRoomsWithSave();
@@ -523,7 +523,6 @@
       p.speed = b.speed * (this.has('i1') ? 1.12 : 1);
       const jm = this.has('i3') ? 1.1 : 1;
       p.jumpForce = b.jumpForce * jm;
-      p.doubleJumpForce = b.doubleJumpForce * jm;
       if (this.game.updateHUD) this.game.updateHUD();
     }
 
