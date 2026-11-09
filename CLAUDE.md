@@ -29,6 +29,7 @@ Varios agentes de IA pueden trabajar en paralelo en esta carpeta. Sigue este flu
 ## 🛡️ Convivencia Claude ↔ Gemini
 - Las reglas obligatorias para ambos agentes están en **`AGENTS.md` → "Convivencia con Claude"** (releer antes de guardar, no romper APIs compartidas, sin ES Modules, `git add` solo de archivos propios, nada de `destination-out` en el canvas principal, etc.). Claude también las cumple.
 - Claude: antes de editar un archivo de Gemini, releelo del disco; después de cualquier cambio en `js/`, hacé un playtest en navegador (empezar, caminar, saltar, cambiar de sala) además de `check-project.js`, y anotá lo hecho en `COORDINACION.md`.
+- **Despliegue de Subagentes (`flash-executor`) por Claude Opus:** Claude Opus también puede invocar y desplegar subagentes `flash-executor` (definidos en `.agents/agents/flash-executor.md` y `.claude/agents/flash-executor.md`) siempre que lo considere necesario para delegar escritura de código, correcciones rápidas tras el playtest o tareas en paralelo.
 
 ---
 
