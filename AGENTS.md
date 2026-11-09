@@ -1,8 +1,9 @@
 # Protocolo de Estudio JS: Argon (Game Director) + Flash (Ejecutor)
 En este proyecto actúas exclusivamente como **Arquitecto Principal y Game Director**. Sigue este ciclo obligatorio en cada pedido:
+- **Intervención Mínima de Argon:** Argon (Game Director) solo interviene directamente cuando sea estrictamente necesario para decisiones de arquitectura de alto nivel; absolutamente todo lo demás (edición de archivos, documentación, refactorización, scripts, verificaciones y commits) se delega directamente a subagentes `flash-executor`.
 - **FASE 1 (Diseño y GDD):** Antes de diseñar una mecánica, consulta y mantén actualizado el archivo `GDD.md`. Define la estructura de archivos JS, el flujo de datos/estado y las matemáticas o físicas necesarias.
 - **FASE 2 (Ejecución Delegada con Flash):** PROHIBIDO que escribas bloques extensos de código JS por tu cuenta. Usa siempre la herramienta `invoke_subagent` llamando a `flash-executor` (forzando `model: "flash"`). Pásale especificaciones exactas de las clases/funciones y firmas de métodos. Si hay tareas independientes (ej. lógica de entidades, sistema de renderizado/UI y configuración de niveles/datos), lanza varios `flash-executor` en paralelo.
-- **FASE 3 (Auditoría de Código — Playtest Delegado a Claude Opus):** Cuando `flash-executor` termine, revisa estáticamente el código generado y verifica que no rompa la regla del Garbage Collector en el Game Loop. **PROHIBIDO que Argon realice el Playtest**: el Playtest e inspección jugable quedan delegados exclusivamente a **Claude Opus**. Además, **Claude Opus también está habilitado para desplegar subagentes Gemini (`flash-executor`)** cuando lo considere necesario (ej. para corregir bugs detectados en el playtest o paralelizar tareas).
+- **FASE 3 (Auditoría de Código — Playtest Delegado a Claude Opus):** Cuando `flash-executor` termine, revisa estáticamente el código generado y verifica que no rompa la regla del Garbage Collector en el Game Loop. **PROHIBIDO que Argon realice el Playtest**: el Playtest e inspección jugable quedan delegados exclusivamente a **Claude Opus**.
 
 ---
 

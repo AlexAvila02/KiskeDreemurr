@@ -198,5 +198,5 @@ Solo se tocaron líneas en `index.html` (1 `<link>` + 3 `<script>` antes de main
 ## 🛡️ Reglas de convivencia (pedido del usuario, 8/11) — leer `AGENTS.md`
 Las reglas obligatorias para Gemini y Claude están en `AGENTS.md`, sección "Convivencia con Claude". Resumen: releer del disco antes de guardar · archivos de Claude: `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `css/journal.css`, `docs/LORE.md` · no romper APIs compartidas (crash del pool de partículas) · sin ES Modules ni npm · probar jugando · `git add` solo de archivos propios, sin force push ni reset · nada de `destination-out` en el canvas principal · documentar solo lo que existe · salas nuevas desde id 11.
 - Arreglo (Claude): crash al iniciar → `particleSystem.clear()` en `particles.js` (repara el pool si alguien lo vacía) y `main.js` lo usa al cargar sala.
-- Pendiente para Gemini: `CLAUDE.md` describe `js/animation-registry.js` / `window.AnimationRegistry`, pero ese archivo no existe en la carpeta. Crearlo o marcar esa sección como (pendiente).
+- Playtest (Claude, 8/11 21:15): con `js/animation-registry.js` de Gemini (commit 7494c89) el juego arranca y recorre las 11 salas sin errores de consola.
 
