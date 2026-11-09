@@ -1,9 +1,31 @@
-# Protocolo de Estudio JS: Argon (Game Director) + Flash (Ejecutor)
-En este proyecto actúas exclusivamente como **Arquitecto Principal y Game Director**. Sigue este ciclo obligatorio en cada pedido:
-- **Intervención Mínima de Argon:** Argon (Game Director) solo interviene directamente cuando sea estrictamente necesario para decisiones de arquitectura de alto nivel; absolutamente todo lo demás (edición de archivos, documentación, refactorización, scripts, verificaciones y commits) se delega directamente a subagentes `flash-executor`.
-- **FASE 1 (Diseño y GDD):** Antes de diseñar una mecánica, consulta y mantén actualizado el archivo `GDD.md`. Define la estructura de archivos JS, el flujo de datos/estado y las matemáticas o físicas necesarias.
-- **FASE 2 (Ejecución Delegada con Flash):** PROHIBIDO que escribas bloques extensos de código JS por tu cuenta. Usa siempre la herramienta `invoke_subagent` llamando a `flash-executor` (forzando `model: "flash"`). Pásale especificaciones exactas de las clases/funciones y firmas de métodos. Si hay tareas independientes (ej. lógica de entidades, sistema de renderizado/UI y configuración de niveles/datos), lanza varios `flash-executor` en paralelo.
-- **FASE 3 (Auditoría de Código — Playtest Delegado a Claude Opus):** Cuando `flash-executor` termine, revisa estáticamente el código generado y verifica que no rompa la regla del Garbage Collector en el Game Loop. **PROHIBIDO que Argon realice el Playtest**: el Playtest e inspección jugable quedan delegados exclusivamente a **Claude Opus**.
+# Reparto de trabajo (decisión del usuario, 8/11) — leelo entero antes de empezar
+
+**Equipo:**
+- **Claude Opus** = desarrollador principal: núcleo del juego, física, depuración, integración, playtest y subidas a GitHub. Hace la mayor parte del trabajo.
+- **Gemini** = **Argon low** (director) que despliega a **Flash low** (ejecutor). Es rápido y barato: rinde mejor produciendo **contenido y arte bien delimitados**, en sus propias zonas. Ahí tiene libertad.
+
+## ✅ Zona libre de Gemini (puede trabajar por iniciativa propia o cuando el usuario se lo pide)
+- **Arte y efectos:** `js/code-art-engine.js` (fondos, cielo, decoraciones), `js/animation-registry.js` (capas, skins y FX nuevos), `js/particles.js` (efectos nuevos), `art-studio.html`, `.agents/skills/generative-code-art/`.
+- **Audio:** `js/audio.js` (música por bioma y efectos de sonido).
+- **Estilo visual:** `css/style.css` (HUD, menús, colores).
+- **Contenido nuevo en archivos nuevos propios:** salas desde id 11 en `js/levels-gemini-*.js` (vía `window.PendingRooms`), enemigos nuevos en `js/enemies-gemini-*.js`, efectos en `js/fx-*.js`. Para cargarlos podés agregar **solo tu línea `<script>`** en `index.html`, antes de `main.js`.
+- **Diseño:** `GDD.md` (zonas, jefes, progresión, ideas).
+- Condiciones en la zona libre: mantener los nombres y parámetros de las funciones públicas que ya existen (`renderBiomeBackground`, `renderTimeOfDayTint`, `particleSystem.clear()`, `createDust()`, `playJump()`, etc.), y **no cambiar cómo se comporta algo que el usuario pidió** (p. ej. cuándo anochece) sin que el usuario lo pida.
+
+## ⛔ Zona de Claude (Gemini no edita: anotá el pedido en `COORDINACION.md` → "Pedidos")
+- **Núcleo:** `js/main.js`, `js/player.js`, `js/world.js`, `js/enemies.js`, `js/controls.js`, `index.html` (salvo agregar tu `<script>`), `scripts/check-project.js`.
+- **Archivos de Claude:** `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `css/journal.css`, `docs/LORE.md`.
+- **Instrucciones:** `CLAUDE.md` y estas dos secciones de `AGENTS.md` ("Reparto de trabajo" y "Convivencia con Claude"). Podés agregar notas al final de `AGENTS.md`, pero no borrar ni reescribir estas secciones.
+- **Bugs:** si encontrás un bug en tu zona, arreglalo. Fuera de tu zona, anotalo en "Pedidos" con cómo reproducirlo.
+
+## 🟡 Necesita permiso (del usuario o una tarea en `COORDINACION.md` → "Tareas para Gemini")
+- Sistemas grandes nuevos que crucen varios archivos, refactors, cambios de API compartida, física o controles, y "optimizaciones" de código que ya funciona (la del pool de partículas crasheó el juego).
+
+## Cómo trabaja Gemini (Argon low + Flash low)
+- **Intervención mínima de Argon:** Argon decide y reparte; la edición la hace `flash-executor`.
+- **Tareas chicas:** una funcionalidad por vez. Argon le pasa a Flash el archivo exacto, la función exacta, qué NO tocar y cómo saber que está listo. Flash solo toca los archivos que Argon le lista.
+- La regla del Garbage Collector (no crear objetos en `update`/`render`) se aplica al **código nuevo**; no reescribas código existente que funciona solo para cumplirla.
+- **Al terminar:** `node scripts/check-project.js` → `git add <tus archivos>` → commit con mensaje claro → `git push origin main` → anotá en `COORDINACION.md` → "Cambios de Gemini — falta playtest" qué cambiaste y qué hay que probar. **El playtest lo hace Claude.**
 
 ---
 

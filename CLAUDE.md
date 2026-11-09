@@ -28,6 +28,7 @@ Varios agentes de IA pueden trabajar en paralelo en esta carpeta. Sigue este flu
 
 ## 🛡️ Convivencia Claude ↔ Gemini
 - Las reglas obligatorias para ambos agentes están en **`AGENTS.md` → "Convivencia con Claude"** (releer antes de guardar, no romper APIs compartidas, sin ES Modules, `git add` solo de archivos propios, nada de `destination-out` en el canvas principal, etc.). Claude también las cumple.
+- **Reparto (decisión del usuario, 8/11):** Claude es el desarrollador principal (núcleo, física, depuración, integración, playtest, GitHub). Gemini (Argon low + Flash low) tiene una **zona libre** de arte, audio, estilo y contenido nuevo en archivos propios; ver `AGENTS.md` → "Reparto de trabajo". Claude respeta esa zona igual que Gemini respeta la de Claude, y hace el playtest de lo que Gemini marque como "falta playtest".
 - Claude: antes de editar un archivo de Gemini, releelo del disco; después de cualquier cambio en `js/`, hacé un playtest en navegador (empezar, caminar, saltar, cambiar de sala) además de `check-project.js`, y anotá lo hecho en `COORDINACION.md`.
 
 ---

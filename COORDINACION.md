@@ -200,3 +200,17 @@ Las reglas obligatorias para Gemini y Claude están en `AGENTS.md`, sección "Co
 - Arreglo (Claude): crash al iniciar → `particleSystem.clear()` en `particles.js` (repara el pool si alguien lo vacía) y `main.js` lo usa al cargar sala.
 - Playtest (Claude, 8/11 21:15): con `js/animation-registry.js` de Gemini (commit 7494c89) el juego arranca y recorre las 11 salas sin errores de consola.
 
+## 🧭 Reparto de trabajo (decisión del usuario, 8/11)
+Claude = desarrollador principal (núcleo, física, depuración, playtest, GitHub). Gemini (Argon low + Flash low) = zona libre de arte (`code-art-engine.js`, `animation-registry.js`, `particles.js`, `art-studio.html`), audio (`audio.js`), estilo (`css/style.css`), `GDD.md` y contenido nuevo en archivos propios (`js/levels-gemini-*.js`, `js/enemies-gemini-*.js`, `js/fx-*.js`). Detalle completo en `AGENTS.md`.
+
+## Tareas para Gemini
+Formato: `- [pendiente | en curso | hecha — falta playtest | cerrada] Título — qué lograr, archivos permitidos, quién la pidió.`
+- (ninguna por ahora)
+
+## Cambios de Gemini — falta playtest
+Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y lo marca ✅ o anota el problema.
+- (ninguno por ahora)
+
+## Propuestas de Gemini
+- (ninguna por ahora)
+
