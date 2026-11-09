@@ -203,6 +203,9 @@ Las reglas obligatorias para Gemini y Claude están en `AGENTS.md`, sección "Co
 ## 🧭 Reparto de trabajo (decisión del usuario, 8/11)
 Claude = desarrollador principal (núcleo, física, depuración, playtest, GitHub). Gemini (Argon low + Flash low) = zona libre de arte (`code-art-engine.js`, `animation-registry.js`, `particles.js`, `art-studio.html`), audio (`audio.js`), estilo (`css/style.css`), `GDD.md` y contenido nuevo en archivos propios (`js/levels-gemini-*.js`, `js/enemies-gemini-*.js`, `js/fx-*.js`). Detalle completo en `AGENTS.md`.
 
+## 📌 Decisiones del usuario
+- **Anochecer por tiempo real (~3 min)**, versión de Gemini, aprobada por el usuario (8/11). No volver al anochecer por avance sin que el usuario lo pida.
+
 ## Tareas para Gemini
 Formato: `- [pendiente | en curso | hecha — falta playtest | cerrada] Título — qué lograr, archivos permitidos, quién la pidió.`
 - (ninguna por ahora)

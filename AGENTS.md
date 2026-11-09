@@ -4,6 +4,9 @@
 - **Claude Opus** = desarrollador principal: núcleo del juego, física, depuración, integración, playtest y subidas a GitHub. Hace la mayor parte del trabajo.
 - **Gemini** = **Argon low** (director) que despliega a **Flash low** (ejecutor). Es rápido y barato: rinde mejor produciendo **contenido y arte bien delimitados**, en sus propias zonas. Ahí tiene libertad.
 
+## 📌 Decisiones del usuario (no cambiar sin que el usuario lo pida)
+- **Anochecer por tiempo real:** el cielo pasa del atardecer a la noche estrellada en ~3 minutos de juego (`DEFAULT_CYCLE_DURATION_MS` en `js/code-art-engine.js`), no según cuánto avanza Ruben. Lo pidió el usuario.
+
 ## ✅ Zona libre de Gemini (puede trabajar por iniciativa propia o cuando el usuario se lo pide)
 - **Arte y efectos:** `js/code-art-engine.js` (fondos, cielo, decoraciones), `js/animation-registry.js` (capas, skins y FX nuevos), `js/particles.js` (efectos nuevos), `art-studio.html`, `.agents/skills/generative-code-art/`.
 - **Audio:** `js/audio.js` (música por bioma y efectos de sonido).
