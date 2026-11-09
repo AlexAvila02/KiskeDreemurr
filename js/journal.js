@@ -828,7 +828,7 @@
             <div class="journal-notes" id="journal-notes"></div>
           </div>
           <div class="journal-footer">
-            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · 🎮 <b>LB</b>/<b>RB</b> pestañas, <b>B</b> cerrar</span>
+            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · 🎮 <b>A</b> aprender · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
             <button class="journal-reset" id="journal-reset" type="button">Borrar diario</button>
           </div>
         </div>`;
@@ -873,8 +873,14 @@
           b.appendChild(ring);
           b.appendChild(el('span', 'journal-node-name', s.name));
           b.appendChild(el('span', 'journal-node-cost', '✦'.repeat(s.cost)));
-          // Elegir una virtud solo la muestra; se aprende con el botón APRENDER (sin gastos accidentales)
-          b.addEventListener('click', () => this.renderSkills(id));
+          // Elegir una virtud la muestra; si ya está seleccionada (p. ej. con A / Enter en el mando o doble clic), la aprende
+          b.addEventListener('click', () => {
+            if (this.selectedSkill === id && this.canLearn(id)) {
+              this.learn(id);
+            } else {
+              this.renderSkills(id);
+            }
+          });
           b.addEventListener('focus', () => { if (this.selectedSkill !== id) this.renderSkills(id); });
           b.addEventListener('mouseenter', () => { if (this.selectedSkill !== id) this.renderSkills(id); });
           col.appendChild(b);

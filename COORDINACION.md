@@ -212,7 +212,7 @@ Formato: `- [pendiente | en curso | hecha — falta playtest | cerrada] Título 
 
 ## Cambios de Gemini — falta playtest
 Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y lo marca ✅ o anota el problema.
-- (ninguno por ahora)
+- [8/11] Aprender virtudes con el mando apretando A directamente sobre el nodo seleccionado (además del botón APRENDER), por pedido del usuario · `js/journal.js` · abrir Diario (Select / I) → pestaña VIRTUDES → pararse sobre una virtud disponible con cruceta/stick y apretar A (o Enter).
 
 ## Propuestas de Gemini
 - (ninguna por ahora)
