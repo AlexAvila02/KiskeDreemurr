@@ -124,7 +124,10 @@
       }
 
       if (options.hasWindmill && typeof CA.drawWindmill === 'function') {
-        CA.drawWindmill(ctx, 930 - cam.x, 160 - (cam.y || 0), time * 0.0007);
+        // Las aspas responden al viento que sopla Ruben (wind-pull.js); si no, giro de siempre
+        const WP = window.WindPull;
+        const millAngle = WP && WP.getMillAngle ? WP.getMillAngle() : time * 0.0007;
+        CA.drawWindmill(ctx, 930 - cam.x, 160 - (cam.y || 0), millAngle);
       }
 
       state.lastBgX = bgCam.x;

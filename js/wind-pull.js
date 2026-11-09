@@ -423,6 +423,45 @@
     if (state.t % 11 === 0 && window.particleSystem) window.particleSystem.createDust(e.x + e.width / 2, e.y + e.height / 2, 1, '#ffffff');
   }
 
+  // ---------------- molino (salas con hasWindmill, p. ej. el Altozano del Molino) ----------------
+  // Soplar hacia las aspas las hace girar: el sentido depende de qué lado del eje golpea el
+  // viento (torque) y al dejar de soplar vuelven solas, con inercia, al giro tranquilo de siempre.
+  const MILL_X = 930, MILL_Y = 78, MILL_R = 56;   // eje y largo de las aspas (coords de la sala)
+  const MILL_BASE = 0.0117;                       // rad por cuadro (= el giro de siempre)
+  const MILL_MAX = 0.32;
+  const mill = { angle: (Date.now() * 0.0007) % (Math.PI * 2), vel: MILL_BASE, puff: 0 };
+  function millStep(g) {
+    const room = g.world.getCurrentRoom();
+    if (!room || !room.hasWindmill) return;
+    let push = 0;
+    if (state.active && state.mode === 'push' && state.power > 0.05) {
+      const h = handPoint(g.player);
+      const rx = MILL_X - h.x, ry = MILL_Y - h.y;
+      const along = rx * state.dirX + ry * state.dirY;
+      const perp = ry * state.dirX - rx * state.dirY;
+      const reach = currentReach();
+      const u = Math.max(0, Math.min(1, along / RANGE));
+      if (along > -MILL_R && along < reach + MILL_R * 0.6 && Math.abs(perp) < halfAt(u) + MILL_R) {
+        // perp > 0 → torque horario (el mismo sentido del giro de siempre)
+        const sign = Math.abs(perp) < 10 ? 1 : Math.sign(perp);
+        const lever = Math.abs(perp) < 10 ? 0.6 : Math.min(1, 0.5 + Math.abs(perp) / MILL_R);
+        const falloff = 1 - Math.max(0, along) / (RANGE + MILL_R) * 0.6;
+        push = sign * state.power * lever * falloff;
+      }
+    }
+    if (push) {
+      mill.vel = Math.max(-MILL_MAX, Math.min(MILL_MAX, mill.vel + push * 0.0065));
+    } else {
+      mill.vel += (MILL_BASE - mill.vel) * 0.012; // frena despacio (inercia de las aspas)
+    }
+    mill.angle = (mill.angle + mill.vel) % (Math.PI * 2);
+    // Girando rápido: polvillo que salta de la punta de las aspas
+    if (Math.abs(mill.vel) > 0.12 && ++mill.puff % 7 === 0 && window.particleSystem) {
+      const k = mill.angle + (mill.puff % 4) * Math.PI / 2;
+      window.particleSystem.createDust(MILL_X + Math.cos(k) * MILL_R, MILL_Y + Math.sin(k) * MILL_R, 2, '#e8d2a6');
+    }
+  }
+
   function preUpdate(g) {
     checkUnlock(g);
     const p = g.player;
@@ -511,6 +550,7 @@
     if (state.pose < 0.01 && !state.active) state.pose = 0;
     p.windPose = state.pose;
     p.windAim = state.rel; // ángulo del brazo extendido (player.js)
+    millStep(g);
   }
 
   // ---------------- dibujo ----------------
@@ -653,6 +693,8 @@
   window.WindPull = {
     isUnlocked: () => isUnlocked(window.gameInstance),
     isActive: () => state.active,
+    // Ángulo de las aspas del molino (bg-continuity.js lo usa para dibujarlo)
+    getMillAngle: () => mill.angle,
     getState: () => ({ unlocked: isUnlocked(window.gameInstance), active: state.active, power: state.power, caught: state.caught.length, stunned: state.stunned.length })
   };
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
