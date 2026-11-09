@@ -212,7 +212,7 @@ Formato: `- [pendiente | en curso | hecha — falta playtest | cerrada] Título 
 
 ## Cambios de Gemini — falta playtest
 Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y lo marca ✅ o anota el problema.
-- [8/11] Aprender virtudes con el mando apretando A directamente sobre el nodo seleccionado (además del botón APRENDER), por pedido del usuario · `js/journal.js` · abrir Diario (Select / I) → pestaña VIRTUDES → pararse sobre una virtud disponible con cruceta/stick y apretar A (o Enter).
+- [8/11] Confirmación en dos pasos para aprender virtudes con mando/teclado (pedido del usuario): apretar A sobre el nodo de la virtud mueve el foco al botón APRENDER; un segundo A sobre APRENDER la compra y devuelve el foco al nodo, o B/Esc cancela y vuelve al nodo · `js/journal.js` · abrir Diario (Select / I) → pestaña VIRTUDES → seleccionar virtud disponible con A → confirmar en APRENDER con A (o cancelar con B).
 
 ## Propuestas de Gemini
 - (ninguna por ahora)

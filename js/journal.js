@@ -534,7 +534,10 @@
       this.refreshHeader();
       this.refreshHud();
       const node = this.skillButtons && this.skillButtons[id];
-      if (node) { node.classList.remove('just-learned'); void node.offsetWidth; node.classList.add('just-learned'); }
+      if (node) {
+        node.classList.remove('just-learned'); void node.offsetWidth; node.classList.add('just-learned');
+        if (this.game.menuNav) this.game.menuNav.setFocus(node, false);
+      }
       return true;
     }
 
@@ -873,12 +876,12 @@
           b.appendChild(ring);
           b.appendChild(el('span', 'journal-node-name', s.name));
           b.appendChild(el('span', 'journal-node-cost', '✦'.repeat(s.cost)));
-          // Elegir una virtud la muestra; si ya está seleccionada (p. ej. con A / Enter en el mando o doble clic), la aprende
+          // Elegir una virtud la muestra; si se puede aprender, pasa el foco al botón APRENDER para confirmar (sin gastos accidentales)
           b.addEventListener('click', () => {
-            if (this.selectedSkill === id && this.canLearn(id)) {
-              this.learn(id);
-            } else {
-              this.renderSkills(id);
+            this.renderSkills(id);
+            const learnBtn = this.modal && this.modal.querySelector('#journal-learn');
+            if (learnBtn && this.game.menuNav) {
+              this.game.menuNav.setFocus(learnBtn);
             }
           });
           b.addEventListener('focus', () => { if (this.selectedSkill !== id) this.renderSkills(id); });
@@ -1121,7 +1124,15 @@
       nav.handlePad = (pressed, prev) => {
         const just = (i) => pressed[i] && !prev[i];
         if (this.isOpen()) {
-          if (just(1) || just(8)) { this.close(); return true; }
+          if (just(1)) {
+            if (this.tab === 'skills' && nav.focused && nav.focused.id === 'journal-learn' && this.skillButtons && this.skillButtons[this.selectedSkill]) {
+              nav.setFocus(this.skillButtons[this.selectedSkill]);
+              return true;
+            }
+            this.close();
+            return true;
+          }
+          if (just(8)) { this.close(); return true; }
           if (just(9)) { this.close(false); return true; }
           if (just(4)) { this.cycleTab(-1); return true; }
           if (just(5)) { this.cycleTab(1); return true; }
@@ -1148,6 +1159,12 @@
 
         if (this.isOpen()) {
           e.stopImmediatePropagation();
+          if (e.code === 'Escape' && this.tab === 'skills' && document.activeElement && document.activeElement.id === 'journal-learn' && this.skillButtons && this.skillButtons[this.selectedSkill]) {
+            e.preventDefault();
+            if (g.menuNav) g.menuNav.setFocus(this.skillButtons[this.selectedSkill]);
+            else this.skillButtons[this.selectedSkill].focus();
+            return;
+          }
           if (e.code === 'Escape' || isToggle) { e.preventDefault(); this.close(); return; }
           if (e.code === 'KeyQ') { e.preventDefault(); this.cycleTab(-1); return; }
           if (e.code === 'KeyE') { e.preventDefault(); this.cycleTab(1); return; }
