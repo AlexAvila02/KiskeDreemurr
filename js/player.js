@@ -639,8 +639,11 @@ class Player {
     // 4b. Brazo libre extendido hacia adelante con la palma abierta (Jalar el Aire)
     if (wp > 0.02) {
       const reach = 6 + 9 * wp;
+      // windAim: hacia dónde apunta la palma (ratón / stick derecho), 0 = adelante, <0 = arriba
+      const rel = (this.windAim || 0) * wp;
+      const ca = Math.cos(rel), sa = Math.sin(rel);
       const ax0 = cx + f * 1, ay0 = sy + 20;
-      const ax1 = cx + f * reach, ay1 = sy + 18.5 + Math.sin(t * 21) * 0.5 * wp;
+      const ax1 = ax0 + f * ca * (reach - 1), ay1 = ay0 - 1.5 * ca + sa * (reach - 1) + Math.sin(t * 21) * 0.5 * wp;
       ctx.lineCap = 'round';
       ctx.strokeStyle = OUT;
       ctx.lineWidth = 6.5;
@@ -652,18 +655,19 @@ class Player {
       ctx.strokeStyle = OUT;
       ctx.lineWidth = 1.2;
       for (let i = -1.5; i <= 1.5; i += 1) {
-        const ang = i * 0.42;
-        const fx = ax1 + f * (2.2 + Math.cos(ang) * 4.2), fy = ay1 + Math.sin(ang) * 4.2;
+        const ang = rel + i * 0.42;
+        const bx = ax1 + f * 2 * ca, by = ay1 + 2 * sa;
+        const fx = ax1 + f * (2.2 * ca + Math.cos(ang) * 4.2), fy = ay1 + 2.2 * sa + Math.sin(ang) * 4.2;
         ctx.strokeStyle = OUT; ctx.lineWidth = 3.4;
-        ctx.beginPath(); ctx.moveTo(ax1 + f * 2, ay1); ctx.lineTo(fx, fy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx, fy); ctx.stroke();
         ctx.strokeStyle = SKIN; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(ax1 + f * 2, ay1); ctx.lineTo(fx, fy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx, fy); ctx.stroke();
       }
       ctx.fillStyle = SKIN;
       ctx.strokeStyle = OUT;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(ax1 + f * 1.5, ay1, 2.8, 3.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(ax1 + f * 1.5 * ca, ay1 + 1.5 * sa, 2.8, 3.4, f * rel, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
       ctx.lineWidth = 2;
     }

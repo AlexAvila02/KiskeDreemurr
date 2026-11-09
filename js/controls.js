@@ -524,7 +524,8 @@ class ControlsManager {
       ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
       ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B · LB'],
       ['scroll', 'Interactuar / Leer', null, 'Y'],
-      ['wind', 'Jalar el Aire', null, 'Abajo + L2'],
+      ['wind', 'Jalar / Soplar el Aire', null, 'Abajo/Arriba + L2'],
+      ['wind', 'Apuntar el aire', 'Mover el ratón', 'Stick derecho'],
       ['book', 'Diario de Ruben', null, 'Select'],
       ['gear', 'Pausa', null, 'Start'],
       ['gamepad', 'En menús: elegir / volver', 'Clic', 'A / B']
@@ -571,7 +572,7 @@ class ControlsManager {
         <div class="control-key"><span>${attack} / Clic Izq</span> Golpear (Ataque)</div>
         <div class="control-key"><span>${grab} / Clic Der</span> Agarrar / Lanzar Objeto</div>
         <div class="control-key"><span>${interact}</span> Interactuar / Leer / Abrir Puertas</div>
-        <div class="control-key"><span>${down} + ${wind}</span> Jalar el Aire (mantener) · mando: <span>Abajo + L2</span></div>
+        <div class="control-key"><span>${down} + ${wind}</span> Jalar el Aire (mantener) · mando: <span>Abajo + L2</span> · apuntar: <span>ratón / stick der.</span></div>
         <div class="control-key">${window.UIIcons ? UIIcons.svg('gamepad', 'ui-inline') : ''} <span>Stick / Cruceta</span> Moverse · <span>A</span> Saltar · <span>X</span> Atacar · <span>B</span> Agarrar · <span>Y</span> Leer/Abrir</div>
       `;
     }

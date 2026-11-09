@@ -14,6 +14,10 @@
  * dibuja en GameHooks.onRenderWorld. La pose de Ruben se dibuja en player.js leyendo
  * `player.windPose` (0..1). Sin basura por cuadro: corrientes y hojas en arreglos fijos.
  *
+ * Apuntado: mientras está activa, la franja apunta hacia el cursor del ratón o hacia donde
+ * se incline el stick derecho del mando (gana el último que se movió). Sin ninguno de los
+ * dos, apunta hacia adelante y Izquierda/Derecha giran a Ruben. Vale para jalar y soplar.
+ *
  * API: window.WindPull.isActive() · window.WindPull.getState()
  */
 (function () {
@@ -50,8 +54,19 @@
     cooldown: 0,
     caught: [],      // enemigos atrapados ahora
     stunned: [],     // enemigos mareados tras soltar
-    t: 0
+    t: 0,
+    // Apuntado (ratón o stick derecho del mando). angle en el marco del mundo (0 = derecha).
+    angle: 0,
+    dirX: 1,
+    dirY: 0,
+    rel: 0           // ángulo relativo a donde mira Ruben (0 = adelante, <0 = arriba)
   };
+
+  // Fuente de apuntado: 'none' (horizontal, hacia donde mira), 'mouse' o 'stick'.
+  // Gana la última que se usó.
+  const aim = { source: 'none', mouseX: 0, mouseY: 0, mouseT: -1e9, stickHeld: false };
+  const STICK_DEAD = 0.35;
+  const MOUSE_FRESH_MS = 3000; // si el ratón no se movió hace rato, se apunta hacia adelante
 
   // Corrientes de aire (pool fijo)
   const streaks = [];
@@ -108,7 +123,54 @@
 
   // ---------------- geometría de la franja ----------------
   function handPoint(p) {
-    return { x: p.x + p.width / 2 + state.facing * 16, y: p.y + 18 };
+    return { x: p.x + p.width / 2 + state.dirX * 16, y: p.y + 19 + state.dirY * 14 };
+  }
+
+  // ---------------- apuntado ----------------
+  function setAngle(a) {
+    state.angle = a;
+    state.dirX = Math.cos(a);
+    state.dirY = Math.sin(a);
+    // Ruben se da vuelta según hacia dónde apunta (con margen cerca de la vertical)
+    if (state.dirX > 0.15) state.facing = 1;
+    else if (state.dirX < -0.15) state.facing = -1;
+    state.rel = Math.atan2(state.dirY, state.dirX * state.facing);
+  }
+  function readStick(g) {
+    const pad = g.getPad ? g.getPad() : null;
+    if (!pad || !pad.axes || pad.axes.length < 4) { aim.stickHeld = false; return; }
+    const ax = pad.axes[2] || 0, ay = pad.axes[3] || 0;
+    aim.stickHeld = ax * ax + ay * ay > STICK_DEAD * STICK_DEAD;
+    if (aim.stickHeld) aim.source = 'stick';
+  }
+  // Ángulo deseado este cuadro (o null = mantener el actual)
+  function targetAngle(g, p) {
+    if (aim.source === 'stick') {
+      if (!aim.stickHeld) return null; // stick suelto: queda apuntando donde estaba
+      const pad = g.getPad();
+      return Math.atan2(pad.axes[3] || 0, pad.axes[2] || 0);
+    }
+    if (aim.source === 'mouse') {
+      const cam = g.camera || { x: 0, y: 0 };
+      const bx = p.x + p.width / 2, by = p.y + 19;
+      const dx = aim.mouseX + cam.x - bx, dy = aim.mouseY + cam.y - by;
+      if (dx * dx + dy * dy < 36) return null;
+      return Math.atan2(dy, dx);
+    }
+    // Sin ratón ni stick: horizontal; izquierda/derecha giran a Ruben plantado
+    const cm = g.controlsManager;
+    if (cm && cm.isActive('moveLeft', g.keys)) return Math.PI;
+    if (cm && cm.isActive('moveRight', g.keys)) return 0;
+    return state.facing > 0 ? 0 : Math.PI;
+  }
+  function updateAim(g, p) {
+    const want = targetAngle(g, p);
+    if (want === null) return;
+    // Giro suave por el camino más corto
+    let d = want - state.angle;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    setAngle(Math.abs(d) < 0.01 ? want : state.angle + d * 0.35);
   }
   function currentReach() {
     const e = 1 - Math.pow(1 - state.power, 3);
@@ -120,10 +182,12 @@
     const h = handPoint(p);
     const reach = currentReach();
     if (reach < 4) return -1;
-    const along = (x - h.x) * state.facing;
+    const rx = x - h.x, ry = y - h.y;
+    const along = rx * state.dirX + ry * state.dirY;
     if (along < -10 || along > reach) return -1;
+    const perp = ry * state.dirX - rx * state.dirY;
     const u = Math.max(0, along / RANGE);
-    return Math.abs(y - h.y) <= halfAt(u) + 6 ? u : -1;
+    return Math.abs(perp) <= halfAt(u) + 6 ? u : -1;
   }
 
   // ---------------- enemigos atrapados ----------------
@@ -237,12 +301,17 @@
     if (!e.alive) return false;
     const h = handPoint(p);
     const cx = e.x + e.width / 2, cy = e.y + e.height / 2;
-    const holdX = h.x + state.facing * (HOLD_GAP + e.width / 2 + idx * 8);
-    const holdY = h.y - 2 + Math.sin(w.t * 0.12 + w.seed) * 4 - idx * 5;
-    const dx = holdX - cx;
-    const step = PULL_SPEED * (0.45 + state.power * 0.55) * (1 + Math.min(1, Math.abs(dx) / 200) * 0.3);
-    const mx = Math.abs(dx) <= step ? dx : Math.sign(dx) * step;
-    const my = (holdY - cy) * 0.045 + Math.sin(w.t * 0.21 + w.seed) * 0.7;
+    const gap = HOLD_GAP + Math.max(e.width, e.height) / 2 + idx * 8;
+    const holdX = h.x + state.dirX * gap;
+    const holdY = h.y + state.dirY * gap - 2 + Math.sin(w.t * 0.12 + w.seed) * 4 - idx * 5;
+    const dx = holdX - cx, dy = holdY - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const step = PULL_SPEED * (0.45 + state.power * 0.55) * (1 + Math.min(1, dist / 200) * 0.3);
+    // Se acerca en línea recta hacia la mano, con un leve vaivén perpendicular a la franja
+    const k = dist <= step || dist === 0 ? 1 : step / dist;
+    const wob = Math.sin(w.t * 0.21 + w.seed) * 0.7;
+    const mx = dx * k - state.dirY * wob;
+    const my = dy * k + state.dirX * wob;
     const world = window.gameInstance.world;
     unstick(e, world);
     moveCollide(e, mx, my, world);
@@ -347,9 +416,9 @@
   // Soplar: aleja a los enemigos dentro de la franja (más fuerte cerca de la mano)
   function pushStep(e, p, u) {
     const world = window.gameInstance.world;
-    const dx = state.facing * PUSH_SPEED * (0.35 + state.power * 0.65) * (1 - u * 0.5);
+    const sp = PUSH_SPEED * (0.35 + state.power * 0.65) * (1 - u * 0.5);
     unstick(e, world);
-    moveCollide(e, dx, 0, world);
+    moveCollide(e, state.dirX * sp, state.dirY * sp, world);
     if ('knockbackVx' in e) e.knockbackVx = 0;
     if (state.t % 11 === 0 && window.particleSystem) window.particleSystem.createDust(e.x + e.width / 2, e.y + e.height / 2, 1, '#ffffff');
   }
@@ -362,6 +431,7 @@
     const hurt = p.anim && p.anim.hurtFlash > 0;
     const can = !p.dead && p.isGrounded && !p.isAttacking && !p.carriedItem && !hurt && state.cooldown === 0 && g.deathTimer <= 0;
     const want = wantsPull(g);
+    readStick(g);
 
     // Cambio de modo en caliente (jalar ↔ soplar): suelta a los atrapados
     if (state.active && want && want !== state.mode) {
@@ -376,12 +446,17 @@
     } else if (!state.active && want && can) {
       state.active = true;
       state.facing = p.facing || 1;
+      // Arranca apuntando hacia donde mira Ruben (el ratón/stick lo corrige enseguida)
+      setAngle(state.facing > 0 ? 0 : Math.PI);
+      if (aim.source === 'stick' && !aim.stickHeld) aim.source = 'none';
+      if (aim.source === 'mouse' && performance.now() - aim.mouseT > MOUSE_FRESH_MS) aim.source = 'none';
       state.power = 0;
       state.mode = want;
       startSound();
     }
 
     if (state.active) {
+      updateAim(g, p);
       state.power = Math.min(1, state.power + 0.045);
       p.facing = state.facing;
       for (const e of g.enemies) {
@@ -435,6 +510,7 @@
     state.pose += (target - state.pose) * (state.active ? 0.22 : 0.18);
     if (state.pose < 0.01 && !state.active) state.pose = 0;
     p.windPose = state.pose;
+    p.windAim = state.rel; // ángulo del brazo extendido (player.js)
   }
 
   // ---------------- dibujo ----------------
@@ -445,13 +521,18 @@
     const p = g.player;
     const biome = (g.world.getCurrentRoom().biome) || 'pradera';
     const tint = TINT[biome] || TINT.pradera;
-    const f = state.facing;
     const h = handPoint(p);
-    const hx = h.x - cam.x, hy = h.y - cam.y;
     const reach = currentReach();
     const t = state.t;
 
     ctx.save();
+    // Marco local de la franja: origen en la mano, eje x = hacia donde apunta.
+    // Se espeja según hacia dónde mira Ruben y se gira por el ángulo relativo, así
+    // el dibujo de siempre (hacia adelante) sirve para cualquier dirección.
+    ctx.translate(h.x - cam.x, h.y - cam.y);
+    ctx.scale(state.facing, 1);
+    ctx.rotate(state.rel);
+    const f = 1, hx = 0, hy = 0;
     // Bruma de aire sin bordes: manchas suaves a lo largo de la franja (no se ve el límite,
     // solo el aire que corre hacia Ruben)
     const steps = 6;
@@ -550,6 +631,19 @@
       stopSound();
       origLoad(index, sx, sy);
     };
+
+    // Ratón: posición en píxeles del canvas (corrige el escalado por CSS)
+    const canvas = g.canvas;
+    if (canvas) {
+      canvas.addEventListener('mousemove', (e) => {
+        const r = canvas.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        aim.mouseX = (e.clientX - r.left) * (canvas.width / r.width);
+        aim.mouseY = (e.clientY - r.top) * (canvas.height / r.height);
+        aim.mouseT = performance.now();
+        aim.source = 'mouse';
+      });
+    }
 
     window.GameHooks.onRenderWorld.push((game, ctx, cam) => {
       try { render(game, ctx, cam); } catch (e) { console.error('[Viento]', e); }

@@ -254,3 +254,9 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 - `wind-pull.js`: los insectos atrapados y mareados ahora se mueven con colisión real (`moveCollide`) contra suelo, techos, muros, portón cerrado y muros quebradizos, y `unstick` los saca si quedaron metidos en una plataforma. Antes la polilla mareada bajaba 0,35 px por cuadro sin chocar (se hundía en el suelo) y el arrastre ignoraba las plataformas.
 - Playtest: arrastre en el suelo y desde una ruina, soltar y dejar caer/flotar → ningún insecto queda dentro de una plataforma. También probado el desbloqueo de Gemini (con la nota `1:0` leída la habilidad funciona) ✅.
 - (8/11 23:58, Claude, pedido del usuario) Jalar el Aire: se quitaron las líneas discontinuas del borde y el relleno con forma de embudo; ahora la franja es una bruma suave sin bordes (manchas radiales) más las corrientes, hojas/copos y el remolino. La zona de captura no cambió.
+
+## Cambio de Claude (9/11): apuntar el aire con ratón o stick derecho — pedido del usuario
+- `wind-pull.js`: mientras se jala o sopla el aire, la franja apunta hacia el cursor del ratón o hacia donde se incline el stick derecho del mando (ejes 2/3); gana el último que se movió. Sin ninguno (o si el ratón no se movió en 3 s), apunta hacia adelante y Izquierda/Derecha giran a Ruben plantado. La captura (`bandU`), el arrastre (`pullStep`), el empuje (`pushStep`) y el dibujo usan el vector `state.dirX/dirY`; Ruben se da vuelta según el lado al que apunta.
+- `player.js`: el brazo extendido y la palma se orientan con `player.windAim` (ángulo relativo, 0 = adelante).
+- `controls.js`: fila "Apuntar el aire — Mover el ratón / Stick derecho" y pista en la guía.
+- Prueba rápida: ratón arriba-derecha → la polilla queda atrapada y viaja a la mano; escarabajos fuera de la franja, no. El usuario pidió no hacer más playtest.
