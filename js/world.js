@@ -22,15 +22,6 @@ class World {
     return {
       pradera: {
         id: 'pradera',
-        skyStops: [
-          [0, '#2c1d33'],
-          [0.35, '#6e3746'],
-          [0.72, '#c86d49'],
-          [1, '#e8b96a']
-        ],
-        farSilhouette: 'rgba(62, 34, 42, 0.5)',
-        midHills: '#4b382a',
-        midHillsStroke: '#3a2416',
         stoneTop: '#7a654b',
         stoneBottom: '#4a3a28',
         turfMain: '#788c38',
@@ -44,15 +35,6 @@ class World {
       },
       bosque: {
         id: 'bosque',
-        skyStops: [
-          [0, '#132421'],
-          [0.45, '#213d34'],
-          [0.8, '#385e4b'],
-          [1, '#688c68']
-        ],
-        farSilhouette: 'rgba(18, 36, 28, 0.65)',
-        midHills: '#243b2c',
-        midHillsStroke: '#17261c',
         stoneTop: '#485948',
         stoneBottom: '#293629',
         turfMain: '#386b44',
@@ -66,15 +48,6 @@ class World {
       },
       montana: {
         id: 'montana',
-        skyStops: [
-          [0, '#1c2838'],
-          [0.45, '#3b526b'],
-          [0.8, '#6e8ba6'],
-          [1, '#b8cde0']
-        ],
-        farSilhouette: 'rgba(42, 58, 78, 0.55)',
-        midHills: '#465669',
-        midHillsStroke: '#253140',
         stoneTop: '#6c7a89',
         stoneBottom: '#414b57',
         turfMain: '#dce8f2',
@@ -88,15 +61,6 @@ class World {
       },
       castillo: {
         id: 'castillo',
-        skyStops: [
-          [0, '#1f121b'],
-          [0.45, '#3d1e2b'],
-          [0.8, '#662d38'],
-          [1, '#9e5a47']
-        ],
-        farSilhouette: 'rgba(36, 16, 24, 0.65)',
-        midHills: '#331c24',
-        midHillsStroke: '#211016',
         stoneTop: '#695853',
         stoneBottom: '#3d312e',
         turfMain: '#8c2732',
@@ -196,8 +160,8 @@ class World {
       width: 1440,
       height: 540,
       platforms: [
-        { x: 0, y: 460, w: 420, h: 80, type: 'ground' },
-        { x: 620, y: 460, w: 820, h: 80, type: 'ground' },
+        // Suelo continuo: el barranco (x 420-620) se tapó (pedido del usuario, 9/11)
+        { x: 0, y: 460, w: 1440, h: 80, type: 'ground' },
         // Techo de copas con un hueco (x 280-410) para subir al molino saltando desde la ruina alta
         { x: 0, y: 0, w: 280, h: 20, type: 'ceiling' },
         { x: 410, y: 0, w: 1030, h: 20, type: 'ceiling' },
@@ -409,118 +373,10 @@ class World {
     const OUT = '#3a2416';
 
     // 1. Cielo y fondo procedural según el bioma de la zona
-    if (typeof CodeArt !== 'undefined' && typeof CodeArt.renderBiomeBackground === 'function') {
-      CodeArt.renderBiomeBackground(
-        ctx,
-        room.biome,
-        camera,
-        960,
-        540,
-        Date.now(),
-        {
-          hasWindmill: !!room.hasWindmill,
-          // Sin la torre/castillo del fondo (pedido del usuario, 9/11)
-          hasTower: false
-        }
-      );
-    } else {
-      ctx.save();
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, room.height);
-      for (const [stop, color] of biome.skyStops) {
-        skyGrad.addColorStop(stop, color);
-      }
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, 960, 540);
-
-      // Sol poniente o luna brumosa en el horizonte
-      if (room.biome === 'pradera') {
-        const sunX = 720 - camera.x * 0.05;
-        const sunY = 260;
-        const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 110);
-        sunGrad.addColorStop(0, 'rgba(255, 242, 190, 0.85)');
-        sunGrad.addColorStop(0.4, 'rgba(245, 185, 95, 0.35)');
-        sunGrad.addColorStop(1, 'rgba(245, 185, 95, 0)');
-        ctx.fillStyle = sunGrad;
-        ctx.beginPath();
-        ctx.arc(sunX, sunY, 110, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Siluetas lejanas en paralaje lento (montañas, árboles altos o torres del reino)
-      ctx.fillStyle = biome.farSilhouette;
-      if (room.biome === 'bosque') {
-        // Árboles altos del Bosque de los Susurros
-        for (let i = 0; i < 10; i++) {
-          const tX = (i * 140) - (camera.x * 0.14) % 140;
-          ctx.fillRect(tX + 45, 80, 26, 400);
-          ctx.beginPath();
-          ctx.arc(tX + 58, 110, 55, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else {
-        // Picos y siluetas de torres del Reino Caído
-        for (let i = 0; i < 7; i++) {
-          const pX = (i * 220) - (camera.x * 0.12) % 220;
-          ctx.beginPath();
-          ctx.moveTo(pX, 470);
-          ctx.lineTo(pX + 70, 210);
-          ctx.lineTo(pX + 140, 470);
-          ctx.fill();
-        }
-      }
-
-      // Colinas redondeadas estilo animación años 50 (Paralaje medio)
-      ctx.fillStyle = biome.midHills;
-      ctx.strokeStyle = biome.midHillsStroke;
-      ctx.lineWidth = 2;
-      for (let j = 0; j < 8; j++) {
-        const cX = (j * 170) - (camera.x * 0.25) % 170;
-        ctx.beginPath();
-        ctx.ellipse(cX + 80, 465, 115, 62, 0, Math.PI, 0);
-        ctx.fill();
-        ctx.stroke();
-      }
-
-      // Molino antiguo con aspas giratorias en el Altozano del Molino
-      if (room.hasWindmill) {
-        const mx = 930 - camera.x;
-        const my = 160 - camera.y;
-        ctx.save();
-        ctx.fillStyle = '#5c432d';
-        ctx.strokeStyle = OUT;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(mx - 28, my);
-        ctx.lineTo(mx - 18, my - 95);
-        ctx.lineTo(mx + 18, my - 95);
-        ctx.lineTo(mx + 28, my);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Techo cónico del molino
-        ctx.fillStyle = '#8c412b';
-        ctx.beginPath();
-        ctx.moveTo(mx - 24, my - 95);
-        ctx.lineTo(mx, my - 122);
-        ctx.lineTo(mx + 24, my - 95);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Aspas giratorias
-        ctx.translate(mx, my - 82);
-        ctx.rotate(Date.now() * 0.0007);
-        ctx.fillStyle = '#e8d2a6';
-        for (let a = 0; a < 4; a++) {
-          ctx.rotate(Math.PI / 2);
-          ctx.fillRect(-3, 0, 6, 54);
-          ctx.strokeRect(-3, 0, 6, 54);
-        }
-        ctx.restore();
-      }
-      ctx.restore();
-    }
+    // El motor CodeArt (js/code-art-engine.js) siempre está cargado en index.html
+    CodeArt.renderBiomeBackground(ctx, room.biome, camera, 960, 540, Date.now(), {
+      hasWindmill: !!room.hasWindmill
+    });
 
     // 2. Dibujar Plataformas (Contorno de tinta cálida y vegetación superior)
     const windWave = Math.sin(Date.now() * 0.003) * 2;

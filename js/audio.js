@@ -74,30 +74,6 @@ class SoundManager {
     osc.stop(now + 0.15);
   }
 
-  // Sonido de Doble Salto (acorde mayor brillante estilo animación clásica)
-  playDoubleJump() {
-    if (!this.ctx || this.isMuted) return;
-    const now = this.ctx.currentTime;
-
-    [392.00, 493.88, 587.33, 783.99].forEach((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.025);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.25, now + 0.22);
-
-      gain.gain.setValueAtTime(0.11, now + idx * 0.025);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start(now + idx * 0.025);
-      osc.stop(now + 0.24);
-    });
-  }
-
   // Sonido de Corte de Espada
   playSlash() {
     if (!this.ctx || this.isMuted) return;
@@ -254,11 +230,6 @@ class SoundManager {
       osc.start(now + i * 0.07);
       osc.stop(now + i * 0.07 + 0.52);
     });
-  }
-
-  // Alias por compatibilidad
-  startCavernAmbience() {
-    this.startMeadowAmbience();
   }
 
   // Música pastoral luminosa de pradera (acorde mayor cálido + notas suaves de arpa)

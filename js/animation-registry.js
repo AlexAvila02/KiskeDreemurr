@@ -834,7 +834,7 @@
   // 8. REGISTRO DE CAPAS POR DEFECTO
   // ==========================================================================
 
-  // 1. Estela Acrobática de Doble Salto y Pogo en Ruben
+  // 1. Estela Acrobática de voltereta y Pogo en Ruben
   registerLayer('player', 'acrobatic-trail', {
     order: -10,
     update(player) {

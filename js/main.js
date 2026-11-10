@@ -503,7 +503,8 @@ class Game {
     } catch (e) { /* sin vibración */ }
   }
 
-  // Muestra la nota de Angelo cuando Ruben pasa por encima y la oculta al alejarse
+  // Oculta la nota de Angelo al alejarse. Ya NO se abre sola al pasar por encima
+  // (pedido del usuario, 9/11): se abre con ARRIBA desde js/npcs.js (cartel "↑ Leer").
   updateNearbyNote() {
     const room = this.world.getCurrentRoom();
     const px = this.player.x + this.player.width / 2;
@@ -517,10 +518,7 @@ class Game {
     }
 
     if (near) {
-      if (near !== this.activeNote) {
-        this.activeNote = near;
-        this.showDialog(near.speaker, near.text, true);
-      }
+      // Cerca de una nota: si está abierta se mantiene; si no, solo se ve el cartel
       return;
     }
 
@@ -550,7 +548,7 @@ class Game {
     const py = this.player.y + this.player.height / 2;
 
     // 1. Revisar notas de Angelo
-    // (Las notas de Angelo se muestran solas al pasar por encima: ver updateNearbyNote)
+    // (Las notas de Angelo se abren con ARRIBA: ver js/npcs.js)
 
     // 2. Revisar puerta sellada
     if (room.door && room.door.isLocked) {
@@ -687,15 +685,6 @@ class Game {
     this.dialogTyping = false;
     this.dialogText.textContent = this.dialogFullText || this.dialogText.textContent;
     this.dialogBox.classList.add('typed');
-  }
-
-  closeDialog() {
-    // Primera pulsación mientras escribe: mostrar todo el texto; la segunda cierra
-    if (this.dialogTyping) {
-      this.finishTyping();
-      return;
-    }
-    this.dialogBox.classList.add('hidden');
   }
 
   showNotification(msg) {
@@ -931,8 +920,6 @@ class Game {
     // 1. Renderizar Mundo y Plataformas
     this.world.render(ctx, cam);
 
-    // 1b. (Se quitó la señal de pasajes hacia arriba —haz de luz + flecha—, pedido del usuario 9/11.
-    //     renderExitHints() queda disponible por si se quiere volver a usar.)
 
     // 2. Renderizar Partículas de Fondo
     window.particleSystem.render(ctx, cam);
@@ -1034,49 +1021,6 @@ class Game {
       ctx.stroke();
     }
     ctx.restore();
-  }
-
-  renderExitHints() {
-    const room = this.world.getCurrentRoom();
-    if (!room.exits) return;
-    const ctx = this.ctx;
-    const t = Date.now() * 0.003;
-    for (const ex of room.exits) {
-      if (!ex.hint || ex.hint.dir !== 'up') continue;
-      const x = ex.hint.x - this.camera.x;
-      const w = ex.hint.w;
-      const y0 = -this.camera.y;
-      ctx.save();
-      // Haz de luz que cae por el hueco del techo
-      const g = ctx.createLinearGradient(0, y0, 0, y0 + 150);
-      g.addColorStop(0, 'rgba(255, 236, 170, 0.55)');
-      g.addColorStop(1, 'rgba(255, 236, 170, 0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(x, y0);
-      ctx.lineTo(x + w, y0);
-      ctx.lineTo(x + w + 20, y0 + 150);
-      ctx.lineTo(x - 20, y0 + 150);
-      ctx.closePath();
-      ctx.fill();
-      // Flecha que sube y baja
-      const ay = y0 + 45 + Math.sin(t) * 5;
-      const ax = x + w / 2;
-      ctx.fillStyle = '#f9efd8';
-      ctx.strokeStyle = '#3a2416';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay - 12);
-      ctx.lineTo(ax + 10, ay);
-      ctx.lineTo(ax + 4, ay);
-      ctx.lineTo(ax + 4, ay + 10);
-      ctx.lineTo(ax - 4, ay + 10);
-      ctx.lineTo(ax - 4, ay);
-      ctx.lineTo(ax - 10, ay);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      ctx.restore();
-    }
   }
 
   renderLighting() {

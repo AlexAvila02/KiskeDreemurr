@@ -66,7 +66,10 @@
     ],
     exits: [
       { x: 0, y: 340, w: 40, h: 120, targetRoom: 3, targetX: 1190, targetY: 410 },
-      { x: 1720, y: 340, w: 40, h: 120, targetRoom: 5, targetX: 60, targetY: 410 }
+      { x: 1720, y: 340, w: 40, h: 120, targetRoom: 5, targetX: 60, targetY: 410 },
+      // Primer barranco (x 560-700): baja a la Laguna del Maestro (sala 12)
+      { x: 560, y: 500, w: 140, h: 60, targetRoom: 12, targetX: 728, targetY: 30,
+        hint: { dir: 'down', x: 560, w: 140 } }
     ],
     spawnEnemies: () => [
       crawler(240, 460, 110),
@@ -341,6 +344,128 @@
       new FlyingShadeEnemy(1200, 250)
     ],
     spawnDebris: () => [stone(180, 460), stone(1300, 460)]
+  });
+
+  // ==========================================================
+  // SALA 11: Hondonada del Pastor (pradera) — SIN ACCESO por ahora (pedido del usuario,
+  // 9/11): se quitó la bajada desde el barranco de la sala 1. La sala se conserva para
+  // conectarla en otro lugar. Al conectarla, revisar su salida de arriba (hoy apunta a
+  // la sala 1, x 640) y la entrada (aterriza en la saliente bajo el hueco: x 1428, y 30).
+  // Abajo vive Tobías, un viejo pastor (NPC, js/npcs.js).
+  // ==========================================================
+  // Mitad izquierda (x 0-960): prado de las ovejas · mitad derecha (x 960-1920): la
+  // cabaña de Tobías, el hueco del techo y las piedras para volver a subir.
+  R({
+    id: 11,
+    name: 'HONDONADA DEL PASTOR',
+    biome: 'pradera',
+    ambience: 'breeze',          // brisa leve con su sonido (js/npcs.js)
+    width: 1920,
+    height: 540,
+    platforms: [
+      ground(0, 1920),
+      ceiling(0, 1360), ceiling(1520, 400),   // hueco del techo (x 1360-1520) = el barranco de arriba
+      wall(0), wall(1890),
+      // Prado de las ovejas
+      ruin(220, 370, 130),
+      ruin(440, 290, 120),
+      ruin(700, 360, 110),
+      // Subida al hueco
+      ruin(1380, 140, 120),                    // saliente bajo el hueco (aterrizaje y salida)
+      ruin(1560, 210, 110),
+      ruin(1720, 280, 120),
+      ruin(1560, 370, 120)
+    ],
+    collectibles: [
+      { item: 'emblema', x: 1780, y: 244 }     // premio por bajar a ver al pastor
+    ],
+    // Decorados sin colisión (los dibuja js/npcs.js detrás de Ruben)
+    props: [
+      { type: 'cabin', x: 1080, y: 460 },
+      { type: 'sheep', x: 360, y: 460, range: 70, facing: 1 },
+      { type: 'sheep', x: 590, y: 460, range: 50, facing: -1 },
+      { type: 'sheep', x: 820, y: 460, range: 40, facing: 1, small: true }
+    ],
+    npcs: [
+      {
+        id: 'tobias',
+        name: 'Tobías, el viejo pastor',
+        x: 1215, y: 460, facing: 1,
+        lines: [
+          '¡Vaya, un muchacho que cae del cielo! Tranquilo, el pasto de esta hondonada es blando. Me llamo Tobías; cuidaba ovejas cuando el reino todavía tenía rey.',
+          '¿Buscas a un joven de bufanda mostaza? Pasó por aquí hace un par de semanas. Tenía la misma mirada testaruda que tú… debe ser tu hermano.',
+          'Me contó que iba hacia el castillo, a buscar algo que su padre escondió. Antes subió al molino: dejó allí algo para quien viniera detrás.',
+          'Si quieres volver arriba, trepa por las piedras hasta la saliente bajo el hueco y salta con fuerza. Y ojo con los escarabajos: el pasto los pone gordos y tercos.'
+        ],
+        farewell: 'Que el viento te acompañe, muchacho. Y dile a tu hermano que el viejo Tobías todavía guarda su lugar junto al fuego.'
+      }
+    ],
+    exits: [
+      // Subida: saltar por el hueco del techo → sale del barranco de la sala 1 (con la
+      // animación de llegada) y aterriza en el borde derecho del barranco
+      { x: 0, y: -400, w: 1920, h: 390, targetRoom: 1, targetX: 640, targetY: 410,
+        hint: { dir: 'up', x: 1360, w: 160 } }
+    ],
+    // Escarabajos gordos del prado (lejos de la cabaña)
+    spawnEnemies: () => [crawler(260, 460, 90), crawler(740, 460, 80)],
+    spawnDebris: () => [stone(520, 460), stone(1300, 460)]
+  });
+
+  // ==========================================================
+  // SALA 12: Laguna del Maestro (bosque) — debajo del primer barranco del Claro de las
+  // Luciérnagas (sala 4). Se cae por el hueco del techo a la saliente alta; abajo hay una
+  // laguna con física de olas (js/water.js) y el Maestro Arroyo, que enseña el Dominio
+  // del Agua. Tres campanas sobre la laguna sirven de práctica.
+  // Para volver: subir por las ruinas hasta la saliente y saltar por el hueco.
+  // ==========================================================
+  R({
+    id: 12,
+    name: 'LAGUNA DEL MAESTRO',
+    biome: 'bosque',
+    width: 1600,
+    height: 540,
+    platforms: [
+      { x: 0, y: 400, w: 520, h: 140, type: 'ground' },     // orilla oeste (el maestro)
+      { x: 1080, y: 400, w: 520, h: 140, type: 'ground' },  // orilla este
+      { x: 520, y: 520, w: 560, h: 20, type: 'ground' },    // fondo de la laguna
+      ceiling(0, 640), ceiling(800, 800),                    // hueco del techo (x 640-800)
+      wall(0), wall(1570),
+      ruin(680, 140, 140),                                   // saliente bajo el hueco
+      ruin(1000, 220, 120),
+      ruin(1180, 310, 120)
+    ],
+    // Laguna: superficie en y 412 (12 px bajo las orillas), 108 px de hondo
+    water: [{ x: 520, y: 412, w: 560, h: 108 }],
+    waterBells: [
+      { x: 600, y: 210, pitch: 660 },
+      { x: 880, y: 262, pitch: 784 },
+      { x: 1420, y: 170, pitch: 988 }
+    ],
+    collectibles: [
+      { item: 'emblema', x: 1240, y: 274 }
+    ],
+    npcs: [
+      {
+        id: 'arroyo',
+        look: 'water-master',
+        teaches: 'water',
+        name: 'Maestro Arroyo',
+        x: 300, y: 400, facing: 1,
+        lines: [
+          'Ah, un muchacho que cae del cielo y todavía no se moja. Soy el Maestro Arroyo. El agua de esta laguna escucha a quien sabe pedirle.',
+          'Tu hermano Angelo se sentó en esta misma orilla. Quería aprender, pero tenía prisa; siempre la tuvo. Me dijo que vendría alguien más paciente.',
+          'Escucha: el agua no se empuja, se invita. Cerca de la laguna, mantén F (L2 en el mando) y subirá a tu mano. Apunta con el ratón o el stick derecho, y suéltala.'
+        ],
+        farewell: 'Haz sonar las tres campanas que cuelgan sobre la laguna. Cuanto más tiempo la sostengas, más fuerte sale el agua.',
+        farewellDone: 'Las campanas todavía cantan. Ve, Ruben: donde haya agua que te escuche, no estarás solo.'
+      }
+    ],
+    exits: [
+      { x: 0, y: -400, w: 1600, h: 390, targetRoom: 4, targetX: 720, targetY: 410,
+        hint: { dir: 'up', x: 640, w: 160 } }
+    ],
+    spawnEnemies: () => [new FlyingShadeEnemy(1350, 250)],
+    spawnDebris: () => [stone(160, 400), stone(1300, 400)]
   });
 
   // ==========================================================

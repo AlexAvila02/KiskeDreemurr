@@ -1,6 +1,6 @@
 /**
  * Clase Ruben - El Protagonista
- * Manejo de física fluida, doble salto, combate cuerpo a cuerpo y agarre/lanzamiento de escombros.
+ * Manejo de física fluida, salto regulable, combate cuerpo a cuerpo y agarre/lanzamiento de escombros.
  */
 // Búferes fijos para la estela del tajo (sin basura por cuadro): N + 1 puntos (x, y)
 const SLASH_N = 18;
@@ -37,7 +37,6 @@ class Player {
     this.jumpForce = -12;
     this.isGrounded = false;
     this.coyoteTime = 0;
-    this.squashTimer = 0;
     this.walkPhase = 0;   // ciclo de caminata (avanza con la velocidad)
     this.dead = false;
 
@@ -65,7 +64,7 @@ class Player {
       sy: 1, vsy: 0,        // resorte de squash & stretch vertical (sx = 1/sy conserva el volumen)
       sx: 1, vsx: 0,        // resorte horizontal (giros y golpes)
       lean: 0,              // inclinación del cuerpo según la velocidad
-      flip: 0,              // voltereta del doble salto (1 -> 0)
+      flip: 0,              // voltereta (llegada a las salas de arriba) (1 -> 0)
       hurtFlash: 0,         // cuadros de destello blanco al recibir daño
       swingDir: 1,          // alterna el sentido del tajo (combo arriba/abajo)
       lunge: 0,             // pequeño avance del cuerpo al atacar
@@ -288,7 +287,6 @@ class Player {
 
     // Temporizadores
     if (this.invulnerableTimer > 0) this.invulnerableTimer--;
-    if (this.squashTimer > 0) this.squashTimer--;
     if (this.attackCooldown > 0) this.attackCooldown--;
     if (this.attackTimer > 0) {
       this.attackTimer--;
@@ -330,7 +328,6 @@ class Player {
       }
       this.anim.sy = 1 - (0.12 + impact * 0.26); this.anim.vsy = 0;
       this.anim.flip = 0;
-      this.squashTimer = 6;
     }
 
     if (wasGrounded && !this.isGrounded) {
@@ -377,7 +374,7 @@ class Player {
     if (moveDir === 0 && this.isGrounded) leanTarget = -(this.vx / this.speed) * 0.08;
     a.lean += (leanTarget - a.lean) * 0.2;
 
-    // Voltereta del doble salto
+    // Voltereta (llegada a las salas de arriba)
     if (a.flip > 0) a.flip = Math.max(0, a.flip - 1 / 24);
     if (a.lunge > 0) a.lunge = Math.max(0, a.lunge - 1 / 10);
     if (a.hurtFlash > 0) a.hurtFlash--;
@@ -553,7 +550,7 @@ class Player {
     ctx.scale(scaleX, scaleY);
     ctx.translate(-cx, -feetY);
 
-    // Voltereta del doble salto alrededor del centro del cuerpo (con aceleración y frenado)
+    // Voltereta alrededor del centro del cuerpo (con aceleración y frenado)
     if (a.flip > 0) {
       const p = 1 - a.flip;
       const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;

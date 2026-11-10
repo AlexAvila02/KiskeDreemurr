@@ -188,7 +188,7 @@ class ParticleSystem {
     }
   }
 
-  // Destello dorado de doble salto (anillo + chispas radiales)
+  // Destello dorado (llave y Diario) (anillo + chispas radiales)
   createDoubleJumpSparks(x, y) {
     this.createShockwave(x, y, 26, '#ffe9a8', 3);
     for (let i = 0; i < 14; i++) {

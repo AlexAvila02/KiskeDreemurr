@@ -54,7 +54,7 @@ class ControlsManager {
       },
       {
         id: 'windPull',
-        name: 'Jalar el Aire (mantener junto con Abajo)',
+        name: 'Viento (con Arriba/Abajo) / Agua (sola)',
         icon: (window.UIIcons ? UIIcons.svg('wind') : ''),
         defaultKeys: ['KeyF', 'ShiftLeft']
       },
@@ -267,15 +267,6 @@ class ControlsManager {
       return this.formatKeyName(keys[1]);
     }
     return '?';
-  }
-
-  /**
-   * Devuelve un texto con las teclas asignadas a una acción (ej: "A / ←")
-   */
-  getDisplayKeysText(actionId) {
-    const keys = this.bindings[actionId] || [];
-    const names = keys.filter(k => !!k).map(k => this.formatKeyName(k));
-    return names.length > 0 ? names.join(' / ') : 'Sin asignar';
   }
 
   /**
@@ -526,6 +517,7 @@ class ControlsManager {
       ['scroll', 'Interactuar / Leer', null, 'Y'],
       ['wind', 'Jalar / Soplar el Aire', null, 'Abajo/Arriba + L2'],
       ['wind', 'Apuntar el aire', 'Mover el ratón', 'Stick derecho'],
+      ['water', 'Dominio del Agua (cerca del agua)', 'Apuntar: ratón', 'L2 · stick der.'],
       ['book', 'Diario de Ruben', null, 'Select'],
       ['gear', 'Pausa', null, 'Start'],
       ['gamepad', 'En menús: elegir / volver', 'Clic', 'A / B']
@@ -553,30 +545,9 @@ class ControlsManager {
   }
 
   /**
-   * Actualiza dinámicamente la guía de controles de la pantalla de inicio y el HUD
+   * Actualiza la pista del cuadro de diálogo con las teclas asignadas
    */
   updateControlsGuideUI() {
-    const guide = document.querySelector('.controls-guide');
-    if (guide) {
-      const leftRight = `${this.getDisplayKeysText('moveLeft')} / ${this.getDisplayKeysText('moveRight')}`;
-      const jump = this.getDisplayKeysText('jump');
-      const attack = this.getDisplayKeysText('attack');
-      const grab = this.getDisplayKeysText('grab');
-      const interact = this.getDisplayKeysText('interact');
-      const down = this.getPrimaryDisplayKey ? this.getPrimaryDisplayKey('aimDown') : 'S';
-      const wind = this.getPrimaryDisplayKey ? this.getPrimaryDisplayKey('windPull') : 'F';
-
-      guide.innerHTML = `
-        <div class="control-key"><span>${leftRight}</span> Moverse</div>
-        <div class="control-key"><span>${jump}</span> Saltar</div>
-        <div class="control-key"><span>${attack} / Clic Izq</span> Golpear (Ataque)</div>
-        <div class="control-key"><span>${grab} / Clic Der</span> Agarrar / Lanzar Objeto</div>
-        <div class="control-key"><span>${interact}</span> Interactuar / Leer / Abrir Puertas</div>
-        <div class="control-key"><span>${down} + ${wind}</span> Jalar el Aire (mantener) · mando: <span>Abajo + L2</span> · apuntar: <span>ratón / stick der.</span></div>
-        <div class="control-key">${window.UIIcons ? UIIcons.svg('gamepad', 'ui-inline') : ''} <span>Stick / Cruceta</span> Moverse · <span>A</span> Saltar · <span>X</span> Atacar · <span>B</span> Agarrar · <span>Y</span> Leer/Abrir</div>
-      `;
-    }
-
     // Actualizar pista en el diálogo de notas
     const dialogHint = document.querySelector('.dialog-hint');
     if (dialogHint) {

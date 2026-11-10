@@ -34,7 +34,8 @@
     'arrow-up': '<path d="M12 19V5M6.5 10.5 12 5l5.5 5.5"/>',
     'arrow-down': '<path d="M12 5v14M6.5 13.5 12 19l5.5-5.5"/>',
     close: '<path d="M6 6l12 12M18 6 6 18"/>',
-    wind: '<path d="M3 8h10.5a3 3 0 1 0-3-3"/><path d="M3 12.5h15a3 3 0 1 1-3 3"/><path d="M3 17h6"/>'
+    wind: '<path d="M3 8h10.5a3 3 0 1 0-3-3"/><path d="M3 12.5h15a3 3 0 1 1-3 3"/><path d="M3 17h6"/>',
+    water: '<path d="M12 3.5c3.6 4.6 6 7.9 6 10.9a6 6 0 0 1-12 0c0-3 2.4-6.3 6-10.9z"/><path d="M9.3 14.6a2.8 2.8 0 0 0 2.7 2.7" opacity=".6"/>'
   };
 
   function svg(name, extraClass) {
