@@ -8,6 +8,9 @@ class SoundManager {
     this.ambientGain = null;
     this.ambientOscs = [];
     this.arpeggioTimer = null;
+    this.lagunaThemeTimer = null;
+    this.isLagunaActive = false;
+    this.lagunaPhraseIdx = 0;
     this.currentBiome = 'pradera';
     this.isMuted = false;
     this.initialized = false;
@@ -37,6 +40,12 @@ class SoundManager {
         pad: [110.00, 164.81, 196.00, 220.00],
         harp: [220.00, 261.63, 329.63, 392.00, 440.00],
         filterFreq: 340
+      },
+      // Laguna del Maestro (Sala 12): Re Lidio / resonancia acuática y mística
+      laguna: {
+        pad: [73.42, 110.00, 146.83, 164.81, 220.00], // Re2, La2, Re3, Mi3, La3 - resonancia acuática y mística
+        harp: [293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99],
+        filterFreq: 450
       }
     };
   }
@@ -48,6 +57,10 @@ class SoundManager {
       this.ctx = new AudioCtx();
       this.initialized = true;
       this.startMeadowAmbience();
+      if (this.isLagunaActive) {
+        this.isLagunaActive = false;
+        this.enterLagunaTheme();
+      }
     } catch (e) {
       console.warn("Web Audio API no soportada:", e);
     }
@@ -258,7 +271,7 @@ class SoundManager {
     // Notas suaves de arpa pastoral cada pocos segundos
     if (this.arpeggioTimer) clearInterval(this.arpeggioTimer);
     this.arpeggioTimer = setInterval(() => {
-      if (!this.ctx || this.isMuted || document.hidden) return;
+      if (!this.ctx || this.isMuted || document.hidden || this.isLagunaActive) return;
       const biomeCfg = this.biomeChords[this.currentBiome] || this.biomeChords.pradera;
       const harpNotes = biomeCfg.harp;
       const freq = harpNotes[Math.floor(Math.random() * harpNotes.length)];
@@ -291,12 +304,182 @@ class SoundManager {
     if (this.ambientFilter) {
       this.ambientFilter.frequency.linearRampToValueAtTime(cfg.filterFreq, now + 1.2);
     }
+    // Asegura suficientes osciladores si el acorde tiene más voces (como las 5 de laguna)
+    while (this.ambientOscs.length < cfg.pad.length) {
+      const idx = this.ambientOscs.length;
+      const osc = this.ctx.createOscillator();
+      osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(cfg.pad[idx], now);
+      osc.connect(this.ambientFilter);
+      osc.start();
+      this.ambientOscs.push(osc);
+    }
     this.ambientOscs.forEach((osc, idx) => {
       if (cfg.pad[idx]) {
         osc.frequency.linearRampToValueAtTime(cfg.pad[idx], now + 1.2);
+      } else if (cfg.pad.length > 0) {
+        osc.frequency.linearRampToValueAtTime(cfg.pad[idx % cfg.pad.length], now + 1.2);
       }
     });
   }
+
+  // Reproduce una nota de arpa de cristal / campana acuática con sutil eco de caverna
+  playLagunaNote(freq, offsetSec = 0, duration = 2.4) {
+    if (!this.ctx || this.isMuted || document.hidden) return;
+    const now = this.ctx.currentTime + offsetSec;
+    if (now < this.ctx.currentTime) return;
+
+    // Nota directa tipo campana de agua / arpa de cristal
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1400, now);
+    filter.frequency.exponentialRampToValueAtTime(500, now + duration);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.038, now + 0.055);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + duration + 0.05);
+
+    // Eco sutil de gruta (~260ms después, atenuado con filtro lowpass suave)
+    const echoDelay = 0.26;
+    const echoNow = now + echoDelay;
+    const echoDuration = Math.max(1.2, duration * 0.75);
+
+    const echoOsc = this.ctx.createOscillator();
+    const echoFilter = this.ctx.createBiquadFilter();
+    const echoGain = this.ctx.createGain();
+
+    echoOsc.type = 'sine';
+    echoOsc.frequency.setValueAtTime(freq, echoNow);
+
+    echoFilter.type = 'lowpass';
+    echoFilter.frequency.setValueAtTime(750, echoNow);
+    echoFilter.frequency.exponentialRampToValueAtTime(320, echoNow + echoDuration);
+
+    echoGain.gain.setValueAtTime(0.0001, echoNow);
+    echoGain.gain.linearRampToValueAtTime(0.011, echoNow + 0.07);
+    echoGain.gain.exponentialRampToValueAtTime(0.0001, echoNow + echoDuration);
+
+    echoOsc.connect(echoFilter);
+    echoFilter.connect(echoGain);
+    echoGain.connect(this.ctx.destination);
+
+    echoOsc.start(echoNow);
+    echoOsc.stop(echoNow + echoDuration + 0.05);
+  }
+
+  // Secuencia cíclica de frases líricas para el Tema de la Laguna
+  scheduleNextLagunaPhrase() {
+    if (!this.isLagunaActive || !this.ctx) return;
+
+    const phrase = SoundManager.LAGUNA_PHRASES[this.lagunaPhraseIdx % SoundManager.LAGUNA_PHRASES.length];
+    this.lagunaPhraseIdx = (this.lagunaPhraseIdx + 1) % SoundManager.LAGUNA_PHRASES.length;
+
+    let maxEndTime = 0;
+    phrase.forEach(item => {
+      this.playLagunaNote(item.note, item.delay, item.dur);
+      const end = item.delay + item.dur;
+      if (end > maxEndTime) maxEndTime = end;
+    });
+
+    // Silencio meditativo entre frases (armoniza con el sonido ambiente de agua)
+    const pauseBetween = 4.0;
+    const nextCallMs = (maxEndTime + pauseBetween) * 1000;
+
+    this.lagunaThemeTimer = setTimeout(() => {
+      this.scheduleNextLagunaPhrase();
+    }, nextCallMs);
+  }
+
+  // Entra al tema musical de la Laguna del Maestro
+  enterLagunaTheme() {
+    if (this.isLagunaActive && this.lagunaThemeTimer) return;
+    this.isLagunaActive = true;
+    if (!this.ctx) return;
+
+    this.setBiomeAmbience('laguna');
+
+    if (this.lagunaThemeTimer) {
+      clearTimeout(this.lagunaThemeTimer);
+      this.lagunaThemeTimer = null;
+    }
+
+    this.lagunaPhraseIdx = 0;
+    this.scheduleNextLagunaPhrase();
+  }
+
+  // Sale del tema de la Laguna del Maestro y restaura el bioma de destino
+  leaveLagunaTheme(targetBiome = 'pradera') {
+    this.isLagunaActive = false;
+    if (this.lagunaThemeTimer) {
+      clearTimeout(this.lagunaThemeTimer);
+      this.lagunaThemeTimer = null;
+    }
+    this.setBiomeAmbience(targetBiome);
+  }
 }
 
+// Frases líricas y contemplativas en Re Lidio / Pentatónica acuática para el Tema del Maestro Arroyo
+SoundManager.LAGUNA_PHRASES = [
+  // Frase 1: El reflejo del agua cristalina (D4, F#4, A4, B4, A4)
+  [
+    { note: 293.66, delay: 0.0, dur: 2.4 }, // D4
+    { note: 369.99, delay: 1.0, dur: 2.2 }, // F#4
+    { note: 440.00, delay: 2.0, dur: 2.4 }, // A4
+    { note: 493.88, delay: 3.2, dur: 2.8 }, // B4
+    { note: 440.00, delay: 4.6, dur: 3.2 }  // A4
+  ],
+  // Frase 2: Murmullo de la gruta mística (F#4, A4, D5, B4, A4, F#4)
+  [
+    { note: 369.99, delay: 0.0, dur: 2.2 }, // F#4
+    { note: 440.00, delay: 0.9, dur: 2.0 }, // A4
+    { note: 587.33, delay: 1.9, dur: 2.6 }, // D5
+    { note: 493.88, delay: 3.0, dur: 2.2 }, // B4
+    { note: 440.00, delay: 4.0, dur: 2.2 }, // A4
+    { note: 369.99, delay: 5.2, dur: 3.5 }  // F#4
+  ],
+  // Frase 3: Danza de gotas sobre la superficie (E4, A4, B4, D5, E5, D5)
+  [
+    { note: 329.63, delay: 0.0, dur: 2.2 }, // E4
+    { note: 440.00, delay: 0.9, dur: 2.2 }, // A4
+    { note: 493.88, delay: 1.8, dur: 2.4 }, // B4
+    { note: 587.33, delay: 2.8, dur: 2.5 }, // D5
+    { note: 659.25, delay: 3.8, dur: 2.8 }, // E5
+    { note: 587.33, delay: 5.0, dur: 3.5 }  // D5
+  ],
+  // Frase 4: Paz del Maestro Arroyo / Cierre contemplativo (B4, A4, F#4, E4, D4)
+  [
+    { note: 493.88, delay: 0.0, dur: 2.2 }, // B4
+    { note: 440.00, delay: 0.9, dur: 2.2 }, // A4
+    { note: 369.99, delay: 1.9, dur: 2.4 }, // F#4
+    { note: 329.63, delay: 3.0, dur: 2.6 }, // E4
+    { note: 293.66, delay: 4.4, dur: 4.2 }  // D4
+  ]
+];
+
 window.soundManager = new SoundManager();
+
+// Integración nativa con GameHooks para activar la música de la Laguna del Maestro (Sala 12)
+window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
+if (window.GameHooks && window.GameHooks.onRoomLoad) {
+  window.GameHooks.onRoomLoad.push((game, room) => {
+    if (!room || !window.soundManager) return;
+    if (room.id === 12 || room.name === 'LAGUNA DEL MAESTRO') {
+      window.soundManager.enterLagunaTheme();
+    } else if (window.soundManager.isLagunaActive) {
+      window.soundManager.leaveLagunaTheme(room.biome || 'pradera');
+    }
+  });
+}

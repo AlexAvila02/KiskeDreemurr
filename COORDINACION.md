@@ -332,3 +332,68 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 - **Maestro Arroyo** (`npcs.js`, `look: 'water-master'`, `teaches: 'water'`): anciano de túnica turquesa con olas, cejas y bigote blancos que se mecen, y un orbe de agua flotando sobre la palma con gotitas en órbita. Tres líneas sobre el agua y Angelo; al terminar enseña la habilidad. Su despedida cambia cuando suenan las tres campanas.
 - `controls.js`: fila "Dominio del Agua (cerca del agua)" y acción F renombrada "Viento (con Arriba/Abajo) / Agua (sola)". `ui-icons.js`: ícono `water`.
 - Probado en navegador antes de que el usuario pidiera no probar: bajada sala 4 → 12 sin morir, aterrizaje en la saliente, entrar al agua (nada). **Sin probar**: el ajuste de flotación posterior, hablar con el maestro, el orbe y las campanas. Sin commit.
+- (10/11, Claude, pedido del usuario) **Campana del techo + mejora del Dominio del Agua + esfera guiada.**
+  - Sala 12: 4.ª campana colgada del techo sobre el maestro (300, 32, `ceiling: true`).
+  - La bola lanzada se deshace a los **22 cuadros** (`SHOT_LIFE`). Simulación: ni con la esfera al máximo llega a la campana del techo (le faltan 14 px) desde ningún punto de la sala; las 3 campanas de la laguna siguen alcanzables con la bola base.
+  - **Maestría** (`ruben_agua_maestria_v1`): cada lanzamiento la sube (+0,045 × (0,3 + 0,7 × carga)) y el orbe crece (radio × (1 + maestría)). Un arco dorado alrededor del orbe muestra el progreso, con aviso al 50%. Al llegar a **+77%** se mejora sola (fanfarria, onda, aviso).
+  - **Esfera guiada**: acción nueva `waterGuide` (**G**, reasignable) o **L3** del mando (botón 10, por flanco), cerca del agua. Suelta una esfera del tamaño original (r 13) que se guía por el aire con el **stick izquierdo** o las teclas de mover/apuntar, con inercia, sin gravedad y ~8 s de vida. Ruben queda plantado con el brazo hacia ella y un hilo de agua los une. Hace sonar campanas, daña enemigos, rompe muros y se funde con el agua; G / L3 de nuevo la revienta.
+  - **Maestro Arroyo**: la despedida cambia por etapas → (3 campanas) pide mejorar la habilidad → (mejorada) explica G / L3 → (campana del techo) despedida final (`farewellLake`, `farewellUpgraded`, `farewellDone`).
+  - Controles: fila "Esfera guiada (tras mejorar) — L3 · stick izq.". "Reiniciar juego" borra habilidad y maestría.
+  - Sin playtest (el usuario dijo que no hace falta); `check-project.js` OK. Sin commit.
+- (10/11, Claude, pedido del usuario) **El viento afecta el agua y el pasto.**
+  - `wind-pull.js`: API nueva `WindPull.getBand()` (franja actual: power, mode, mano, dirección, alcance; devuelve siempre el mismo objeto) y `WindPull.bandHalf(u)`.
+  - `water.js` (`windOnWater`): las columnas de la superficie dentro de la franja reciben fuerza. **Soplar** las hunde con picado irregular (olas que viajan) y arranca espuma que vuela en la dirección del viento; **jalar** levanta el agua hacia Ruben con gotitas que vuelan a su mano.
+  - `terrain-art.js` (`drawLive`): las briznas de pasto (pradera y bosque) dentro de la franja se doblan en la dirección del viento (soplar = se alejan, jalar = se inclinan hacia Ruben), tiemblan y se ven más bajitas. Las de afuera siguen con su vaivén normal.
+  - Sin playtest (el usuario dijo que no hace falta); `check-project.js` OK. Sin commit.
+- (10/11, Claude, pedido del usuario) **Escena de las macetas del Maestro del Agua** (`water.js`, sala 12 `potSpots`).
+  - Al sonar la **4.ª campana** empieza la escena. El maestro gira hacia la laguna, guarda su orbe y, una por una, se agacha (`n.bend`), saca una maceta de barro y la apoya en el suelo, con golpe sordo, polvo y aplastón. Quedan juntas en x 352, 386 y 420.
+  - Después habla en un **cuadro de diálogo ABAJO** (estilo en línea `bottom: 74px`, que vuelve arriba al terminar o al salir de la sala), sin bloquear el juego:
+    1. «El origen es el agua. Del océano nació la vida y ella fluyó hasta llegar a nosotros...»
+    2. ~7,5 s después: «Eso es lo que dicen nuestras mejores mentes... y yo creo en sus palabras.»
+  - Mientras habla hay que llevar una **esfera de agua a cada maceta**: vale la esfera guiada (G / L3) y también la bola lanzada. Cada maceta se llena, suena una nota y le crece un brote. Con las tres llenas y la 2.ª frase leída, florecen (cada una de un color), fanfarria, aviso «Las tres macetas florecieron» y el diálogo se cierra.
+  - Durante la escena el maestro no habla con E (`n.busy`, sin cartel "Hablar") y su texto no se cierra por distancia. Si Ruben sale y vuelve, la frase se muestra de nuevo. Las macetas se dibujan detrás de Ruben (capa `world` `water-pots`).
+  - Sin playtest (el usuario dijo que no hace falta); `check-project.js` OK. Sin commit.
+- (10/11, Claude, pedido del usuario) Cuadro de diálogo de la escena de las macetas: pegado al borde de abajo (`bottom: 8px`), más ancho (90%, máx. 880 px) y más bajito (padding 6 px, radio 14), para no tapar las macetas ni a Ruben. Vuelve al estilo normal al terminar o al salir de la sala. Sin commit.
+- (10/11, Claude, bug reportado por el usuario) **"Reiniciar juego" no reiniciaba las campanas.** Causa: las salas de `window.PendingRooms` reutilizan sus objetos de configuración entre partidas (`registerRoom` copia la sala pero no sus arreglos), así que `waterBells[i].lit` y `npcs[i].lineIdx` sobrevivían. Ahora `water.js` (en `onRestartGame`) apaga todas las campanas, borra `waterBellsDone` / `waterLakeBellsDone` / `potQuest` (macetas), reinicia el agua y vuelve a cero a los NPC (líneas, pose, ocupado; también el pastor). OJO para salas nuevas: todo estado que se guarde en objetos de la configuración hay que resetearlo en `onRestartGame`. Sin commit.
+
+## Cambio de Claude (10/11): el agua queda en el suelo, se lleva entre salas y ya no hace daño — pedido del usuario
+- **Charcos** (`water.js`, `room.puddles`): el agua que cae (bola lanzada que choca o se deshace en el aire, esfera guiada que revienta, bola que se le cae a Ruben) queda como charco en el suelo que haya debajo. Se evapora: un charco lleno dura **40 s** (`EVAP_FRAMES`), también mientras Ruben está en otra sala. Tiene hilitos de vapor, se junta con charcos vecinos y Ruben chapotea al pisarlo. No se forma en el fondo de una laguna.
+- **Los charcos son fuente de agua**: con F / L2 cerca de un charco (≤320 px) se vuelve a levantar, pero solo sale el agua que le queda. La esfera guiada (G / L3) también puede salir de un charco, más chica si tiene poca agua.
+- **Llevar la bola**: con F / L2 mantenido Ruben ya **no queda plantado**: camina y salta con la bola en la mano (no puede atacar ni agarrar). Crece solo mientras está enganchada a una fuente; lejos de toda fuente se evapora despacio (40 s una llena; aviso "El agua se evaporó"). **Pasa con él de sala en sala** (`loadRoom` ya no la borra). Soltar = lanzarla. Si lo golpean se le cae y deja charco.
+- **Viento vs. agua**: con una bola en la mano, F / L2 es del agua aunque se apriete arriba/abajo (`wind-pull.js` cede con `WaterControl.isHolding()`).
+- **Enemigos — sin daño**: la bola lanzada los **empuja** (más cuanto más grande) y los **aturde 3 s** (`STUN_WATER = 180`); la esfera guiada los **atraviesa** sin reventar, los arrastra con su velocidad y también los aturde. Se quitó todo `takeDamage` del agua.
+- `wind-pull.js`: API nueva **`WindPull.stun(enemigo, cuadros, vx, vy)`** (reutiliza el mareo del viento: sin IA ni daño por contacto, estrellitas) y el mareo ahora admite empuje horizontal con colisiones reales.
+- Prueba headless (Node, mundo simulado, sin navegador): bola 1 → 0,75 tras 10 s lejos; sigue en la mano al cambiar de sala; enemigo sin perder vida, empujado de x 360 a 318 y aturdido ~3 s; de un charco de 0,5 sale una bola de 0,47; charco 0,61 → 0,11 en 20 s. Sin errores. **Sin probar en el juego real** (aspecto visual, sensación al caminar con la bola). `check-project.js` OK. Sin commit.
+
+## 🧱 Refactorización etapa 1 (Claude, 10/11, aprobada por el usuario): GameHooks nativos y salas copiadas — Gemini: LEER `MAPA.md`
+- **Ya no se envuelven funciones del juego.** Antes había 24 envolturas (`game.update` ×5, `loadRoom` ×5, `doAction` ×4, `player.update` ×3...), y el orden dependía de la carga. Ahora `main.js` llama a hooks en momentos fijos: `onBeforeUpdate / onAfterUpdate(game, running)` (también en pausa), `onAction → true` (consume), `onBeforeRoomLoad`, `onRoomLoad(game, room, index, prevIndex, sx, sy)`, `onFreezeInput → true`, `onAfterPlayerUpdate`, `onBlockExits → true`, `onKeepDialog → true`, `onBeforeTogglePause → true`, `onRestartGame`. Ayudantes: `game.runHooks(name, ...)` y `game.runHooksUntil(name, ...)`. Contrato completo en **`MAPA.md`** (archivo nuevo, describe el estado actual).
+  - `main.js`: `update` = hooks + `updateCore`; `loadRoom` = hooks + `loadRoomCore`; puntos de enganche en `doAction`, `togglePause`, `updateNearbyNote` (ahora cierra el texto anterior al pasar de una nota a otra), `checkRoomExits` y alrededor de `player.update`.
+  - Migrados: `wind-pull.js`, `npcs.js`, `water.js`, `levels-expansion.js` (animación de llegada), `journal.js` (update, sala y pausa) y `animation-registry.js` (FX en `onAfterUpdate`; la envoltura vieja quedó solo como respaldo si no hay hooks nativos).
+  - Siguen envueltas, para la etapa 3: `player.attack / interactOrThrow / takeDamage` en `journal.js` (virtudes).
+- **Salas copiadas por partida**: `World.registerRoom` hace copia profunda de los datos (`World.cloneRoomData`; funciones y clases se comparten). Se quitaron los reseteos a mano de `main.restartGame` (muros, objetos, llave, portón) y de `water.js` (campanas, macetas, charcos, NPC).
+- `CLAUDE.md` y `AGENTS.md`: regla nueva "no envolver funciones del juego, usar GameHooks (ver MAPA.md)".
+- Verificación: `check-project.js` OK. Prueba sin navegador con el juego REAL (todos los scripts de `index.html`, `Game` y `Player` reales en un DOM simulado):
+  - 0 envolturas sobre game/player y sin errores.
+  - Caminar, saltar y cambiar de sala OK; llegada a la sala 2 con la curva OK.
+  - Notas: no se abren solas, ARRIBA las abre y al alejarse se cierran.
+  - Viento plantado OK; agua (nadar, maestro enseña, orbe) OK.
+  - "Reiniciar juego" deja las campanas apagadas y el maestro desde cero; pausa OK.
+- **Sin playtest en navegador.** Sin commit (lo sube el usuario).
+
+## Cambio puntual de Gemini (11/11, pedido del usuario): Selección de habilidades en el Diario por clic
+- **js/journal.js** (`buildTree`): Se eliminó el listener de `mouseenter` en los botones de virtudes del árbol de habilidades (`b.addEventListener('mouseenter', ...)`).
+- Ahora una habilidad solo se selecciona al hacerle **clic** (o mediante `focus` con teclado/gamepad), evitando que el cursor la deseleccione por accidente al moverse hacia el botón "Aprender".
+- Verificado con `node scripts/check-project.js` (0 errores).
+
+## Composición musical y ambiental de Gemini (11/11, pedido del usuario): Música para la Laguna del Maestro
+- **js/audio.js** (Zona libre de Gemini):
+  - Añadido preset de acordes armónicos `laguna`: pad en Re2, La2, Re3, Mi3, La3 (resonancia acuática y mística) con filtro lowpass en 450 Hz y banco armónico de campana/arpa.
+  - Implementado el tema "El Canto de la Laguna / Tema del Maestro Arroyo":
+    - Melodía lírica contemplativa dividida en 4 frases en escala Re Lidio / Pentatónica acuática (D4, E4, F#4, A4, B4, D5, E5).
+    - Notas con envolvente suave (ataque límpido tipo campana de agua / arpa de cristal) y eco sintetizado a ~260ms amortiguado a ~750 Hz emulando la acústica de la gruta subterránea.
+    - Silencios meditativos (~4 s) entre frases para que respire y armonice con el rumor ambiente de agua de `water.js`.
+    - Transición suave con `enterLagunaTheme()` y restauración transparente al salir mediante `leaveLagunaTheme(targetBiome)`.
+    - Conectado nativamente a `GameHooks.onRoomLoad` para la sala 12 (`room.id === 12 || room.name === 'LAGUNA DEL MAESTRO'`).
+  - Sin allocations en el bucle principal (`update`/`render`): la síntesis se programa por Web Audio API con temporizadores espaciados.
+  - Verificado con `node scripts/check-project.js` (0 errores) y pruebas unitarias de eventos y hooks sin navegador. Pendiente playtest con Claude Opus en la sala 12.
+
