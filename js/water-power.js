@@ -359,7 +359,9 @@
   function canGuide(g) {
     const p = g.player;
     return st.learned && st.upgraded && !st.holding && !p.dead && p.isGrounded && !ws.swim &&
-      !p.carriedItem && g.deathTimer <= 0 && !(p.anim && p.anim.hurtFlash > 0);
+      !p.carriedItem && g.deathTimer <= 0 && !(p.anim && p.anim.hurtFlash > 0) &&
+      // La esfera guiada también gasta energía elemental (js/stamina.js)
+      (!window.Stamina || window.Stamina.canUse());
   }
   function toggleGuide(g) {
     if (guide.on) { popGuide(g); return; }
@@ -412,6 +414,8 @@
 
     const p = g.player;
     if (p.dead || (p.anim && p.anim.hurtFlash > 0) || ws.swim) { popGuide(g); return; }
+    // Sin energía la esfera se revienta sola
+    if (window.Stamina && !window.Stamina.canUse()) { popGuide(g); return; }
     guide.t++;
     // Dirección: stick izquierdo (analógico) o teclas de movimiento / apuntar
     let dx = 0, dy = 0;
@@ -602,6 +606,7 @@
     isLearned: () => st.learned,
     isUpgraded: () => st.upgraded,
     isHolding: () => st.holding,
+    isGuiding: () => guide.on,
     getState: () => ({ learned: st.learned, upgraded: st.upgraded, mastery: st.mastery, swimming: ws.swim, holding: st.holding, size: st.size, guiding: guide.on })
   };
   window.GameHooks = window.GameHooks || {};

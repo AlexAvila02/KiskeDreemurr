@@ -53,6 +53,7 @@
     if (wp && wp.isActive && wp.isActive()) return true;
     const wc = window.WaterControl;
     if (wc && wc.isHolding && wc.isHolding()) return true;
+    if (wc && wc.isGuiding && wc.isGuiding()) return true;   // esfera guiada (G / L3)
     return false;
   }
 

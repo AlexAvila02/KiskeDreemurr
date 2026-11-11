@@ -533,3 +533,9 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/player.js`: `render()` dibuja las tres fases (respiración más honda, párpados caídos y cejas preocupadas, boca de jadeo, rodillas con túnica apoyada, espada clavada o caída plana, segunda mano en el piso, cabeza gacha con ojos cerrados). El ancla de la bufanda baja al arrodillarse.
 - `index.html`: `player.js?v=7`, `stamina.js?v=2`.
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador: con el viento activo se arrodilla al 23 %, no se mueve; al vaciarse cae, no se mueve durante 5 s y luego camina, salta, cambia de sala y puede volver a usar el viento. Sin errores de consola.
+
+## La esfera guiada (G / L3) gasta energía elemental (Claude, 11/11, pedido del usuario)
+- `js/water-power.js`: nueva API `WaterControl.isGuiding()`. `canGuide()` exige `Stamina.canUse()` para soltar la esfera, y `guideStep()` la revienta (deja su charco) si la energía se agota mientras se guía.
+- `js/stamina.js`: `powerInUse()` cuenta también la esfera guiada, así que vacía la barra azul al mismo ritmo que los otros poderes y no se recarga mientras está activa.
+- `index.html`: `stamina.js?v=3`, `water-power.js?v=3`.
+- Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (sala 12): con la esfera guiada activa la barra baja de 100 % a 96,6 % en 2 s. Sin errores de consola. No se probó en vivo el agotamiento completo durante la guía.
