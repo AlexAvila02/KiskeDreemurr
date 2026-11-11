@@ -245,28 +245,28 @@ class SoundManager {
     });
   }
 
-  // Música pastoral luminosa de pradera (acorde mayor cálido + notas suaves de arpa)
+  // Música pastoral luminosa (arpegios suaves de arpa sin drone/estática continua de fondo)
   startMeadowAmbience() {
     if (!this.ctx) return;
-    const cfg = this.biomeChords[this.currentBiome] || this.biomeChords.pradera;
 
-    this.ambientGain = this.ctx.createGain();
-    this.ambientGain.gain.setValueAtTime(0.035, this.ctx.currentTime);
-    this.ambientGain.connect(this.ctx.destination);
+    // Desconectar y limpiar osciladores continuos de fondo si existieran
+    if (this.ambientOscs && this.ambientOscs.length > 0) {
+      this.ambientOscs.forEach(osc => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch (_) {}
+      });
+    }
+    this.ambientOscs = [];
 
-    this.ambientFilter = this.ctx.createBiquadFilter();
-    this.ambientFilter.type = 'lowpass';
-    this.ambientFilter.frequency.setValueAtTime(cfg.filterFreq, this.ctx.currentTime);
-    this.ambientFilter.connect(this.ambientGain);
-
-    this.ambientOscs = cfg.pad.map((freq, idx) => {
-      const osc = this.ctx.createOscillator();
-      osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-      osc.connect(this.ambientFilter);
-      osc.start();
-      return osc;
-    });
+    if (this.ambientGain) {
+      try {
+        this.ambientGain.disconnect();
+      } catch (_) {}
+      this.ambientGain = null;
+    }
+    this.ambientFilter = null;
 
     // Notas suaves de arpa pastoral cada pocos segundos
     if (this.arpeggioTimer) clearInterval(this.arpeggioTimer);
@@ -282,9 +282,9 @@ class SoundManager {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, now);
 
-      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.setValueAtTime(0.00001, now);
       gain.gain.linearRampToValueAtTime(0.025, now + 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.0008, now + 1.8);
+      gain.gain.exponentialRampToValueAtTime(0.00001, now + 1.8);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -293,34 +293,18 @@ class SoundManager {
     }, 2200);
   }
 
-  // Cambia suavemente el acorde de fondo al cambiar de zona/bioma
+  // Cambia el bioma activo para los arpegios melódicos sin usar drone continuo
   setBiomeAmbience(biome = 'pradera') {
-    if (this.currentBiome === biome) return;
     this.currentBiome = biome;
-    if (!this.ctx || !this.ambientOscs.length) return;
-
-    const cfg = this.biomeChords[biome] || this.biomeChords.pradera;
-    const now = this.ctx.currentTime;
-    if (this.ambientFilter) {
-      this.ambientFilter.frequency.linearRampToValueAtTime(cfg.filterFreq, now + 1.2);
+    if (this.ambientOscs && this.ambientOscs.length > 0) {
+      this.ambientOscs.forEach(osc => {
+        try {
+          osc.stop();
+          osc.disconnect();
+        } catch (_) {}
+      });
+      this.ambientOscs = [];
     }
-    // Asegura suficientes osciladores si el acorde tiene más voces (como las 5 de laguna)
-    while (this.ambientOscs.length < cfg.pad.length) {
-      const idx = this.ambientOscs.length;
-      const osc = this.ctx.createOscillator();
-      osc.type = idx % 2 === 0 ? 'sine' : 'triangle';
-      osc.frequency.setValueAtTime(cfg.pad[idx], now);
-      osc.connect(this.ambientFilter);
-      osc.start();
-      this.ambientOscs.push(osc);
-    }
-    this.ambientOscs.forEach((osc, idx) => {
-      if (cfg.pad[idx]) {
-        osc.frequency.linearRampToValueAtTime(cfg.pad[idx], now + 1.2);
-      } else if (cfg.pad.length > 0) {
-        osc.frequency.linearRampToValueAtTime(cfg.pad[idx % cfg.pad.length], now + 1.2);
-      }
-    });
   }
 
   // Reproduce una nota de arpa de cristal / campana acuática con sutil eco de caverna
@@ -341,9 +325,9 @@ class SoundManager {
     filter.frequency.setValueAtTime(1400, now);
     filter.frequency.exponentialRampToValueAtTime(500, now + duration);
 
-    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.setValueAtTime(0.00001, now);
     gain.gain.linearRampToValueAtTime(0.038, now + 0.055);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    gain.gain.exponentialRampToValueAtTime(0.00001, now + duration);
 
     osc.connect(filter);
     filter.connect(gain);
@@ -368,9 +352,9 @@ class SoundManager {
     echoFilter.frequency.setValueAtTime(750, echoNow);
     echoFilter.frequency.exponentialRampToValueAtTime(320, echoNow + echoDuration);
 
-    echoGain.gain.setValueAtTime(0.0001, echoNow);
+    echoGain.gain.setValueAtTime(0.00001, echoNow);
     echoGain.gain.linearRampToValueAtTime(0.011, echoNow + 0.07);
-    echoGain.gain.exponentialRampToValueAtTime(0.0001, echoNow + echoDuration);
+    echoGain.gain.exponentialRampToValueAtTime(0.00001, echoNow + echoDuration);
 
     echoOsc.connect(echoFilter);
     echoFilter.connect(echoGain);

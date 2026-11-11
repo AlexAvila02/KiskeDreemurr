@@ -397,3 +397,11 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
   - Sin allocations en el bucle principal (`update`/`render`): la síntesis se programa por Web Audio API con temporizadores espaciados.
   - Verificado con `node scripts/check-project.js` (0 errores) y pruebas unitarias de eventos y hooks sin navegador. Pendiente playtest con Claude Opus en la sala 12.
 
+## Ajuste de Audio de Gemini (11/11, pedido del usuario): Eliminación de zumbido / estática de fondo
+- **js/audio.js** (Zona libre de Gemini):
+  - Se removió por completo el drone continuo de baja frecuencia (`this.ambientOscs` y `this.ambientGain`) en `startMeadowAmbience()`, `setBiomeAmbience()` y `enterLagunaTheme()`, el cual producía un zumbido eléctrico / sonido percibido como estática persistente durante el juego.
+  - Se mantienen los arpegios melódicos limpios y pastorales de arpa por bioma y las frases cristalinas de la Laguna del Maestro sin ningún ruido residual.
+  - Se afinó el decaimiento de las notas (`exponentialRampToValueAtTime`) a valores asintóticos inaudibles (`0.00001`) antes del `stop()` para evitar cualquier micro-clic al cortar la reproducción.
+  - Verificado con `node scripts/check-project.js` (0 errores).
+
+
