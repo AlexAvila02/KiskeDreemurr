@@ -77,6 +77,8 @@
     const s = readSave();
     if (!s) return false;
     game.world = new World();
+    // Mismos parches que al iniciar (salida de la sala 3 a la 4, emblemas de las salas 0-3)
+    if (window.LevelsExpansion && window.LevelsExpansion.patchOriginalRooms) window.LevelsExpansion.patchOriginalRooms(game.world);
     for (const k of Object.keys(s.rooms || {})) {
       const r = game.world.rooms[+k];
       const st = s.rooms[k];
