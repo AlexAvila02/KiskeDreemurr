@@ -373,6 +373,17 @@
     ctx.restore();
   }
 
+  // Objetos no conseguidos: sin ícono, solo un "?" en su lugar
+  function slotIcon(key, size, owned) {
+    if (owned) return iconCanvas(key, size);
+    const q = el('span', 'journal-unknown-mark', '?');
+    q.style.width = size + 'px';
+    q.style.height = size + 'px';
+    q.style.lineHeight = size + 'px';
+    q.style.fontSize = Math.round(size * 0.5) + 'px';
+    return q;
+  }
+
   // Lienzo nítido (alta densidad) con un ícono dibujado; `hidden` = silueta "por descubrir"
   function iconCanvas(key, size, hidden = false) {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -873,7 +884,7 @@
         const owned = this.ownsItem(id);
         const b = el('button', 'journal-slot' + (owned ? ' owned' : ' unknown') + (id === this.selectedItem ? ' selected' : ''));
         b.type = 'button';
-        b.appendChild(iconCanvas(id, 40, !owned));
+        b.appendChild(slotIcon(id, 40, owned));
         if (info.stack) {
           b.appendChild(el('span', 'journal-slot-count', `${this.itemCount(id)}/${this.worldCount(id)}`));
         }
@@ -903,7 +914,7 @@
       const owned = this.ownsItem(id);
       box.innerHTML = '';
       const frame = el('div', 'journal-detail-frame');
-      frame.appendChild(iconCanvas(id, 88, !owned));
+      frame.appendChild(slotIcon(id, 88, owned));
       box.appendChild(frame);
       box.appendChild(el('div', 'journal-detail-kind', owned ? info.kind : 'Por descubrir'));
       box.appendChild(el('h3', 'journal-detail-name', owned ? info.name : '? ? ?'));
@@ -999,7 +1010,7 @@
         b.type = 'button';
         b.dataset.item = id;
         b.disabled = !owned;
-        b.appendChild(iconCanvas(id, 32, !owned));
+        b.appendChild(slotIcon(id, 32, owned));
         const txt = el('span', 'stat-equip-text');
         txt.appendChild(el('span', 'stat-equip-name', owned ? info.name : '???'));
         txt.appendChild(el('span', 'stat-equip-desc', owned
