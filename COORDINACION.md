@@ -423,3 +423,11 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
 
 
 
+
+## Claude (11/11, pedido del usuario): el agua atraviesa y rodea a los enemigos
+- **js/water.js** (`shotsStep`, nuevos `startWrap` / `wrapsStep` / `drawWraps`):
+  - El orbe de agua ya no se deshace al tocar un enemigo: lo **atraviesa** (daña una sola vez a cada uno, máx. 6 por disparo), pierde caudal (tamaño ×0.72, velocidad ×0.85) y sigue; si queda muy chico se deshace.
+  - **Envolvimiento**: dos corrientes recorren el contorno del enemigo (por arriba y por abajo desde el lado de entrada), se juntan del otro lado soltando gotas en la dirección del chorro; queda una película de agua que se escurre y el enemigo gotea un rato. Mientras el orbe está dentro del enemigo se dibuja semitransparente.
+  - Pool fijo `WRAPS` (8), se limpia en `loadRoom` y `onRestartGame`.
+  - Las gotas ya no atraviesan el suelo: desaparecen al tocar una plataforma.
+  - Verificado con `check-project.js` (0 errores) y playtest en navegador (sala 12: un disparo atravesó y envolvió a dos escarabajos seguidos, luego caminar/saltar/cambiar de sala sin errores de consola).

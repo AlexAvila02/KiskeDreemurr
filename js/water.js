@@ -14,8 +14,10 @@
  *      a menos de 320 px: el agua sube de la laguna (la superficie se levanta en ese punto)
  *      y forma un orbe en la mano de Ruben que crece mientras se mantiene.
  *    - Apuntar con el ratón o el stick derecho (sin ninguno: adelante y un poco arriba).
- *    - Soltar: el orbe sale disparado con gravedad real. Golpea enemigos (daño según
- *      tamaño), rompe muros quebradizos, hace sonar campanas y salpica al chocar.
+ *    - Soltar: el orbe sale disparado con gravedad real. ATRAVIESA a los enemigos (daño según
+ *      tamaño; pierde caudal en cada uno) y los rodea como agua real: dos corrientes abrazan
+ *      su contorno, se juntan del otro lado y lo dejan empapado y goteando. El orbe
+ *      también rompe muros quebradizos, hace sonar campanas y salpica al chocar.
  *    - Arriba/Abajo + F/L2 siguen siendo Soplar/Jalar el Aire (wind-pull.js).
  *
  * Integración (sin editar main.js): envuelve game.update, game.doAction, game.loadRoom y
@@ -108,7 +110,7 @@
       spawnDrop(x + (Math.random() - 0.5) * 10, y, Math.cos(a) * sp, Math.sin(a) * sp * up, 1.6 + Math.random() * 2.2, false);
     }
   }
-  function stepDrops(room) {
+  function stepDrops(room, plats) {
     for (const d of DROPS) {
       if (!d.on) continue;
       d.life--;
@@ -121,6 +123,14 @@
       d.vy += 0.32; d.x += d.vx; d.y += d.vy;
       const wb = d.vy > 0 ? bodyAt(room, d.x, d.y, 0) : null;
       if (wb && d.y >= surfaceAt(wb, d.x)) { splashAt(wb, d.x, 0.25 + d.r * 0.08, 0); d.on = false; continue; }
+      // Las gotas mojan el suelo y desaparecen (no lo atraviesan)
+      if (plats && d.vy > 0) {
+        let landed = false;
+        for (const pl of plats) {
+          if (d.x > pl.x && d.x < pl.x + pl.w && d.y > pl.y + 1 && d.y < pl.y + pl.h) { landed = true; break; }
+        }
+        if (landed) { d.on = false; continue; }
+      }
       if (d.life <= 0 || (room && d.y > room.height + 20)) d.on = false;
     }
   }
@@ -261,7 +271,12 @@
   };
   const aim = { source: 'none', mouseX: 0, mouseY: 0, mouseT: -1e9, stickHeld: false };
   const SHOTS = [];
-  for (let i = 0; i < 6; i++) SHOTS.push({ on: false, x: 0, y: 0, vx: 0, vy: 0, r: 6, size: 0, t: 0 });
+  for (let i = 0; i < 6; i++) SHOTS.push({ on: false, x: 0, y: 0, vx: 0, vy: 0, r: 6, size: 0, t: 0, inside: false, hits: [null, null, null, null, null, null], nHits: 0 });
+  // Agua que envuelve a un enemigo al atravesarlo: dos corrientes rodean su contorno
+  // (por arriba y por abajo), se juntan del otro lado y lo dejan empapado y goteando.
+  const WRAPS = [];
+  for (let i = 0; i < 8; i++) WRAPS.push({ on: false, e: null, t: 0, a0: 0, size: 0, vx: 0, vy: 0, joined: false });
+  const WRAP_FLOW = 34, WRAP_LIFE = 150;
 
   function loadLearned() {
     try { return window.localStorage.getItem(SAVE_KEY) === '1'; } catch (e) { return false; }
@@ -444,7 +459,8 @@
       const sp = 6.5 + 7 * size;
       s.on = true; s.x = h.x + Math.cos(st.angle) * (8 + 10 * size); s.y = h.y + Math.sin(st.angle) * (8 + 10 * size);
       s.vx = Math.cos(st.angle) * sp; s.vy = Math.sin(st.angle) * sp;
-      s.r = 5 + 8 * size; s.size = size; s.t = 0;
+      s.r = 5 + 8 * size; s.size = size; s.t = 0; s.inside = false; s.nHits = 0;
+      for (let k = 0; k < s.hits.length; k++) s.hits[k] = null;
       break;
     }
     playWhoosh(size);
@@ -532,15 +548,23 @@
         playSplash(0.5 + s.size * 0.4);
         s.on = false; continue;
       }
-      // Enemigos
+      // Enemigos: el agua no choca, los ATRAVIESA y los rodea (pierde algo de caudal en cada uno)
+      s.inside = false;
       for (const e of g.enemies) {
         if (!e.alive) continue;
         const nx = Math.max(e.x, Math.min(s.x, e.x + e.width)), ny = Math.max(e.y, Math.min(s.y, e.y + e.height));
-        if ((s.x - nx) * (s.x - nx) + (s.y - ny) * (s.y - ny) <= s.r * s.r) {
-          e.takeDamage(Math.round(10 + 20 * s.size), Math.sign(s.vx || 1) * (4 + 5 * s.size));
-          if (g.hitStop) g.hitStop(3);
-          hit = true; break;
-        }
+        if ((s.x - nx) * (s.x - nx) + (s.y - ny) * (s.y - ny) > s.r * s.r) continue;
+        s.inside = true;
+        if (s.hits.indexOf(e) !== -1) continue;
+        if (s.nHits < s.hits.length) s.hits[s.nHits++] = e;
+        e.takeDamage(Math.round(10 + 20 * s.size), Math.sign(s.vx || 1) * (3 + 4 * s.size));
+        if (g.hitStop) g.hitStop(2);
+        startWrap(e, s);
+        playSplash(0.3 + s.size * 0.35);
+        s.size *= 0.72;
+        s.r = 5 + 8 * s.size;
+        s.vx *= 0.85; s.vy *= 0.85;
+        if (s.size < 0.12) { hit = true; break; }
       }
       // Campanas de práctica
       if (!hit && room.waterBells) {
@@ -563,6 +587,59 @@
         if (window.particleSystem) window.particleSystem.createShockwave(s.x, s.y, 14 + s.size * 16, 'rgba(200, 236, 255, 0.85)', 2);
         s.on = false;
       }
+    }
+  }
+
+  function startWrap(e, s) {
+    let w = null;
+    for (const x of WRAPS) { if (x.on && x.e === e) { w = x; break; } }
+    if (!w) for (const x of WRAPS) { if (!x.on) { w = x; break; } }
+    if (!w) return;
+    w.on = true; w.e = e; w.t = 0; w.joined = false;
+    w.a0 = Math.atan2(-s.vy, -s.vx);       // lado por donde entra el agua
+    w.size = Math.max(w.size * 0.5, s.size); w.vx = s.vx; w.vy = s.vy;
+    // Salpicón en la cara de entrada
+    const cx = e.x + e.width / 2, cy = e.y + e.height / 2;
+    const ex = cx + Math.cos(w.a0) * e.width / 2, ey = cy + Math.sin(w.a0) * e.height / 2;
+    for (let i = 0; i < 4 + Math.round(s.size * 5); i++) {
+      spawnDrop(ex, ey, Math.cos(w.a0) * (0.5 + Math.random() * 1.5) + (Math.random() - 0.5),
+        -1 - Math.random() * 2, 1.2 + Math.random() * 1.6, false);
+    }
+  }
+
+  function wrapsStep() {
+    for (const w of WRAPS) {
+      if (!w.on) continue;
+      const e = w.e;
+      w.t++;
+      if (!e || !e.alive) {
+        if (e) burst(e.x + e.width / 2, e.y + e.height / 2, 8, 2.2);
+        w.on = false; w.e = null; w.size = 0; continue;
+      }
+      const cx = e.x + e.width / 2, cy = e.y + e.height / 2;
+      const rx = e.width / 2 + 3, ry = e.height / 2 + 3;
+      // Las dos corrientes se juntan del otro lado y siguen la dirección del chorro
+      if (!w.joined && w.t >= WRAP_FLOW * 0.45) {
+        w.joined = true;
+        const xa = w.a0 + Math.PI;
+        const jx = cx + Math.cos(xa) * rx, jy = cy + Math.sin(xa) * ry;
+        for (let i = 0; i < 5 + Math.round(w.size * 6); i++) {
+          spawnDrop(jx, jy, w.vx * (0.25 + Math.random() * 0.3) + (Math.random() - 0.5),
+            w.vy * 0.25 - Math.random() * 1.2, 1.2 + Math.random() * 1.8, false);
+        }
+      }
+      // Gotas que resbalan por el contorno mientras el agua lo cubre
+      if (w.t < WRAP_FLOW && w.t % 4 === 0) {
+        const a = w.a0 + (Math.random() < 0.5 ? 1 : -1) * Math.PI * (w.t / WRAP_FLOW);
+        spawnDrop(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, (Math.random() - 0.5) * 0.6, 0.3, 1 + Math.random(), false);
+      }
+      // Empapado: gotea desde abajo, cada vez menos
+      const drip = w.t > WRAP_FLOW ? Math.max(5, Math.round(6 + (w.t - WRAP_FLOW) / 10)) : 0;
+      if (drip && w.t % drip === 0) {
+        const d = spawnDrop(e.x + 3 + Math.random() * Math.max(1, e.width - 6), e.y + e.height, 0, 0.4, 1.1 + Math.random() * 1.1, false);
+        if (d) d.life = 45;
+      }
+      if (w.t >= WRAP_LIFE) { w.on = false; w.e = null; w.size = 0; }
     }
   }
 
@@ -667,6 +744,55 @@
     ctx.restore();
   }
 
+  function wrapPath(ctx, cx, cy, rx, ry, a, b, ccw) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, a, b, ccw);
+  }
+  function drawWraps(ctx, cam, t) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const w of WRAPS) {
+      if (!w.on || !w.e) continue;
+      const e = w.e;
+      const cx = e.x + e.width / 2 - cam.x, cy = e.y + e.height / 2 - cam.y;
+      const rx = e.width / 2 + 3, ry = e.height / 2 + 3;
+      // Película de agua que lo cubre (se escurre con el tiempo)
+      const film = w.t < WRAP_FLOW ? Math.min(1, w.t / 8) : Math.max(0, 1 - (w.t - WRAP_FLOW) / (WRAP_LIFE - WRAP_FLOW));
+      if (film > 0) {
+        ctx.globalAlpha = 0.32 * film;
+        ctx.fillStyle = '#7eccdc';
+        ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.7 * film;
+        ctx.fillStyle = '#f0fdff';
+        ctx.beginPath(); ctx.ellipse(cx - rx * 0.35, cy - ry * 0.45, rx * 0.22, ry * 0.12, -0.5, 0, Math.PI * 2); ctx.fill();
+      }
+      if (w.t >= WRAP_FLOW) continue;
+      // Dos corrientes que abrazan el contorno: avanzan (cabeza) y se van vaciando (cola)
+      const head = Math.min(1, w.t / (WRAP_FLOW * 0.45)) * Math.PI;
+      const tail = Math.max(0, (w.t - WRAP_FLOW * 0.3) / (WRAP_FLOW * 0.7)) * Math.PI;
+      if (head - tail < 0.05) continue;
+      const lw = 3 + 5 * w.size;
+      for (let side = 0; side < 2; side++) {
+        const ccw = side === 1, sg = ccw ? -1 : 1;
+        const a = w.a0 + sg * tail, b = w.a0 + sg * head;
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = 'rgba(58, 36, 22, 0.6)';
+        ctx.lineWidth = lw + 2;
+        wrapPath(ctx, cx, cy, rx, ry, a, b, ccw); ctx.stroke();
+        ctx.strokeStyle = 'rgba(126, 204, 220, 0.95)';
+        ctx.lineWidth = lw;
+        ctx.stroke();
+        ctx.setLineDash([4, 7]);
+        ctx.lineDashOffset = -t * 1.8 * sg;
+        ctx.strokeStyle = 'rgba(240, 253, 255, 0.95)';
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
+
   function drawOrbAt(ctx, x, y, r, t) {
     ctx.save();
     const wob = Math.sin(t * 0.3) * 0.08;
@@ -713,7 +839,11 @@
       drawOrbAt(ctx, ox - cam.x, oy - cam.y, r, t);
     }
     for (const s of SHOTS) {
-      if (s.on) drawOrbAt(ctx, s.x - cam.x, s.y - cam.y, s.r, t + s.t);
+      if (!s.on) continue;
+      // Mientras atraviesa a un enemigo el orbe se ve a medias: el agua pasa por los costados
+      ctx.globalAlpha = s.inside ? 0.45 : 1;
+      drawOrbAt(ctx, s.x - cam.x, s.y - cam.y, s.r, t + s.t);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -809,7 +939,8 @@
           applyPose(g);
           objectsStep(g);
           shotsStep(g);
-          stepDrops(room);
+          wrapsStep();
+          stepDrops(room, g.world.getPlatforms());
           bellsStep(room);
         } catch (e) { console.error('[Agua]', e); }
       } else {
@@ -828,6 +959,7 @@
       st.holding = false; st.size = 0; st.swim = false; st.prevSwim = false; st.lastBody = null;
       for (const s of SHOTS) s.on = false;
       for (const d of DROPS) d.on = false;
+      for (const w of WRAPS) { w.on = false; w.e = null; w.size = 0; }
       streamSound(0);
       origLoad(index, sx, sy);
     };
@@ -849,6 +981,7 @@
         const room = game.world.getCurrentRoom();
         drawBells(ctx, room, cam, st.t);
         if (room.water) drawWater(ctx, room, cam, st.t);
+        drawWraps(ctx, cam, st.t);
         drawDrops(ctx, cam);
         drawControl(ctx, game, cam, st.t);
       } catch (e) { console.error('[Agua]', e); }
@@ -869,6 +1002,7 @@
     try { window.localStorage.removeItem(SAVE_KEY); } catch (e) { /* */ }
     st.holding = false; st.size = 0;
     for (const s of SHOTS) s.on = false;
+    for (const w of WRAPS) { w.on = false; w.e = null; w.size = 0; }
   });
   window.GameHooks.onInit.push((game) => {
     try { install(game); } catch (e) { console.error('[Agua] no se pudo iniciar:', e); }
