@@ -47,7 +47,9 @@
   // Maestría: cada lanzamiento agranda la esfera; al llegar a +77% se mejora la habilidad
   const MASTERY_MAX = 0.77;
   const BASE_R = 13;             // radio de la esfera "original" (orbe lleno sin maestría)
-  const GUIDE_SPEED = 4.2, GUIDE_LIFE = 480;
+  // La esfera guiada no caduca: solo se deshace al usarla (campana, maceta, muro), al
+  // soltarla (G / L3), al quedarse sin energía elemental o si Ruben muere.
+  const GUIDE_SPEED = 4.2;
   const STUN_WATER = 180;        // 3 s de aturdimiento al mojar a un enemigo
 
   // ---------------- estado ----------------
@@ -413,7 +415,7 @@
     if (!guide.on) return;
 
     const p = g.player;
-    if (p.dead || (p.anim && p.anim.hurtFlash > 0) || ws.swim) { popGuide(g); return; }
+    if (p.dead) { popGuide(g); return; }
     // Sin energía la esfera se revienta sola
     if (window.Stamina && !window.Stamina.canUse()) { popGuide(g); return; }
     guide.t++;
@@ -435,8 +437,29 @@
     const tvy = len > 0 ? dy / Math.max(1, len) * GUIDE_SPEED : 0;
     guide.vx += (tvx - guide.vx) * 0.14;
     guide.vy += (tvy - guide.vy) * 0.14;
-    guide.x += guide.vx;
-    guide.y += guide.vy + (len > 0 ? 0 : Math.sin(guide.t * 0.08) * 0.25);
+    const room = g.world.getCurrentRoom();
+    const R = guide.r || BASE_R;
+    const plats = g.world.getPlatforms();
+    const solidAt = (x, y) => {
+      for (const pl of plats) {
+        if (x + R > pl.x && x - R < pl.x + pl.w && y + R > pl.y && y - R < pl.y + pl.h) return true;
+      }
+      return false;
+    };
+    const nx = guide.x + guide.vx;
+    const ny = guide.y + guide.vy + (len > 0 ? 0 : Math.sin(guide.t * 0.08) * 0.25);
+    // Muros quebradizos: la esfera los rompe y se gasta (eso es "usarla")
+    if (g.world.checkBreakableImpact && g.world.checkBreakableImpact({ x: nx - R, y: ny - R, w: R * 2, h: R * 2 })) {
+      guide.x = nx; guide.y = ny; popGuide(g); return;
+    }
+    // Plataformas: la esfera se apoya / desliza contra ellas en vez de reventarse
+    // (si nació metida dentro de una plataforma, se mueve libre hasta salir)
+    const stuck = solidAt(guide.x, guide.y);
+    if (stuck || !solidAt(nx, guide.y)) guide.x = nx; else guide.vx = 0;
+    if (stuck || !solidAt(guide.x, ny)) guide.y = ny; else guide.vy = 0;
+    // Bordes de la sala: se queda dentro
+    guide.x = Math.max(R, Math.min(room.width - R, guide.x));
+    guide.y = Math.max(R, Math.min(room.height - R, guide.y));
     if (guide.t % 3 === 0) spawnDrop(guide.x - guide.vx * 2, guide.y - guide.vy * 2, guide.vx * 0.1, guide.vy * 0.1 + 0.3, 1.2, false);
     // Ruben mira a su esfera (brazo extendido hacia ella)
     const ang = Math.atan2(guide.y - (p.y + 19), guide.x - (p.x + p.width / 2));
@@ -444,14 +467,15 @@
     st.angle = ang;
     st.rel = Math.atan2(Math.sin(ang), Math.cos(ang) * p.facing);
 
-    const room = g.world.getCurrentRoom();
-    const R = guide.r || BASE_R;
-    // Choques: agua (se funde), campanas, muros quebradizos, plataformas.
+    // Agua: la esfera flota sobre la superficie (no se funde con la laguna).
     // A los enemigos los ATRAVIESA: los empuja con su propia velocidad y los aturde 3 s.
-    const wb = bodyAt(room, guide.x, guide.y, 0);
-    if (wb && guide.y >= surfaceAt(wb, guide.x)) {
-      splashAt(wb, guide.x, 6, 3); burst(guide.x, surfaceAt(wb, guide.x), 12, 3.4); playSplash(0.6);
-      guide.on = false; return;
+    const wb = bodyAt(room, guide.x, guide.y + R, 0);
+    if (wb) {
+      const top = surfaceAt(wb, guide.x) - R * 0.6;
+      if (guide.y > top) {
+        if (guide.vy > 1.5 && guide.t % 6 === 0) splashAt(wb, guide.x, 1.5, 2);
+        guide.y = top; if (guide.vy > 0) guide.vy = 0;
+      }
     }
     const gp = potCatch(room, guide.x, guide.y, R);
     if (gp) { fillPot(g, room, gp); guide.on = false; return; }
@@ -468,11 +492,6 @@
         if (e.__wetT === undefined || ws.t - e.__wetT > 45) wetEnemy(g, e, guide.vx * 0.9, guide.vy * 0.6 - 0.8);
       }
     }
-    if (g.world.checkBreakableImpact && g.world.checkBreakableImpact({ x: guide.x - R, y: guide.y - R, w: R * 2, h: R * 2 })) { popGuide(g); return; }
-    for (const pl of g.world.getPlatforms()) {
-      if (guide.x + R > pl.x && guide.x - R < pl.x + pl.w && guide.y + R > pl.y && guide.y - R < pl.y + pl.h) { popGuide(g); return; }
-    }
-    if (guide.x < -40 || guide.x > room.width + 40 || guide.y < -40 || guide.y > room.height + 40 || guide.t > GUIDE_LIFE) popGuide(g);
   }
 
 

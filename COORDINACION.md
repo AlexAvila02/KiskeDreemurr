@@ -539,3 +539,9 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/stamina.js`: `powerInUse()` cuenta también la esfera guiada, así que vacía la barra azul al mismo ritmo que los otros poderes y no se recarga mientras está activa.
 - `index.html`: `stamina.js?v=3`, `water-power.js?v=3`.
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (sala 12): con la esfera guiada activa la barra baja de 100 % a 96,6 % en 2 s. Sin errores de consola. No se probó en vivo el agotamiento completo durante la guía.
+
+## La esfera guiada no se destruye sola (Claude, 11/11, pedido del usuario)
+- `js/water-power.js` (`guideStep`): la esfera guiada ya no caduca (se quitó `GUIDE_LIFE`), no se revienta al recibir un golpe ni al nadar, ni al chocar con plataformas o salir de la sala. Ahora solo se deshace al **usarla** (campana, maceta, muro quebradizo), al **soltarla** con G / L3, al **agotarse la energía** elemental o si Ruben muere.
+- Choques: contra plataformas se apoya/desliza (movimiento por ejes; si nace metida en una, se mueve libre hasta salir); queda dentro de los bordes de la sala; sobre la laguna **flota** en la superficie en vez de fundirse.
+- `index.html`: `water-power.js?v=4`.
+- Verificado: `scripts/check-project.js` (0 errores) y playtest (sala 12): la esfera flota sobre la laguna, se apoya en paredes/techo, sigue tras 17 s y tras un golpe; G la revienta; caminar, saltar y cambiar de sala OK. Sin errores de consola.
