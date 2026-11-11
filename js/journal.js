@@ -776,7 +776,6 @@
           </div>
           <div class="journal-footer">
             <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> equipar · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
-            <button class="journal-reset" id="journal-reset" type="button">Borrar diario</button>
           </div>
         </div>`;
       const notif = document.getElementById('notification');
@@ -787,13 +786,6 @@
       modal.addEventListener('mousedown', (e) => { if (e.target === modal) this.close(); });
       modal.querySelectorAll('.journal-tab').forEach(t => {
         t.addEventListener('click', () => this.setTab(t.dataset.tab));
-      });
-      const reset = modal.querySelector('#journal-reset');
-      reset.addEventListener('click', () => {
-        if (Date.now() < this.resetArmed) { this.resetAll(); reset.textContent = 'Borrar diario'; this.resetArmed = 0; return; }
-        this.resetArmed = Date.now() + 3000;
-        reset.textContent = '¿Seguro? Tocá otra vez';
-        setTimeout(() => { if (Date.now() >= this.resetArmed) reset.textContent = 'Borrar diario'; }, 3100);
       });
     }
 
@@ -962,9 +954,7 @@
       });
       const wrap = el('div', 'stat-radar-wrap');
       wrap.innerHTML = `<svg class="stat-radar" viewBox="0 0 260 232" role="img" ` +
-        `aria-label="Gráfico de radar de las estadísticas de Ruben">${svg}</svg>` +
-        `<div class="stat-radar-legend"><span class="lg-trained">Entrenado</span>` +
-        `<span class="lg-pending">Por entrenar</span></div>`;
+        `aria-label="Gráfico de radar de las estadísticas de Ruben">${svg}</svg>`;
       return wrap;
     }
 
@@ -974,20 +964,7 @@
       box.innerHTML = '';
 
       const sec = el('div', 'stats-section');
-      sec.appendChild(el('div', 'stats-title', 'RUBEN'));
       sec.appendChild(this.statRadar());
-      for (const id of STAT_ORDER) {
-        const row = el('div', 'stat-row stat-' + id);
-        const head = el('div', 'stat-head');
-        head.appendChild(el('span', 'stat-name', STATS[id].name));
-        head.appendChild(el('span', 'stat-value', this.statText(id)));
-        row.appendChild(head);
-        const eb = this.equipBonus(id);
-        const meta = `Nivel ${this.statLevel(id)}` + (eb ?` · equipo +${Math.round(eb * 100)}%` : '') +
-          ` · Entrenan: ${this.trainersOf(id)}`;
-        row.appendChild(el('div', 'stat-meta', meta));
-        sec.appendChild(row);
-      }
       box.appendChild(sec);
 
       const eq = el('div', 'stats-section');
