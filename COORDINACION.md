@@ -431,3 +431,11 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
   - Pool fijo `WRAPS` (8), se limpia en `loadRoom` y `onRestartGame`.
   - Las gotas ya no atraviesan el suelo: desaparecen al tocar una plataforma.
   - Verificado con `check-project.js` (0 errores) y playtest en navegador (sala 12: un disparo atravesó y envolvió a dos escarabajos seguidos, luego caminar/saltar/cambiar de sala sin errores de consola).
+
+## Claude (11/11, pedido del usuario): barra de energía elemental
+- **js/stamina.js (nuevo)**: barra azul (degrada a blanco) debajo de los corazones, compartida por Aire y Agua. Llena = 1 minuto de uso a fondo (3600 cuadros). Se vacía mientras un poder está activo, no se llena mientras se usa, y se recarga al soltar al mismo ritmo (lo usado = lo que tarda en volver). Al agotarse queda bloqueada hasta llegar al 20 % (evita que el viento parpadee y suelte a los insectos). Se muestra desde que se aprende el primer poder; reinicio de juego la llena.
+- **js/wind-pull.js** y **js/water.js**: la condición de activación consulta `window.Stamina.canUse()`. `WaterControl.isHolding()` nuevo para la barra.
+- **index.html**: carga `js/stamina.js` antes de los poderes; subí `wind-pull.js?v=3` y `water.js?v=3`.
+- **css/style.css**: bloque `.stamina-bar` / `.stamina-fill` nuevo (al final de la sección HUD).
+- Verificado: `check-project.js` (0 errores) y playtest en navegador (Playwright, Chromium): barra visible tras desbloquear el viento, baja al usar, sube al soltar, se agota a los 3600 cuadros de uso, no reactiva mientras está bloqueada, recarga ~50 % en 30 s y vuelve a 100 % al reiniciar. Sin errores de consola.
+- **Falta playtest** del agua con la barra (sala 12, Maestro del Agua) y del ajuste de tiempos a sentir en mando.

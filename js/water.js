@@ -477,8 +477,10 @@
   function controlStep(g) {
     const p = g.player;
     const hurt = p.anim && p.anim.hurtFlash > 0;
+    // Sin energía elemental (js/stamina.js) no se puede levantar ni sostener el orbe
     const can = !p.dead && p.isGrounded && !st.swim && !p.carriedItem && !hurt && g.deathTimer <= 0 &&
-      !(window.WindPull && window.WindPull.isActive && window.WindPull.isActive());
+      !(window.WindPull && window.WindPull.isActive && window.WindPull.isActive()) &&
+      (!window.Stamina || window.Stamina.canUse());
     const want = wantsWater(g);
 
     if (st.holding && (!want || !can)) {
@@ -991,6 +993,7 @@
   window.WaterControl = {
     learn: (g) => learn(g || window.gameInstance),
     isLearned: () => st.learned,
+    isHolding: () => st.holding,
     getState: () => ({ learned: st.learned, swimming: st.swim, holding: st.holding, size: st.size })
   };
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
