@@ -1156,6 +1156,32 @@ body {
   color: #f0bf4c;
 }
 
+/* ---------- HUD: energía de los poderes elementales (js/stamina.js) ---------- */
+.stamina-bar {
+  position: relative;
+  width: 180px;
+  height: 12px;
+  margin-top: 2px;
+  background: #2b1a10;
+  border: 2px solid #3a2416;
+  border-radius: 8px;
+  box-shadow: 0 2px 0 #2b1a10;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Azul que se degrada a blanco; el borde derecho siempre es blanco */
+.stamina-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #1d56b8 0%, #4a92e6 50%, #ffffff 100%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+}
+
+.stamina-bar.is-empty { opacity: 0.6; }
+
+
 /* Notas automáticas (se muestran al pasar por encima): sin "presiona para cerrar" */
 .dialog-box.auto .dialog-hint { display: none; }
 .dialog-box { pointer-events: none; }

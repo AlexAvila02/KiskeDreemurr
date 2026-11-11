@@ -484,3 +484,11 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - **index.html / css/style.css**: botones nuevos, CONTINUAR apagado sin partida guardada.
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (menú, puerta, aviso sobre diálogo, continuar, nueva partida). Sin errores de consola.
 - Pendiente: el estado de la escena del Maestro (macetas/campanas) no se guarda; al continuar se reinicia esa sala.
+
+## Claude (11/11, pedido del usuario): barra de energía elemental
+- **js/stamina.js (nuevo)**: barra azul (degrada a blanco) bajo los corazones, compartida por Aire y Agua. Llena = 1 minuto de uso (3600 cuadros). Se vacía mientras un poder está activo y se recarga al soltar a la misma velocidad. Al agotarse queda bloqueada hasta el 20 % (evita parpadeos que sueltan a los insectos). Reinicio de juego la llena.
+- **js/wind-pull.js** (`can`) y **js/water-power.js** (`blocked`) consultan `window.Stamina.canUse()`.
+- **index.html**: carga `js/stamina.js` antes de `wind-pull.js` (subido a `?v=7`).
+- **css/style.css**: bloque `.stamina-bar` / `.stamina-fill`.
+- Verificado: `check-project.js` (0 errores) y playtest en Chromium (Playwright): barra visible tras desbloquear el viento, baja al usar, sube al soltar, se agota y no reactiva bloqueada, recarga y reinicio. Sin errores de consola.
+- **Falta playtest** del agua con la barra (sala del Maestro del Agua) y del ajuste de tiempos con mando.

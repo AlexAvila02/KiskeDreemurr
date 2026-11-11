@@ -425,7 +425,9 @@
     state.t++;
     if (state.cooldown > 0) state.cooldown--;
     const hurt = p.anim && p.anim.hurtFlash > 0;
-    const can = !p.dead && p.isGrounded && !p.isAttacking && !p.carriedItem && !hurt && state.cooldown === 0 && g.deathTimer <= 0;
+    // Sin energía elemental (js/stamina.js) no se puede activar ni seguir usando el viento
+    const can = !p.dead && p.isGrounded && !p.isAttacking && !p.carriedItem && !hurt && state.cooldown === 0 && g.deathTimer <= 0 &&
+      (!window.Stamina || window.Stamina.canUse());
     const want = wantsPull(g);
 
     // Cambio de modo en caliente (jalar ↔ soplar): suelta a los atrapados

@@ -213,7 +213,9 @@
     const p = g.player;
     const hurt = p.anim && p.anim.hurtFlash > 0;
     const blocked = guide.on || p.dead || ws.swim || !!p.carriedItem || g.deathTimer > 0 ||
-      !!(window.WindPull && window.WindPull.isActive && window.WindPull.isActive());
+      !!(window.WindPull && window.WindPull.isActive && window.WindPull.isActive()) ||
+      // Sin energía elemental (js/stamina.js) no se puede sostener el agua
+      (!!window.Stamina && !window.Stamina.canUse());
     const want = wantsWater(g);
 
     if (st.holding) {
