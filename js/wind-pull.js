@@ -10,9 +10,9 @@
  *   - Al soltar, los insectos quedan mareados ~1 s (caen y ven estrellitas): momento de dar
  *     el tajo. Recibir un golpe, saltar del borde o cambiar de sala corta la habilidad.
  *
- * Integración (sin editar main.js): envuelve game.update, game.doAction y player.update;
- * dibuja en GameHooks.onRenderWorld. La pose de Ruben se dibuja en player.js leyendo
- * `player.windPose` (0..1). Sin basura por cuadro: corrientes y hojas en arreglos fijos.
+ * Integración: GameHooks onBeforeUpdate / onAfterUpdate / onAction / onFreezeInput /
+ * onBeforeRoomLoad (ver MAPA.md); dibuja en GameHooks.onRenderWorld. La pose de Ruben se dibuja en player.js leyendo
+ * `player.setArmPose('wind', pose, ángulo)`. Sin basura por cuadro: corrientes y hojas en arreglos fijos.
  *
  * Apuntado: mientras está activa, la franja apunta hacia el cursor del ratón o hacia donde
  * se incline el stick derecho del mando (gana el último que se movió). Sin ninguno de los
@@ -29,7 +29,6 @@
   const PULL_SPEED = 1.05;    // px por cuadro con potencia completa ("lentamente")
   const HOLD_GAP = 22;        // distancia a la mano donde quedan flotando los insectos
   const STUN_FRAMES = 80;     // mareo al soltarlos
-  const EMPTY_KEYS = Object.freeze({});
 
   const TINT = {
     pradera: [255, 244, 220],
@@ -64,9 +63,6 @@
 
   // Fuente de apuntado: 'none' (horizontal, hacia donde mira), 'mouse' o 'stick'.
   // Gana la última que se usó.
-  const aim = { source: 'none', mouseX: 0, mouseY: 0, mouseT: -1e9, stickHeld: false };
-  const STICK_DEAD = 0.35;
-  const MOUSE_FRESH_MS = 3000; // si el ratón no se movió hace rato, se apunta hacia adelante
 
   // Corrientes de aire (pool fijo)
   const streaks = [];
@@ -76,49 +72,21 @@
   for (let i = 0; i < 12; i++) bits.push({ u: Math.random(), v: Math.random() * 2 - 1, sp: 0.004 + Math.random() * 0.006, rot: Math.random() * 6.28, c: i % 3, s: 2 + Math.random() * 2 });
 
   // ---------------- sonido de viento (ruido filtrado) ----------------
-  const audio = { src: null, gain: null, filter: null, buffer: null };
+  // Ruido grave (marrón) → bandpass que sube con la potencia (sound-kit.js)
+  let windLoop = null;
   function startSound() {
-    const sm = window.soundManager;
-    if (!sm || !sm.ctx || sm.isMuted || audio.src) return;
-    const ac = sm.ctx;
-    try {
-      if (!audio.buffer) {
-        const len = ac.sampleRate * 2;
-        audio.buffer = ac.createBuffer(1, len, ac.sampleRate);
-        const d = audio.buffer.getChannelData(0);
-        let last = 0;
-        for (let i = 0; i < len; i++) { last = last * 0.96 + (Math.random() * 2 - 1) * 0.04; d[i] = last * 6; }
-      }
-      const src = ac.createBufferSource();
-      src.buffer = audio.buffer;
-      src.loop = true;
-      const filter = ac.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 420;
-      filter.Q.value = 0.9;
-      const gain = ac.createGain();
-      gain.gain.value = 0;
-      src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
-      src.start();
-      audio.src = src; audio.gain = gain; audio.filter = filter;
-    } catch (e) { audio.src = null; }
+    if (windLoop) return;
+    windLoop = window.SoundKit.loop('brown', { type: 'bandpass', freq: 420, Q: 0.9 });
   }
   function updateSound() {
-    if (!audio.src) return;
-    const ac = window.soundManager.ctx;
-    const now = ac.currentTime;
-    audio.gain.gain.setTargetAtTime(0.16 * state.power, now, 0.08);
-    audio.filter.frequency.setTargetAtTime(380 + state.power * 520 + Math.sin(state.t * 0.09) * 120, now, 0.1);
+    if (!windLoop) return;
+    windLoop.setLevel(0.16 * state.power, 0.08);
+    windLoop.setFreq(380 + state.power * 520 + Math.sin(state.t * 0.09) * 120, 0.1);
   }
   function stopSound() {
-    if (!audio.src) return;
-    const ac = window.soundManager.ctx;
-    const src = audio.src, gain = audio.gain;
-    audio.src = null;
-    try {
-      gain.gain.setTargetAtTime(0, ac.currentTime, 0.06);
-      src.stop(ac.currentTime + 0.3);
-    } catch (e) { /* */ }
+    if (!windLoop) return;
+    windLoop.stop(0.06, 0.3);
+    windLoop = null;
   }
 
   // ---------------- geometría de la franja ----------------
@@ -136,27 +104,9 @@
     else if (state.dirX < -0.15) state.facing = -1;
     state.rel = Math.atan2(state.dirY, state.dirX * state.facing);
   }
-  function readStick(g) {
-    const pad = g.getPad ? g.getPad() : null;
-    if (!pad || !pad.axes || pad.axes.length < 4) { aim.stickHeld = false; return; }
-    const ax = pad.axes[2] || 0, ay = pad.axes[3] || 0;
-    aim.stickHeld = ax * ax + ay * ay > STICK_DEAD * STICK_DEAD;
-    if (aim.stickHeld) aim.source = 'stick';
-  }
-  // Ángulo deseado este cuadro (o null = mantener el actual)
+  // Ángulo deseado este cuadro (o null = mantener el actual). Ratón / stick: aim.js
   function targetAngle(g, p) {
-    if (aim.source === 'stick') {
-      if (!aim.stickHeld) return null; // stick suelto: queda apuntando donde estaba
-      const pad = g.getPad();
-      return Math.atan2(pad.axes[3] || 0, pad.axes[2] || 0);
-    }
-    if (aim.source === 'mouse') {
-      const cam = g.camera || { x: 0, y: 0 };
-      const bx = p.x + p.width / 2, by = p.y + 19;
-      const dx = aim.mouseX + cam.x - bx, dy = aim.mouseY + cam.y - by;
-      if (dx * dx + dy * dy < 36) return null;
-      return Math.atan2(dy, dx);
-    }
+    if (window.Aim.source() !== 'none') return window.Aim.target(g, p.x + p.width / 2, p.y + 19);
     // Sin ratón ni stick: horizontal; izquierda/derecha giran a Ruben plantado
     const cm = g.controlsManager;
     if (cm && cm.isActive('moveLeft', g.keys)) return Math.PI;
@@ -340,13 +290,18 @@
     w.spin *= 0.9;
     const flier = 'originY' in e;
     unstick(e, world);
+    // Empujón (p. ej. una bola de agua): se frena solo y respeta las plataformas
+    const pvx = w.vx || 0;
+    if (pvx) w.vx = Math.abs(pvx) < 0.08 ? 0 : pvx * 0.9;
     if (flier) {
       // La polilla baja flotando, pero se posa sobre el suelo en vez de hundirse
-      moveCollide(e, 0, 0.35, world);
+      const pvy = w.pvy || 0;
+      if (pvy) w.pvy = Math.abs(pvy) < 0.08 ? 0 : pvy * 0.9;
+      moveCollide(e, pvx, 0.35 + pvy, world);
     } else {
       // El escarabajo cae al suelo (con colisión real contra plataformas)
       w.vy = Math.min(8, w.vy + 0.45);
-      if (moveCollide(e, 0, w.vy, world)) {
+      if (moveCollide(e, pvx, w.vy, world)) {
         w.vy = 0;
         if ('isGrounded' in e) e.isGrounded = true;
       }
@@ -406,6 +361,8 @@
     const b6 = pad && pad.buttons && pad.buttons[6];
     g.keys.PadL2 = !!(b6 && (b6.pressed || b6.value > 0.35));
     if (!cm.isActive('windPull', g.keys)) return null;
+    // Con una bola de agua en la mano, F / L2 es del agua (water.js)
+    if (window.WaterControl && window.WaterControl.isHolding && window.WaterControl.isHolding()) return null;
     // Abajo + L2 = jalar (atrae) · Arriba + L2 = soplar (empuja hacia afuera)
     if (cm.isActive('aimUp', g.keys)) return 'push';
     if (cm.isActive('aimDown', g.keys)) return 'pull';
@@ -470,7 +427,6 @@
     const hurt = p.anim && p.anim.hurtFlash > 0;
     const can = !p.dead && p.isGrounded && !p.isAttacking && !p.carriedItem && !hurt && state.cooldown === 0 && g.deathTimer <= 0;
     const want = wantsPull(g);
-    readStick(g);
 
     // Cambio de modo en caliente (jalar ↔ soplar): suelta a los atrapados
     if (state.active && want && want !== state.mode) {
@@ -487,8 +443,7 @@
       state.facing = p.facing || 1;
       // Arranca apuntando hacia donde mira Ruben (el ratón/stick lo corrige enseguida)
       setAngle(state.facing > 0 ? 0 : Math.PI);
-      if (aim.source === 'stick' && !aim.stickHeld) aim.source = 'none';
-      if (aim.source === 'mouse' && performance.now() - aim.mouseT > MOUSE_FRESH_MS) aim.source = 'none';
+      window.Aim.forgetStale();   // ratón quieto hace rato / stick suelto: apunta adelante
       state.power = 0;
       state.mode = want;
       startSound();
@@ -548,14 +503,13 @@
     const target = state.active ? 1 : 0;
     state.pose += (target - state.pose) * (state.active ? 0.22 : 0.18);
     if (state.pose < 0.01 && !state.active) state.pose = 0;
-    p.windPose = state.pose;
-    p.windAim = state.rel; // ángulo del brazo extendido (player.js)
+    p.setArmPose('wind', state.pose, state.rel);   // brazo extendido (player.js)
     millStep(g);
   }
 
   // ---------------- dibujo ----------------
   function render(g, ctx, cam) {
-    if (!g.isPlaying || g.isPaused) { if (audio.src && g.isPaused) stopSound(); return; }
+    if (!g.isPlaying || g.isPaused) { if (windLoop && g.isPaused) stopSound(); return; }
     const pw = state.power;
     if (pw <= 0.01) return;
     const p = g.player;
@@ -645,56 +599,65 @@
 
   // ---------------- instalación ----------------
   function install(g) {
-    const p = g.player;
-    const origPlayerUpdate = p.update.bind(p);
-    p.update = (world, keys, cm) => origPlayerUpdate(world, state.active ? EMPTY_KEYS : keys, cm);
-
-    const origDoAction = g.doAction.bind(g);
-    g.doAction = (action) => {
-      if (state.active && action !== 'interact') return; // plantado: no salta, ni ataca, ni agarra
-      origDoAction(action);
-    };
-
-    const origUpdate = g.update.bind(g);
-    g.update = (dt) => {
-      const run = g.isPlaying && !g.isPaused;
-      if (run) { try { preUpdate(g); } catch (e) { console.error('[Viento]', e); } }
-      origUpdate(dt);
-      if (run) { try { postUpdate(g); } catch (e) { console.error('[Viento]', e); } }
-    };
-
-    const origLoad = g.loadRoom.bind(g);
-    g.loadRoom = (index, sx = null, sy = null) => {
+    const H = window.GameHooks;
+    // Plantado: Ruben no recibe teclas y no salta, ni ataca, ni agarra
+    H.onFreezeInput.push(() => state.active);
+    H.onAction.push((game, action) => state.active && action !== 'interact');
+    H.onBeforeUpdate.push((game, running) => { if (running) preUpdate(game); });
+    H.onAfterUpdate.push((game, running) => { if (running) postUpdate(game); });
+    H.onBeforeRoomLoad.push(() => {
       clearAll();
       state.active = false;
       state.power = 0;
       stopSound();
-      origLoad(index, sx, sy);
-    };
-
-    // Ratón: posición en píxeles del canvas (corrige el escalado por CSS)
-    const canvas = g.canvas;
-    if (canvas) {
-      canvas.addEventListener('mousemove', (e) => {
-        const r = canvas.getBoundingClientRect();
-        if (!r.width || !r.height) return;
-        aim.mouseX = (e.clientX - r.left) * (canvas.width / r.width);
-        aim.mouseY = (e.clientY - r.top) * (canvas.height / r.height);
-        aim.mouseT = performance.now();
-        aim.source = 'mouse';
-      });
-    }
+    });
 
     window.GameHooks.onRenderWorld.push((game, ctx, cam) => {
       try { render(game, ctx, cam); } catch (e) { console.error('[Viento]', e); }
     });
   }
 
+  const band = { power: 0, mode: 'pull', hx: 0, hy: 0, dirX: 1, dirY: 0, reach: 0, range: RANGE };
   window.WindPull = {
     isUnlocked: () => isUnlocked(window.gameInstance),
     isActive: () => state.active,
     // Ángulo de las aspas del molino (bg-continuity.js lo usa para dibujarlo)
     getMillAngle: () => mill.angle,
+    // Franja de viento actual (la usan el agua y el pasto). Devuelve siempre el mismo
+    // objeto (sin basura por cuadro); power = 0 cuando no sopla ni jala.
+    getBand: () => {
+      const g = window.gameInstance;
+      if (!g || !g.player || state.power <= 0.01) { band.power = 0; return band; }
+      const h = handPoint(g.player);
+      band.power = state.power;
+      band.mode = state.mode;
+      band.hx = h.x; band.hy = h.y;
+      band.dirX = state.dirX; band.dirY = state.dirY;
+      band.reach = currentReach();
+      return band;
+    },
+    // Aturde a un enemigo N cuadros (sin IA ni daño por contacto, estrellitas) con un
+    // empujón opcional (vx, vy) que respeta las plataformas. Lo usa el agua (water.js).
+    stun: (e, frames, vx = 0, vy = 0) => {
+      if (!e || !e.alive) return;
+      const ci = state.caught.indexOf(e);
+      if (ci >= 0) state.caught.splice(ci, 1);
+      if (!e.__wind) e.__wind = { t: Math.random() * 10, spin: 0, stun: 0, vy: 0, seed: Math.random() * 6.28 };
+      const w = e.__wind;
+      e.update = caughtUpdate;
+      e.render = captureRender;
+      w.stun = Math.max(w.stun, frames);
+      w.vx = vx;
+      w.spin = (vx >= 0 ? 1 : -1) * 0.5;
+      if ('originY' in e) w.pvy = vy; else w.vy = vy;
+      if ('knockbackVx' in e) e.knockbackVx = 0;
+      if ('knockbackVy' in e) e.knockbackVy = 0;
+      if ('vx' in e) e.vx = 0;
+      if ('vy' in e) e.vy = 0;
+      if (!state.stunned.includes(e)) state.stunned.push(e);
+    },
+    // Media altura de la franja a la distancia relativa u (0 = mano, 1 = extremo)
+    bandHalf: (u) => halfAt(u),
     getState: () => ({ unlocked: isUnlocked(window.gameInstance), active: state.active, power: state.power, caught: state.caught.length, stunned: state.stunned.length })
   };
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };

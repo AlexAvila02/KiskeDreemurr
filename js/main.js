@@ -76,19 +76,57 @@ class Game {
     this.init();
   }
 
+  // Nombres de todos los GameHooks (arreglos de funciones). Contrato:
+  //  onInit(game)                                  una vez, al crear el juego
+  //  onBeforeUpdate(game, running)                 cada cuadro, antes de la lógica (también en pausa)
+  //  onAfterUpdate(game, running)                  cada cuadro, después de la lógica (también en pausa)
+  //  onUpdate(game, dt)                            (antiguo) cada cuadro, después de onAfterUpdate
+  //  onAction(game, action) → true                 consume la acción (no llega a main ni a los demás)
+  //  onBeforeRoomLoad(game, index, sx, sy)         antes de cambiar de sala
+  //  onRoomLoad(game, room, index, prevIndex, sx, sy)  después de cambiar de sala
+  //  onFreezeInput(game) → true                    Ruben no recibe teclas este cuadro
+  //  onAfterPlayerUpdate(game)                     después de mover a Ruben (antes de salidas)
+  //  onBlockExits(game) → true                     no revisar salidas de sala este cuadro
+  //  onKeepDialog(game) → true                     no cerrar el diálogo abierto por distancia
+  //  onBeforeTogglePause(game, force) → true       consume la pausa (p. ej. cerrar el Diario)
+  //  onPlayerHurt(game, amount)                    Ruben recibió daño (player.takeDamage)
+  //  onRestartGame(game)                           "Reiniciar juego": borrar progreso propio
+  //  onRenderWorld(game, ctx, cam) · onRenderHUD   dibujo
+  static get NO_KEYS() { return Game._noKeys || (Game._noKeys = Object.freeze({})); }
+
+  static get HOOK_NAMES() {
+    return ['onInit', 'onBeforeUpdate', 'onAfterUpdate', 'onUpdate', 'onAction', 'onBeforeRoomLoad',
+      'onRoomLoad', 'onFreezeInput', 'onAfterPlayerUpdate', 'onBlockExits', 'onKeepDialog',
+      'onBeforeTogglePause', 'onPlayerHurt', 'onRestartGame', 'onRenderWorld', 'onRenderHUD'];
+  }
+
+  // Llama a todos los hooks `name` (un error en uno no frena a los demás)
+  runHooks(name, ...args) {
+    const list = window.GameHooks && window.GameHooks[name];
+    if (!list) return;
+    for (let i = 0; i < list.length; i++) {
+      try { list[i](this, ...args); } catch (e) { console.error(`[GameHooks.${name}]`, e); }
+    }
+  }
+  // Como runHooks, pero se detiene en el primero que devuelve true (y devuelve true)
+  runHooksUntil(name, ...args) {
+    const list = window.GameHooks && window.GameHooks[name];
+    if (!list) return false;
+    for (let i = 0; i < list.length; i++) {
+      try { if (list[i](this, ...args) === true) return true; } catch (e) { console.error(`[GameHooks.${name}]`, e); }
+    }
+    return false;
+  }
+
   init() {
     window.gameInstance = this;
 
-    // Exponer hooks globales para que cualquier archivo nuevo (plugins/expansiones) se integre sin editar main.js
-    window.GameHooks = window.GameHooks || {
-      onInit: [],
-      onRoomLoad: [],
-      onUpdate: [],
-      onRenderWorld: [],
-      onRenderHUD: [],
-      onAction: []
-    };
-    window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
+    // Hooks globales: los módulos (js/*.js) se enganchan acá en vez de reemplazar funciones
+    // del juego. Lista completa y contrato de cada uno: ver MAPA.md → "GameHooks".
+    window.GameHooks = window.GameHooks || {};
+    for (const name of Game.HOOK_NAMES) {
+      if (!Array.isArray(window.GameHooks[name])) window.GameHooks[name] = [];
+    }
 
     // Cargar sala inicial
     this.loadRoom(0);
@@ -183,6 +221,13 @@ class Game {
   }
 
   loadRoom(index, spawnX = null, spawnY = null) {
+    const prevIndex = this.world.currentRoomIndex;
+    this.runHooks('onBeforeRoomLoad', index, spawnX, spawnY);
+    this.loadRoomCore(index, spawnX, spawnY);
+    this.runHooks('onRoomLoad', this.world.getCurrentRoom(), index, prevIndex, spawnX, spawnY);
+  }
+
+  loadRoomCore(index, spawnX, spawnY) {
     this.world.currentRoomIndex = index;
     this.visitedRooms.add(index);
     const room = this.world.getCurrentRoom();
@@ -305,6 +350,7 @@ class Game {
   // Alterna o fuerza el estado de pausa del juego
   togglePause(forceState = null) {
     if (!this.isPlaying || this.deathTimer > 0) return;
+    if (this.runHooksUntil('onBeforeTogglePause', forceState)) return;
 
     if (forceState !== null) {
       this.isPaused = forceState;
@@ -339,6 +385,8 @@ class Game {
   // Acción del jugador (la usan teclado, mouse y mando)
   doAction(action) {
     if (!this.isPlaying || this.isPaused || this.deathTimer > 0) return;
+    // Los módulos pueden consumir la acción (viento plantado, nado, NPC, esfera guiada...)
+    if (this.runHooksUntil('onAction', action)) return;
     const dialogOpen = !this.dialogBox.classList.contains('hidden');
 
     // Con una nota abierta, saltar o interactuar la cierra; lo demás se ignora
@@ -506,6 +554,8 @@ class Game {
   // Oculta la nota de Angelo al alejarse. Ya NO se abre sola al pasar por encima
   // (pedido del usuario, 9/11): se abre con ARRIBA desde js/npcs.js (cartel "↑ Leer").
   updateNearbyNote() {
+    // Un módulo puede mantener su diálogo abierto (NPC hablando, escena del maestro...)
+    if (this.activeNote && this.runHooksUntil('onKeepDialog')) return;
     const room = this.world.getCurrentRoom();
     const px = this.player.x + this.player.width / 2;
     const py = this.player.y + this.player.height / 2;
@@ -518,7 +568,12 @@ class Game {
     }
 
     if (near) {
-      // Cerca de una nota: si está abierta se mantiene; si no, solo se ve el cartel
+      // Cerca de una nota: si está abierta se mantiene; si no, solo se ve el cartel.
+      // Si había otro texto abierto (otra nota, un NPC), se cierra.
+      if (this.activeNote && this.activeNote !== near && this.activeNote !== room.door) {
+        this.activeNote = null;
+        this.hideDialog();
+      }
       return;
     }
 
@@ -600,16 +655,9 @@ class Game {
   // Reinicia la partida completa: mundo nuevo (llave, portón y muros como al principio),
   // Ruben en la primera sala y GameHooks.onRestartGame para que los módulos borren su progreso
   restartGame() {
+    // Mundo nuevo: World.registerRoom copia la configuración de cada sala, así que muros,
+    // objetos, campanas, NPC, etc. vuelven solos a como estaban al principio
     this.world = new World();
-    // Las salas de window.PendingRooms reutilizan sus objetos: dejar muros y objetos como nuevos
-    for (const room of this.world.rooms) {
-      if (!room) continue;
-      for (const br of room.breakables || []) br.broken = false;
-      for (const c of room.collectibles || []) c.collected = false;
-      if (room.keyItem) room.keyItem.collected = false;
-      if (room.door && room.door.requiredKeys) room.door.isLocked = true;
-    }
-    const hooks = window.GameHooks && window.GameHooks.onRestartGame;
     const p = this.player;
     if (p.carriedItem) { p.carriedItem.isCarried = false; p.carriedItem = null; }
     p.keys = 0;
@@ -625,7 +673,7 @@ class Game {
     this.hitStopFrames = 0;
     this.deathCause = null;
     this.visitedRooms = new Set();
-    if (hooks) for (const fn of hooks) { try { fn(this); } catch (e) { console.error(e); } }
+    this.runHooks('onRestartGame');
     p.hp = p.maxHp;
     this.loadRoom(0, 80, 410);
     this.irisOpen = 1;
@@ -778,6 +826,7 @@ class Game {
   }
 
   checkRoomExits() {
+    if (this.runHooksUntil('onBlockExits')) return;
     const room = this.world.getCurrentRoom();
     const px = this.player.x + this.player.width / 2;
     const py = this.player.y + this.player.height / 2;
@@ -812,8 +861,17 @@ class Game {
     }
   }
 
+  // Cuadro de lógica: hooks antes/después (también en pausa, para sonidos ambiente) y la
+  // lógica del juego solo si está corriendo
   update(dt) {
-    if (!this.isPlaying || this.isPaused) return;
+    const running = this.isPlaying && !this.isPaused;
+    this.runHooks('onBeforeUpdate', running);
+    if (running) this.updateCore(dt);
+    this.runHooks('onAfterUpdate', running);
+    this.runHooks('onUpdate', dt);
+  }
+
+  updateCore(dt) {
     if (this.irisOpen > 0) this.irisOpen = Math.max(0, this.irisOpen - 1 / this.IRIS_FRAMES);
     // El mundo se congela mientras se lee una nota
     // (Las notas ya no pausan el juego: se leen mientras Ruben sigue moviéndose)
@@ -837,8 +895,11 @@ class Game {
 
     const room = this.world.getCurrentRoom();
 
-    // Actualizar Ruben pasando el gestor de controles para movimiento dinámico
-    this.player.update(this.world, this.keys, this.controlsManager);
+    // Actualizar Ruben pasando el gestor de controles para movimiento dinámico.
+    // Un módulo puede congelar sus teclas (viento, esfera guiada, animación de llegada).
+    const frozen = this.runHooksUntil('onFreezeInput');
+    this.player.update(this.world, frozen ? Game.NO_KEYS : this.keys, this.controlsManager);
+    this.runHooks('onAfterPlayerUpdate');
 
     // Ruben no puede salir del mapa por los costados (solo por las salidas)
     const p = this.player;

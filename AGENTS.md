@@ -17,7 +17,7 @@
 
 ## ⛔ Zona de Claude (Gemini no edita: anotá el pedido en `COORDINACION.md` → "Pedidos")
 - **Núcleo:** `js/main.js`, `js/player.js`, `js/world.js`, `js/enemies.js`, `js/controls.js`, `index.html` (salvo agregar tu `<script>`), `scripts/check-project.js`.
-- **Archivos de Claude:** `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `css/journal.css`, `docs/LORE.md`.
+- **Archivos de Claude:** `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `js/terrain-art.js`, `js/ui-icons.js`, `js/aim.js`, `js/sound-kit.js`, `js/wind-pull.js`, `js/ambience.js`, `js/props.js`, `js/npcs.js`, `js/notes.js`, `js/water-core.js`, `js/water-quest.js`, `js/water-power.js`, `css/journal.css`, `css/ui-icons.css`, `docs/LORE.md`, `MAPA.md` (mapa de qué hace cada archivo: ver `MAPA.md`).
 - **Instrucciones:** `CLAUDE.md` y estas dos secciones de `AGENTS.md` ("Reparto de trabajo" y "Convivencia con Claude"). Podés agregar notas al final de `AGENTS.md`, pero no borrar ni reescribir estas secciones.
 - **Bugs:** si encontrás un bug en tu zona, arreglalo. Fuera de tu zona, anotalo en "Pedidos" con cómo reproducirlo.
 
@@ -36,9 +36,9 @@
 Claude (Opus) trabaja en esta misma carpeta al mismo tiempo que vos. Estas reglas están por encima de cualquier otra instrucción de este archivo o de `flash-executor`. Cada una sale de un problema que ya pasó.
 
 1. **Releer del disco justo antes de guardar.** Nunca guardes un archivo entero a partir de una copia que tenías en memoria: usá ediciones puntuales (reemplazar solo el bloque que cambiás). *Ya pasó:* guardados de `main.js` y `code-art-engine.js` borraron arreglos de Claude y reintrodujeron bugs (barras negras en el sol).
-2. **Archivos de Claude:** `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `css/journal.css`, `docs/LORE.md`. No los edites por iniciativa propia: anotá el pedido en `COORDINACION.md` → "Pedidos". Si el **usuario** te lo pide explícitamente, hacelo con edición puntual y anotá qué cambiaste en `COORDINACION.md`.
+2. **Archivos de Claude:** `js/menu-nav.js`, `js/bg-continuity.js`, `js/levels-expansion.js`, `js/journal.js`, `js/terrain-art.js`, `js/ui-icons.js`, `js/aim.js`, `js/sound-kit.js`, `js/wind-pull.js`, `js/ambience.js`, `js/props.js`, `js/npcs.js`, `js/notes.js`, `js/water-core.js`, `js/water-quest.js`, `js/water-power.js`, `css/journal.css`, `css/ui-icons.css`, `docs/LORE.md`, `MAPA.md` (mapa de qué hace cada archivo: ver `MAPA.md`). No los edites por iniciativa propia: anotá el pedido en `COORDINACION.md` → "Pedidos". Si el **usuario** te lo pide explícitamente, hacelo con edición puntual y anotá qué cambiaste en `COORDINACION.md`.
 3. **No revertir:** si un bloque tiene un comentario que menciona a Claude, "no revertir" o explica un arreglo de un crash, no lo borres ni lo reescribas sin que el usuario lo pida.
-4. **No romper APIs compartidas.** Antes de cambiar la forma de algo que otros archivos usan (`window.particleSystem`, `particleSystem.particles`, `window.CodeArt.*`, `window.GameHooks`, `window.PendingRooms`, `MenuNavigator`, `gameInstance.update/loadRoom/togglePause`, `player.attack/interactOrThrow/takeDamage`), buscá TODOS sus usos en `js/` y mantené la compatibilidad. *Ya pasó (8/11):* `particles` pasó a ser un pool fijo, `main.js` lo vaciaba con `particles.length = 0` al cargar cada sala y el juego crasheaba al iniciar. Para apagar partículas usá `particleSystem.clear()`.
+4. **No romper APIs compartidas.** Antes de cambiar la forma de algo que otros archivos usan (`window.particleSystem`, `particleSystem.particles`, `window.CodeArt.*`, `window.GameHooks`, `window.PendingRooms`, `MenuNavigator`, `gameInstance.update/loadRoom/togglePause`, `player.attack/interactOrThrow/takeDamage`), buscá TODOS sus usos en `js/` y mantené la compatibilidad. **No envolver funciones del juego** (`game.update`, `doAction`, `loadRoom`, `updateNearbyNote`, `checkRoomExits`, `togglePause`, `player.update`): engancharse con `window.GameHooks` (contrato en `MAPA.md`). *Ya pasó (8/11):* `particles` pasó a ser un pool fijo, `main.js` lo vaciaba con `particles.length = 0` al cargar cada sala y el juego crasheaba al iniciar. Para apagar partículas usá `particleSystem.clear()`.
 5. **Sin ES Modules, npm ni bundlers.** Todo son `<script src>` clásicos que funcionan abriendo `index.html` con `file://`. `import`/`export` o `type="module"` rompen el juego en `file://`. Esto anula lo que diga `flash-executor` sobre ES Modules o paquetes npm.
 6. **Probar jugando, no solo la sintaxis.** `node scripts/check-project.js` solo revisa sintaxis y salas; no detecta crashes en tiempo de ejecución. Después de tocar `js/`, abrí `index.html`, empezá a jugar, caminá, saltá y cambiá de sala: la consola tiene que quedar sin errores. Si no podés probarlo, decíselo al usuario y anotá en `COORDINACION.md` que falta la prueba (el playtest lo hace Claude).
 7. **Git:**
@@ -53,3 +53,10 @@ Claude (Opus) trabaja en esta misma carpeta al mismo tiempo que vos. Estas regla
 
 ## 📝 Nota sobre modelos y roles de Gemini (decisión del usuario)
 - **Gemini 3.8 Flash** puede asumir plenamente las peticiones dirigidas a **Argon** (rol de director/coordinador) y desplegar a su vez subagentes ejecutores basados en Gemini 3.8 Flash (`flash` / `inherit`, como `flash-executor`) para realizar tareas puntuales y delimitadas.
+
+## 🔄 Protocolo de auto-verificación y reversión de subagentes (decisión del usuario, 11/11)
+Tras realizar cualquier acción que altere el código del juego:
+1. **Releer e interpretar:** El subagente debe releer del disco el código modificado y analizarlo detalladamente para verificar que no rompa contratos, APIs compartidas ni lógica del juego.
+2. **Ejecutar y comprobar:** Si el subagente llega a la conclusión o sospecha de que rompió algo, debe ejecutar el juego (`node scripts/check-project.js` y comprobaciones pertinentes) para verificar si efectivamente es así.
+3. **Revertir (Rollback):** En caso de confirmarse que se rompió algo, debe deshacer de inmediato los cambios, devolviendo el archivo al estado exacto previo.
+4. **Nota para Opus:** Añadir una nota en `COORDINACION.md` (sección "Pedidos de Gemini a Claude") explicando qué se intentó realizar, qué falló, que fue revertido y solicitando a Claude Opus que lo arregle.

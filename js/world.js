@@ -76,7 +76,25 @@ class World {
   }
 
   // Permite a cualquier agente registrar o reemplazar una sala de forma limpia
+  // Copia profunda de los DATOS de una sala (arreglos y objetos planos). Funciones e
+  // instancias de clases se comparten. Así cada World (cada partida) tiene su propio
+  // estado: campanas, muros rotos, objetos juntados, NPC... nunca se arrastran entre partidas.
+  static cloneRoomData(v) {
+    if (Array.isArray(v)) return v.map(World.cloneRoomData);
+    // Objeto plano = su prototipo es Object.prototype (o null). Se compara por la cadena de
+    // prototipos y no contra Object.prototype para funcionar también en otros "realms"
+    // (iframes, vm de Node en scripts/check-project.js).
+    const proto = v && typeof v === 'object' ? Object.getPrototypeOf(v) : undefined;
+    if (proto !== undefined && (proto === null || Object.getPrototypeOf(proto) === null)) {
+      const o = {};
+      for (const k in v) o[k] = World.cloneRoomData(v[k]);
+      return o;
+    }
+    return v;
+  }
+
   registerRoom(roomConfig) {
+    roomConfig = World.cloneRoomData(roomConfig);
     const normalized = {
       biome: 'pradera',
       width: 1280,

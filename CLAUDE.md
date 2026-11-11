@@ -16,12 +16,12 @@ Varios agentes de IA pueden trabajar en paralelo en esta carpeta. Sigue este flu
    Verifica sintaxis JS de todos los módulos, integridad de `<script src>` en `index.html`, y que todas las salas tengan `spawnEnemies`/`spawnDebris` como funciones válidas y biomas existentes.
 3. **Pushear siempre a `main`**: Al completar cualquier tarea, corrección o mejora (tras validar con `check-project.js`), realiza `git add`, `git commit` y **pushea siempre a `main`** (`git push origin main`) para mantener sincronizado el repositorio.
 4. **Extensión sin tocar `js/main.js` ni `js/world.js`**:
-   - **Hooks del Motor (`window.GameHooks`)**: Cualquier script nuevo puede suscribirse sin modificar `js/main.js`:
-     - `window.GameHooks.onInit.push((game) => ...)`
-     - `window.GameHooks.onRoomLoad.push((game, room, index) => ...)`
-     - `window.GameHooks.onUpdate.push((game, dt) => ...)`
-     - `window.GameHooks.onRenderWorld.push((game, ctx, camera) => ...)`
-     - `window.GameHooks.onAction.push((game, action) => ...)`
+   - **Hooks del Motor (`window.GameHooks`)**: Cualquier script nuevo se engancha sin modificar `js/main.js`. **No envolver funciones del juego** (`game.update`, `doAction`, `loadRoom`, `player.update`...): usar los hooks. Contrato completo en **`MAPA.md`**. Los principales:
+     - `onInit(game)` (registrar acá los demás) · `onBeforeUpdate / onAfterUpdate(game, running)` (también en pausa)
+     - `onAction(game, action) → true` consume la acción · `onBeforeRoomLoad(game, index, sx, sy)` · `onRoomLoad(game, room, index, prevIndex, sx, sy)`
+     - `onFreezeInput(game) → true` · `onAfterPlayerUpdate(game)` · `onBlockExits(game) → true` · `onKeepDialog(game) → true` · `onBeforeTogglePause(game, force) → true` · `onPlayerHurt(game, amount)`
+     - Compartidos: apuntado ratón/stick → `window.Aim`; ruidos y tonos sintetizados → `window.SoundKit`; pose del brazo → `player.setArmPose(fuente, pose, ángulo)`; virtudes → `player.mods`.
+     - `onRestartGame(game)` (solo progreso propio: las salas se copian en cada partida) · `onRenderWorld(game, ctx, camera)`
    - **Cola de Salas (`window.PendingRooms`)**: Puedes definir nuevas salas en un archivo separado empujando configuraciones a `window.PendingRooms = window.PendingRooms || []; window.PendingRooms.push({ id: 4, ... })` o llamando `window.gameInstance.world.registerRoom({...})`.
 
 ---

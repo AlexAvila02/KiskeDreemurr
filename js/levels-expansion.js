@@ -439,10 +439,19 @@
     waterBells: [
       { x: 600, y: 210, pitch: 660 },
       { x: 880, y: 262, pitch: 784 },
-      { x: 1420, y: 170, pitch: 988 }
+      { x: 1420, y: 170, pitch: 988 },
+      // Campana del techo, sobre el maestro: la bola lanzada se deshace antes de llegar;
+      // solo la alcanza la esfera guiada (habilidad mejorada)
+      { x: 300, y: 32, pitch: 1320, ceiling: true }
     ],
     collectibles: [
       { item: 'emblema', x: 1240, y: 274 }
+    ],
+    // Macetas que el maestro coloca al sonar la última campana (escena en js/water.js)
+    potSpots: [
+      { x: 352, y: 400, color: '#e2705a' },
+      { x: 386, y: 400, color: '#f2d29b' },
+      { x: 420, y: 400, color: '#9fdcef' }
     ],
     npcs: [
       {
@@ -457,7 +466,9 @@
           'Escucha: el agua no se empuja, se invita. Cerca de la laguna, mantén F (L2 en el mando) y subirá a tu mano. Apunta con el ratón o el stick derecho, y suéltala.'
         ],
         farewell: 'Haz sonar las tres campanas que cuelgan sobre la laguna. Cuanto más tiempo la sostengas, más fuerte sale el agua.',
-        farewellDone: 'Las campanas todavía cantan. Ve, Ruben: donde haya agua que te escuche, no estarás solo.'
+        farewellLake: 'Bien hecho. Ahora mira arriba: la campana que cuelga sobre mi cabeza. Tu agua se deshace antes de llegar. Úsala, úsala mucho: el agua crece con quien la practica. Cuando tu esfera sea mucho más grande, el agua te obedecerá también en el aire.',
+        farewellUpgraded: '¿Lo sientes? Tu agua ya no se cae. Pulsa G (L3 en el mando) cerca de la laguna: saldrá una esfera que puedes guiar por el aire con el stick o las flechas. Llévala hasta la campana del techo.',
+        farewellDone: 'Las cuatro campanas cantan. Ve, Ruben: donde haya agua que te escuche, no estarás solo.'
       }
     ],
     exits: [
@@ -498,7 +509,6 @@
   // por el hueco del suelo, da una voltereta y aterriza en la plataforma de al lado.
   // Se activa al entrar por una salida con hint 'up' a una sala con salida hint 'down'.
   // ==========================================================
-  const EMPTY_KEYS = Object.freeze({});
   const rise = { t: -1, hold: 8, dur: 30, x0: 0, y0: 0, x1: 0, y1: 0, h: 110, prevX: 0, prevY: 0 };
   const RISE_START_Y = 545;     // fuera de cámara, debajo del hueco
 
@@ -513,17 +523,16 @@
 
   function installRiseArrival(game) {
     const p = game.player;
+    const H = window.GameHooks;
     const rising = () => rise.t >= 0;
 
-    const origLoad = game.loadRoom.bind(game);
-    game.loadRoom = (index, sx = null, sy = null) => {
-      const prev = game.world.rooms[game.world.currentRoomIndex];
-      const viaUp = sx !== null && prev && prev.exits &&
-        prev.exits.some(e => e.targetRoom === index && e.hint && e.hint.dir === 'up');
+    // Al entrar por una salida 'up' a una sala con salida 'down': preparar la curva
+    H.onRoomLoad.push((g, room, index, prevIndex, sx) => {
       rise.t = -1;
-      origLoad(index, sx, sy);
+      const prev = g.world.rooms[prevIndex];
+      const viaUp = sx !== null && prev && prev !== room && prev.exits &&
+        prev.exits.some(e => e.targetRoom === index && e.hint && e.hint.dir === 'up');
       if (!viaUp) return;
-      const room = game.world.getCurrentRoom();
       const hole = room && room.exits && room.exits.find(e => e.hint && e.hint.dir === 'down');
       if (!hole) return;
       // Arranca escondido bajo el hueco y termina justo en el punto de aparición de siempre
@@ -537,21 +546,17 @@
       p.vx = 0; p.vy = 0;
       p.isGrounded = false;
       rise.prevX = p.x; rise.prevY = p.y;
-    };
+    });
 
-    // Mientras sube no se revisan salidas (el hueco es la salida hacia abajo)
-    const origExits = game.checkRoomExits.bind(game);
-    game.checkRoomExits = () => { if (!rising()) origExits(); };
-
-    // Sin saltar, atacar ni agarrar durante la animación
-    const origDoAction = game.doAction.bind(game);
-    game.doAction = (action) => { if (!rising()) origDoAction(action); };
-
-    const origPlayerUpdate = p.update.bind(p);
-    p.update = (world, keys, cm) => {
-      if (!rising() || p.dead) { if (p.dead) rise.t = -1; return origPlayerUpdate(world, keys, cm); }
-      // La física corre igual (bufanda, resortes), pero la posición la guía la curva
-      origPlayerUpdate(world, EMPTY_KEYS, cm);
+    // Mientras sube: no se revisan salidas (el hueco es la salida hacia abajo), no hay
+    // acciones ni teclas, y la física corre igual (bufanda, resortes) pero la posición
+    // la guía la curva
+    H.onBlockExits.push(() => rising());
+    H.onAction.push(() => rising());
+    H.onFreezeInput.push(() => rising() && !p.dead);
+    H.onAfterPlayerUpdate.push(() => {
+      if (!rising()) return;
+      if (p.dead) { rise.t = -1; return; }
       const t = rise.t++;
       if (t < rise.hold) {
         p.x = rise.x0; p.y = rise.y0; p.vx = 0; p.vy = 0; p.isGrounded = false;
@@ -583,7 +588,7 @@
         rise.t = -1;
         p.vx = 0;
       }
-    };
+    });
   }
 
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };

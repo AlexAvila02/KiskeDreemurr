@@ -59,6 +59,12 @@ class ControlsManager {
         defaultKeys: ['KeyF', 'ShiftLeft']
       },
       {
+        id: 'waterGuide',
+        name: 'Esfera guiada (tras mejorar el agua)',
+        icon: (window.UIIcons ? UIIcons.svg('water') : ''),
+        defaultKeys: ['KeyG', null]
+      },
+      {
         id: 'interact',
         name: 'Interactuar / Leer / Abrir',
         icon: (window.UIIcons ? UIIcons.svg('scroll') : ''),
@@ -518,6 +524,7 @@ class ControlsManager {
       ['wind', 'Jalar / Soplar el Aire', null, 'Abajo/Arriba + L2'],
       ['wind', 'Apuntar el aire', 'Mover el ratón', 'Stick derecho'],
       ['water', 'Dominio del Agua (cerca del agua)', 'Apuntar: ratón', 'L2 · stick der.'],
+      ['water', 'Esfera guiada (tras mejorar)', null, 'L3 · stick izq.'],
       ['book', 'Diario de Ruben', null, 'Select'],
       ['gear', 'Pausa', null, 'Start'],
       ['gamepad', 'En menús: elegir / volver', 'Clic', 'A / B']

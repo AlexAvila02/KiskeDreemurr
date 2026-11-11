@@ -997,7 +997,19 @@
   window.GameHooks.onInit.push((game) => {
     installWrappers();
 
-    if (game && !game.__animRegistryUpdateHooked) {
+    // main.js con hooks nativos (Claude, refactor etapa 1): avanzar FX en onAfterUpdate.
+    // main.js ya despacha GameHooks.onUpdate por su cuenta.
+    if (game && typeof game.runHooks === 'function' && window.GameHooks.onAfterUpdate) {
+      if (!game.__animRegistryUpdateHooked) {
+        game.__animRegistryUpdateHooked = true;
+        window.GameHooks.onAfterUpdate.push((g, running) => {
+          if (!running) return;
+          updateFX(16.666);
+          updateAfterimages();
+        });
+      }
+    } else if (game && !game.__animRegistryUpdateHooked) {
+      // Respaldo para un main.js sin hooks nativos: envolver game.update
       game.__animRegistryUpdateHooked = true;
       const origGameUpdate = game.update;
       game.update = function (dt) {

@@ -11,10 +11,9 @@
  * "DIARIO" en el menú de pausa · 🎮 Select/Back. Dentro: Q/E o LB/RB cambian de pestaña,
  * flechas o cruceta mueven la selección, Enter / A elige, Esc / B cierra.
  *
- * Se integra solo con hooks y envoltorios (no edita main.js, player.js ni world.js):
- *   GameHooks.onInit · GameHooks.onRenderWorld · envuelve game.update, game.loadRoom,
- *   game.togglePause, player.attack, player.interactOrThrow, player.takeDamage y
- *   amplía MenuNavigator (js/menu-nav.js) para que el mando navegue el Diario.
+ * Se integra con GameHooks (onInit, onAfterUpdate, onRoomLoad, onBeforeTogglePause,
+ *   onPlayerHurt, onRenderWorld; ver MAPA.md), ajusta player.mods (virtudes de combate)
+ *   y amplía MenuNavigator (js/menu-nav.js) para que el mando navegue el Diario.
  */
 (function () {
   'use strict';
@@ -436,7 +435,7 @@
 
       this.syncRoomsWithSave();
       this.wrapGame();
-      this.wrapPlayer();
+      this.hookPlayer();
       this.buildUI();
       this.hookMenuNav();
       this.setupKeys();
@@ -523,6 +522,16 @@
       p.speed = b.speed * (this.has('i1') ? 1.12 : 1);
       const jm = this.has('i3') ? 1.1 : 1;
       p.jumpForce = b.jumpForce * jm;
+      // Virtudes de combate: player.js las lee de player.mods
+      if (p.mods) {
+        p.mods.attackDamage = this.has('e1') ? 1.5 : 1;     // Acero: +50% de daño
+        p.mods.attackCooldown = this.has('e2') ? 12 : 18;   // ataque más rápido
+        const i2 = this.has('i2');                          // piedras al doble, más lejos
+        p.mods.throwDamage = i2 ? 2 : 1;
+        p.mods.throwSpeed = i2 ? 1.3 : 1;
+        p.mods.throwLift = i2 ? 1.15 : 1;
+        p.mods.hurtInvuln = this.has('c3') ? 1.5 : 1;       // invulnerabilidad más larga
+      }
       if (this.game.updateHUD) this.game.updateHUD();
     }
 
@@ -546,64 +555,22 @@
 
     // ---------------- Envoltorios del motor ----------------
     wrapGame() {
-      const g = this.game;
-      const origUpdate = g.update.bind(g);
-      g.update = (dt) => { origUpdate(dt); try { this.tick(); } catch (e) { console.error('[Diario]', e); } };
-
-      const origLoad = g.loadRoom.bind(g);
-      g.loadRoom = (index, sx = null, sy = null) => {
-        origLoad(index, sx, sy);
-        this.hearts.length = 0;
-      };
-
-      const origToggle = g.togglePause.bind(g);
-      g.togglePause = (force = null) => {
-        if (this.isOpen()) { this.close(false); return; }
-        origToggle(force);
-      };
+      const H = window.GameHooks;
+      H.onAfterUpdate.push(() => this.tick());
+      H.onRoomLoad.push(() => { this.hearts.length = 0; });
+      // Con el Diario abierto, "pausa" lo cierra (en vez de abrir el menú de pausa)
+      H.onBeforeTogglePause.push(() => {
+        if (!this.isOpen()) return false;
+        this.close(false);
+        return true;
+      });
 
       window.GameHooks.onRenderWorld.push((game, ctx, cam) => this.renderWorld(ctx, cam));
     }
 
-    wrapPlayer() {
-      const p = this.game.player;
-      const origAttack = p.attack.bind(p);
-      p.attack = (enemies, aim) => {
-        const mult = this.has('e1') ? 1.5 : 1;
-        const patched = [];
-        if (mult !== 1 && Array.isArray(enemies)) {
-          for (const e of enemies) {
-            if (!e || typeof e.takeDamage !== 'function' || Object.prototype.hasOwnProperty.call(e, 'takeDamage')) continue;
-            const f = e.takeDamage;
-            e.takeDamage = function (amount, kb) { return f.call(this, amount * mult, kb); };
-            patched.push(e);
-          }
-        }
-        const wasAttacking = p.isAttacking;
-        try { origAttack(enemies, aim); } finally { for (const e of patched) delete e.takeDamage; }
-        if (!wasAttacking && p.isAttacking && this.has('e2')) p.attackCooldown = Math.min(p.attackCooldown, 12);
-      };
-
-      const origThrow = p.interactOrThrow.bind(p);
-      p.interactOrThrow = (list) => {
-        const carried = p.carriedItem;
-        origThrow(list);
-        if (carried && !p.carriedItem && carried.isThrown && this.has('i2')) {
-          carried.damage = (carried.damage || 25) * 2;
-          carried.vx *= 1.3;
-          carried.vy *= 1.15;
-        }
-      };
-
-      const origHurt = p.takeDamage.bind(p);
-      p.takeDamage = (amount, kb) => {
-        const before = p.hp;
-        origHurt(amount, kb);
-        if (p.hp < before) {
-          this.sinceHurt = 0;
-          if (this.has('c3') && !p.dead) p.invulnerableTimer = Math.round(p.invulnerableTimer * 1.5);
-        }
-      };
+    // Ser golpeado reinicia la cuenta de la regeneración (virtud Corazón)
+    hookPlayer() {
+      window.GameHooks.onPlayerHurt.push(() => { this.sinceHurt = 0; });
     }
 
     // ---------------- Lógica por cuadro ----------------
@@ -891,7 +858,6 @@
             }
           });
           b.addEventListener('focus', () => { if (this.selectedSkill !== id) this.renderSkills(id); });
-          b.addEventListener('mouseenter', () => { if (this.selectedSkill !== id) this.renderSkills(id); });
           col.appendChild(b);
           this.skillButtons[id] = b;
         });

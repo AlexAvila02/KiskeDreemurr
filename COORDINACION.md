@@ -420,14 +420,59 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
       - `leaveLagunaTheme(targetBiome)`: Marca la sala como inactiva, restaura de inmediato el bioma ambiental objetivo y realiza un fade-out gradual en `this.lagunaGain.gain` de su volumen actual a `0.00001` en 2.5s. Cancela el secuenciador a los 2.6s tras culminar el desvanecimiento para evitar cortes secos de notas en reproducción.
   - Verificado con `node scripts/check-project.js` (0 errores).
 
+## Cambio puntual de Gemini (11/11, pedido del usuario): Aumento de +50% al tiempo de evaporación del agua
+- **js/water-core.js** (y `js/water.js` / `js/water-power.js`):
+  - Modificada la constante `EVAP_FRAMES` de `2400` a `3600` (a 60 cuadros/segundo: pasa de 40 s a 60 s, incremento del +50%).
+  - Compartida vía `WaterCore.EVAP_FRAMES` a `js/water-power.js`.
+  - Afecta al tiempo que tardan los charcos de agua en el suelo en evaporarse por completo (`room.puddles`, también entre salas con `ws.t`), así como a la evaporación del orbe de agua en la mano cuando Ruben se aleja de una fuente de agua (`st.size -= 1 / EVAP_FRAMES`).
+  - Actualizados los comentarios y documentación en cabecera con el nuevo valor nominal de 60 s.
+  - Verificado con `node scripts/check-project.js` (0 errores).
 
 
+## 🧱 Refactorización etapa 2 (Claude, 11/11, aprobada por el usuario): archivos separados por tema — ver `MAPA.md` → "Archivos"
+Sin cambios de comportamiento: el código de cada función se movió **tal cual**, cortando por rangos de líneas. Solo se reescribió lo que antes compartían dentro de un mismo archivo: estado/reloj e instalación de hooks.
+- **`water.js` (1505 líneas) → 3 archivos**, en este orden de carga:
+  - `water-core.js`: superficie, nado, gotas, charcos, sonidos y viento sobre el agua. Expone `WaterCore`, con el reloj y el estado de nado en `WaterCore.ws`.
+  - `water-quest.js`: campanas y escena de las macetas. Expone `WaterQuest`.
+  - `water-power.js`: Dominio del Agua y la API pública `WaterControl`, que no cambió.
+  - Se borró `water.js`.
+- **`npcs.js` (806 líneas) → 4 archivos**:
+  - `ambience.js`: brisa. Expone `Ambience.getBreeze()`.
+  - `props.js`: cabaña y ovejas, capa world `room-props` (orden 49).
+  - `npcs.js`: NPC y diálogos, capa `npcs` (orden 50). Expone `NPCs.drawBubble`.
+  - `notes.js`: cartel "↑ Leer".
+- Capas world: `water-puddles` (60) y `water-pots` (61), antes eran una sola.
+- `index.html`: los 7 scripts nuevos, en orden y con comentarios.
+- `AGENTS.md`: lista de archivos de Claude actualizada (faltaban wind-pull, terrain-art, ui-icons y los nuevos). `MAPA.md`: tabla de todos los archivos (dueño, qué hace, qué expone, de qué depende).
+- Verificación: `check-project.js` OK. Prueba sin navegador con el juego REAL, sin errores:
+  - Todo lo de la etapa 1 sigue funcionando.
+  - Esfera guiada: aparece, se mueve y revienta.
+  - Escena de las macetas completa: coloca 3, el diálogo aparece abajo y no se cierra por distancia, florecen y el cuadro vuelve arriba.
+  - `render()` completo en las salas 0, 2, 11 y 12, con decorados, brisa, NPC, notas, agua, campanas y macetas.
+- **Sin playtest en navegador.** Sin commit. Copia de respaldo de los originales en el scratchpad de la sesión.
 
+## 🧱 Refactorización etapa 3 (Claude, 11/11, aprobada por el usuario): sin duplicados ni envolturas — ver `MAPA.md`
+- **`aim.js` (nuevo, `window.Aim`)**: un solo lector de ratón (un único `mousemove` sobre el canvas) y stick derecho. `wind-pull.js` y `water-power.js` dejaron de tener cada uno su propio estado, listener y lectura del stick; conservan su suavizado y su política (`Aim.forgetStale(keepIdleStick)`, `Aim.target(game, x, y)`).
+- **`sound-kit.js` (nuevo, `window.SoundKit`)**: ruidos blanco/rosado/marrón en caché, `loop` (ruido → filtro → volumen, con LFO opcional), `noiseHit` y `tone`. Pasaron al kit el agua (salpicadura, brazada, ráfaga, campana, chorro, ambiente), la brisa, el viento y el golpe de maceta, con los mismos parámetros. Va aparte de `audio.js` porque ese archivo es zona de Gemini. **Gemini: para efectos sintetizados nuevos podés usar `SoundKit`.**
+- **Pose del brazo** (`player.js`): `player.setArmPose('wind' | 'water', pose, ángulo)` y `armPose()` devuelve la más fuerte. Se eliminaron `player.windPose` / `windAim` y el truco de "aplicar la pose del agua después del viento".
+- **Virtudes sin envolturas**: `player.mods` (`attackDamage`, `attackCooldown`, `throwDamage`, `throwSpeed`, `throwLift`, `hurtInvuln`), que ajusta `journal.js → applyPassives`. Hook nuevo **`onPlayerHurt(game, amount)`** (`player.takeDamage`), que el Diario usa para reiniciar la regeneración. **Ya no queda ninguna función del juego ni del jugador envuelta.**
+- **Error corregido de paso**: con la virtud de piedras al doble, el daño de una misma piedra se duplicaba en cada lanzamiento (25 → 50 → 100…). Ahora siempre es el doble del daño base (`item.baseDamage`).
+- Verificación: `check-project.js` OK. Prueba sin navegador con el juego REAL, con audio simulado que cuenta nodos:
+  - Todo lo de las etapas 1 y 2 sigue funcionando.
+  - El kit crea nodos sin errores de envolvente.
+  - Hay un solo listener de ratón y la fuente pasa a "ratón".
+  - Pose de agua 1, apuntando hacia el cursor; pose de viento 1 y 0 al soltar.
+  - Virtudes: daño 22,5, enfriamiento 12, piedra 50/50/50, invulnerabilidad 83 y regeneración reiniciada.
+  - Dibujo de las salas 0, 2, 11 y 12 sin errores, incluido el tema de la laguna nuevo de Gemini en `audio.js`, que funciona con `onRoomLoad`.
+- **Sin playtest en navegador.** Sin commit.
 
-## Claude (11/11, pedido del usuario): el agua atraviesa y rodea a los enemigos
-- **js/water.js** (`shotsStep`, nuevos `startWrap` / `wrapsStep` / `drawWraps`):
-  - El orbe de agua ya no se deshace al tocar un enemigo: lo **atraviesa** (daña una sola vez a cada uno, máx. 6 por disparo), pierde caudal (tamaño ×0.72, velocidad ×0.85) y sigue; si queda muy chico se deshace.
-  - **Envolvimiento**: dos corrientes recorren el contorno del enemigo (por arriba y por abajo desde el lado de entrada), se juntan del otro lado soltando gotas en la dirección del chorro; queda una película de agua que se escurre y el enemigo gotea un rato. Mientras el orbe está dentro del enemigo se dibuja semitransparente.
-  - Pool fijo `WRAPS` (8), se limpia en `loadRoom` y `onRestartGame`.
-  - Las gotas ya no atraviesan el suelo: desaparecen al tocar una plataforma.
-  - Verificado con `check-project.js` (0 errores) y playtest en navegador (sala 12: un disparo atravesó y envolvió a dos escarabajos seguidos, luego caminar/saltar/cambiar de sala sin errores de consola).
+## Sonido de impacto de agua contra el suelo (Gemini, 11/11, pedido del usuario)
+- **sounds/water-impact.mp3** (archivo nuevo):
+  - Guardado el archivo de audio MP3 aportado por el usuario con el sonido real de chapoteo / impacto de agua.
+- **js/audio.js**:
+  - Incorporado en `SoundManager.WATER_IMPACT_B64` para garantizar carga instantánea, 100% offline y compatible con protocolo `file://` (sin bloqueos CORS ni peticiones de red).
+  - Decodificado a `this.waterImpactBuffer` en `AudioContext` para reproducción con cero latencia y modulación de pitch orgánica (`playbackRate = 0.95 .. 1.05`).
+  - Método público nuevo: `window.soundManager.playWaterGroundImpact(intensity)`.
+- **js/water-core.js** (`addPuddle`):
+  - Conectado el disparo de `window.soundManager.playWaterGroundImpact(intensity)` cada vez que el agua cae y choca contra una plataforma o el suelo (`pl`), cubriendo orbes lanzados, esfera guiada reventada y agua caída de la mano.
+- Verificado con `node scripts/check-project.js` (0 errores).

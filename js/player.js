@@ -59,6 +59,21 @@ class Player {
     // Inventario de habilidades y llaves
     this.keys = 0;
 
+    // Pose del brazo extendido con la palma abierta que piden las habilidades (viento, agua):
+    // cada una escribe la suya con setArmPose(fuente, pose, ángulo) y se dibuja la más fuerte.
+    this.armPoses = {};
+    this._arm = { pose: 0, aim: 0 };
+
+    // Modificadores que ajustan las virtudes del Diario (journal.js → applyPassives)
+    this.mods = {
+      attackDamage: 1,      // multiplica el daño del tajo
+      attackCooldown: 18,   // cuadros entre tajos
+      throwDamage: 1,       // multiplica el daño de la piedra lanzada
+      throwSpeed: 1,        // multiplica la velocidad horizontal del lanzamiento
+      throwLift: 1,         // multiplica la velocidad vertical del lanzamiento
+      hurtInvuln: 1         // multiplica la invulnerabilidad tras un golpe
+    };
+
     // Estado de animación (solo visual: no afecta física ni hitboxes)
     this.anim = {
       sy: 1, vsy: 0,        // resorte de squash & stretch vertical (sx = 1/sy conserva el volumen)
@@ -80,6 +95,25 @@ class Player {
       { x: this.x, y: this.y + 26 },
       { x: this.x, y: this.y + 36 }
     ];
+  }
+
+  // Pose del brazo: 0 = normal, 1 = brazo extendido. aim = ángulo relativo a donde mira
+  // (0 = adelante, <0 = arriba). Fuentes: 'wind' (wind-pull.js), 'water' (water-power.js).
+  setArmPose(source, pose, aim = 0) {
+    const s = this.armPoses[source] || (this.armPoses[source] = { pose: 0, aim: 0 });
+    s.pose = pose;
+    s.aim = aim;
+  }
+  // La pose más fuerte de este cuadro (objeto reutilizado: no crea basura)
+  armPose() {
+    let best = null;
+    for (const k in this.armPoses) {
+      const s = this.armPoses[k];
+      if (!best || s.pose > best.pose) best = s;
+    }
+    this._arm.pose = best ? best.pose : 0;
+    this._arm.aim = best ? best.aim : 0;
+    return this._arm;
   }
 
   jump() {
@@ -127,7 +161,7 @@ class Player {
     const dirY = Math.sin(this.attackAim);
     this.isAttacking = true;
     this.attackTimer = this.attackDuration;
-    this.attackCooldown = 18;
+    this.attackCooldown = this.mods.attackCooldown;
     // Cada tajo alterna el sentido (combo) y da un pequeño impulso visual
     this.anim.swingDir *= -1;
     this.anim.lunge = 1;
@@ -154,7 +188,7 @@ class Player {
         this.attackBox.y < enemy.y + enemy.height &&
         this.attackBox.y + this.attackBox.h > enemy.y
       ) {
-        enemy.takeDamage(15, (dirX || this.facing * 0.5) * 8);
+        enemy.takeDamage(15 * this.mods.attackDamage, (dirX || this.facing * 0.5) * 8);
         // Chispas en el punto de contacto
         const hx = Math.max(enemy.x, Math.min(enemy.x + enemy.width, this.x + this.width / 2 + dirX * 16));
         const hy = Math.max(enemy.y, Math.min(enemy.y + enemy.height, this.y + this.height / 2 + dirY * 16));
@@ -185,8 +219,13 @@ class Player {
     if (this.carriedItem) {
       this.carriedItem.isCarried = false;
       this.carriedItem.isThrown = true;
-      this.carriedItem.vx = this.facing * 10;
-      this.carriedItem.vy = -3.8;
+      this.carriedItem.vx = this.facing * 10 * this.mods.throwSpeed;
+      this.carriedItem.vy = -3.8 * this.mods.throwLift;
+      // Daño según las virtudes, siempre sobre el daño base de la piedra (antes se
+      // duplicaba en cada lanzamiento de la misma piedra: 25, 50, 100...)
+      const item = this.carriedItem;
+      if (item.baseDamage === undefined) item.baseDamage = item.damage || 25;
+      item.damage = item.baseDamage * this.mods.throwDamage;
       window.soundManager.playThrow();
       this.carriedItem = null;
       if (window.gameInstance) window.gameInstance.updateHUD();
@@ -219,7 +258,8 @@ class Player {
   takeDamage(amount, knockback = 0) {
     if (this.invulnerableTimer > 0 || this.dead) return;
     this.hp = Math.max(0, this.hp - amount);
-    this.invulnerableTimer = 55;
+    this.invulnerableTimer = Math.round(55 * this.mods.hurtInvuln);
+    if (window.gameInstance && window.gameInstance.runHooks) window.gameInstance.runHooks('onPlayerHurt', amount);
     this.vx = knockback;
     this.vy = -4.5;
     // Destello blanco + aplastamiento por el impacto
@@ -455,7 +495,7 @@ class Player {
     anchor.y = this.y + 17;
 
     // El viento que jala Ruben empuja la bufanda hacia atrás
-    const speed = Math.max(Math.min(1, Math.abs(this.vx) / this.speed), (this.windPose || 0) * 0.95);
+    const speed = Math.max(Math.min(1, Math.abs(this.vx) / this.speed), this.armPose().pose * 0.95);
     const back = -this.facing;
     const t = Date.now() * 0.008;
     for (let i = 1; i < this.capePoints.length; i++) {
@@ -492,7 +532,8 @@ class Player {
     const idle = this.isGrounded && Math.abs(this.vx) < 0.3 && !this.isAttacking;
     // Pose "Jalar el Aire" (js/wind-pull.js): 0 = normal, 1 = agachado, inclinado hacia atrás,
     // piernas abiertas y la mano libre extendida con la palma abierta tirando del viento
-    const wp = this.windPose || 0;
+    const arm = this.armPose();
+    const wp = arm.pose;
     const windTremble = wp ? Math.sin(t * 47) * 0.5 * wp : 0;
 
     // Squash & stretch: resorte (aterrizaje/salto/golpe) + estirón por velocidad vertical
@@ -659,8 +700,8 @@ class Player {
     // 4b. Brazo libre extendido hacia adelante con la palma abierta (Jalar el Aire)
     if (wp > 0.02) {
       const reach = 6 + 9 * wp;
-      // windAim: hacia dónde apunta la palma (ratón / stick derecho), 0 = adelante, <0 = arriba
-      const rel = (this.windAim || 0) * wp;
+      // arm.aim: hacia dónde apunta la palma (ratón / stick derecho), 0 = adelante, <0 = arriba
+      const rel = arm.aim * wp;
       const ca = Math.cos(rel), sa = Math.sin(rel);
       const ax0 = cx + f * 1, ay0 = sy + 20;
       const ax1 = ax0 + f * ca * (reach - 1), ay1 = ay0 - 1.5 * ca + sa * (reach - 1) + Math.sin(t * 21) * 0.5 * wp;
