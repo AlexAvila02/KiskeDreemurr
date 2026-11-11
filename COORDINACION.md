@@ -517,3 +517,8 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/journal.js` `statRadar()`: la zona pendiente (máximo 5 en cada eje) se dibuja rayada en azul con `<pattern id="radar-hatch">`; la zona entrenada es sólida naranja (`#e0892b`) con borde marrón grueso; los puntos tienen borde crema. Se agregó leyenda "Entrenado / Por entrenar".
 - `css/journal.css`: reglas `.radar-pending`, `.radar-shape`, `.radar-dot`, `.stat-radar-legend`.
 - Verificado: `scripts/check-project.js` (0 errores). Pendiente: playtest visual con niveles entrenados en el Diario (el navegador integrado no pudo abrir el juego en vivo).
+
+## Radar: números enteros sin tope visible (Claude, 11/11, pedido del usuario)
+- `js/journal.js`: `STAT_MAX` pasa de 5 a 100 (tope interno, no se muestra). Los anillos del radar son decorativos y sin números; el valor de cada eje es solo el nivel entero (sin "/5"). La fila dice "Nivel N" y las notificaciones/diálogos de entrenamiento dicen "nivel N".
+- Nota de balance: `statMult` sigue siendo `1 + step × nivel`, así que a nivel 100 el movimiento queda ~6× y el daño ~11×. Pendiente de ajuste si el usuario lo pide.
+- Verificado: `scripts/check-project.js` (0 errores). Playtest en navegador: pendiente.

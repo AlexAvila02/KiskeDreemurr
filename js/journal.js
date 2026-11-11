@@ -79,7 +79,7 @@
   // ------------------------------------------------------------------
   // Estadísticas de Ruben (pestaña ESTADÍSTICAS del Diario)
   // ------------------------------------------------------------------
-  const STAT_MAX = 5;                // niveles de entrenamiento por estadística
+  const STAT_MAX = 100;              // tope interno de entrenamiento por estadística (el jugador no lo ve)
   const BASE_DAMAGE = 15;            // daño del tajo básico (player.js: 15 * mods.attackDamage)
   const BASE_ATTACK_FRAMES = 18;     // cuadros entre tajos sin mejoras (player.js)
   const STATS = {
@@ -560,8 +560,8 @@
       this.refreshHeader();
       const sm = window.soundManager;
       if (sm && sm.playUnlockAbility) try { sm.playUnlockAbility(); } catch (e) { /* */ }
-      this.game.showNotification(`${STATS[id].name} · nivel ${this.statLevel(id)}/${STAT_MAX}`);
-      return `${STATS[id].trainText} (${STATS[id].name}: nivel ${this.statLevel(id)}/${STAT_MAX}).`;
+      this.game.showNotification(`${STATS[id].name} · nivel ${this.statLevel(id)}`);
+      return `${STATS[id].trainText} (${STATS[id].name}: nivel ${this.statLevel(id)}).`;
     }
 
     // Equipa / quita un objeto del diario (hasta EQUIP_SLOTS)
@@ -932,8 +932,9 @@
         '<rect width="6" height="6" fill="#fffaf0"/>' +
         '<path d="M0,6 L6,0 M-3,3 L3,-3 M3,9 L9,3" stroke="#4a6fa5" stroke-width="1.3"/>' +
         '</pattern></defs>';
-      for (let ring = 1; ring <= STAT_MAX; ring++) {
-        const pts = STAT_ORDER.map((_, i) => pt(i, ring / STAT_MAX).map(f).join(',')).join(' ');
+      // Anillos decorativos sin números: no revelan el tope
+      for (let ring = 1; ring <= 4; ring++) {
+        const pts = STAT_ORDER.map((_, i) => pt(i, ring / 4).map(f).join(',')).join(' ');
         svg += `<polygon class="radar-ring" points="${pts}"/>`;
       }
       // Zona pendiente: el máximo en cada eje, rayada en azul (lo que falta por entrenar)
@@ -955,7 +956,7 @@
         const [lx, ly] = pt(i, labelR / R);
         const anchor = i === 1 ? 'start' : (i === 3 ? 'end' : 'middle');
         svg += `<text class="radar-label" x="${f(lx)}" y="${f(ly)}" text-anchor="${anchor}">${STATS[id].short}</text>`;
-        svg += `<text class="radar-level" x="${f(lx)}" y="${f(ly + 12)}" text-anchor="${anchor}">${lvl}/${STAT_MAX}</text>`;
+        svg += `<text class="radar-level" x="${f(lx)}" y="${f(ly + 12)}" text-anchor="${anchor}">${lvl}</text>`;
       });
       const wrap = el('div', 'stat-radar-wrap');
       wrap.innerHTML = `<svg class="stat-radar" viewBox="0 0 260 232" role="img" ` +
@@ -980,7 +981,7 @@
         head.appendChild(el('span', 'stat-value', this.statText(id)));
         row.appendChild(head);
         const eb = this.equipBonus(id);
-        const meta = `Entrenamiento ${this.statLevel(id)}/${STAT_MAX}` + (eb ? ` · equipo +${Math.round(eb * 100)}%` : '') +
+        const meta = `Nivel ${this.statLevel(id)}` + (eb ?` · equipo +${Math.round(eb * 100)}%` : '') +
           ` · Entrenan: ${this.trainersOf(id)}`;
         row.appendChild(el('div', 'stat-meta', meta));
         sec.appendChild(row);
