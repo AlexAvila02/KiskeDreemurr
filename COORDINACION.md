@@ -522,3 +522,8 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/journal.js`: `STAT_MAX` pasa de 5 a 100 (tope interno, no se muestra). Los anillos del radar son decorativos y sin números; el valor de cada eje es solo el nivel entero (sin "/5"). La fila dice "Nivel N" y las notificaciones/diálogos de entrenamiento dicen "nivel N".
 - Nota de balance: `statMult` sigue siendo `1 + step × nivel`, así que a nivel 100 el movimiento queda ~6× y el daño ~11×. Pendiente de ajuste si el usuario lo pide.
 - Verificado: `scripts/check-project.js` (0 errores). Playtest en navegador: pendiente.
+
+## Atajo Ñ + número para ir a una sala (Claude, 11/11, pedido del usuario)
+- Nuevo `js/room-shortcuts.js` (cargado en `index.html` antes de `main.js`): pulsar **Ñ** y luego un número (uno o más dígitos, teclado o numpad) lleva a Ruben a esa sala (`world.rooms[n]`). Se confirma solo a los ~0,6 s o con Enter; Escape u otra tecla cancela; Retroceso borra un dígito. Un cartel arriba muestra "Ir a sala: n" y luego el nombre de la sala, o "No existe la sala n".
+- Ruben aparece en el `targetX/targetY` de alguna salida que apunte a esa sala (o en 80,100 si no hay). Si llevaba una piedra, la suelta. Solo funciona jugando y sin pausa ni menú de controles abierto. No toca `main.js` (escucha en fase de captura y frena los dígitos mientras el atajo está activo).
+- Verificado: `scripts/check-project.js` (0 errores, 13 salas) y playtest en navegador: Ñ+5, Ñ+12+Enter, Ñ+3 (numpad) y Ñ+8 con teclas reales cambian de sala; Ñ+99 muestra "No existe"; caminar y saltar después siguen bien, sin errores de consola.
