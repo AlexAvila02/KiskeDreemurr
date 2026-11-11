@@ -9,6 +9,8 @@ class SoundManager {
     this.ambientOscs = [];
     this.arpeggioTimer = null;
     this.lagunaThemeTimer = null;
+    this.lagunaFadeTimer = null;
+    this.lagunaGain = null;
     this.isLagunaActive = false;
     this.lagunaPhraseIdx = 0;
     this.currentBiome = 'pradera';
@@ -55,6 +57,7 @@ class SoundManager {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AudioCtx();
+      this.ensureLagunaGain();
       this.initialized = true;
       this.startMeadowAmbience();
       if (this.isLagunaActive) {
@@ -64,6 +67,16 @@ class SoundManager {
     } catch (e) {
       console.warn("Web Audio API no soportada:", e);
     }
+  }
+
+  ensureLagunaGain() {
+    if (!this.ctx) return null;
+    if (!this.lagunaGain) {
+      this.lagunaGain = this.ctx.createGain();
+      this.lagunaGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      this.lagunaGain.connect(this.ctx.destination);
+    }
+    return this.lagunaGain;
   }
 
   // Sonido de Salto normal (ágil y cálido)
@@ -310,6 +323,9 @@ class SoundManager {
   // Reproduce una nota de arpa de cristal / campana acuática con sutil eco de caverna
   playLagunaNote(freq, offsetSec = 0, duration = 2.4) {
     if (!this.ctx || this.isMuted || document.hidden) return;
+    const masterGain = this.ensureLagunaGain();
+    if (!masterGain) return;
+
     const now = this.ctx.currentTime + offsetSec;
     if (now < this.ctx.currentTime) return;
 
@@ -331,7 +347,7 @@ class SoundManager {
 
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(masterGain);
 
     osc.start(now);
     osc.stop(now + duration + 0.05);
@@ -358,7 +374,7 @@ class SoundManager {
 
     echoOsc.connect(echoFilter);
     echoFilter.connect(echoGain);
-    echoGain.connect(this.ctx.destination);
+    echoGain.connect(masterGain);
 
     echoOsc.start(echoNow);
     echoOsc.stop(echoNow + echoDuration + 0.05);
@@ -368,8 +384,10 @@ class SoundManager {
   scheduleNextLagunaPhrase() {
     if (!this.isLagunaActive || !this.ctx) return;
 
-    const phrase = SoundManager.LAGUNA_PHRASES[this.lagunaPhraseIdx % SoundManager.LAGUNA_PHRASES.length];
-    this.lagunaPhraseIdx = (this.lagunaPhraseIdx + 1) % SoundManager.LAGUNA_PHRASES.length;
+    const phrases = SoundManager.LAGUNA_PHRASES;
+    const currentIdx = this.lagunaPhraseIdx % phrases.length;
+    const phrase = phrases[currentIdx];
+    this.lagunaPhraseIdx = (this.lagunaPhraseIdx + 1) % phrases.length;
 
     let maxEndTime = 0;
     phrase.forEach(item => {
@@ -378,8 +396,9 @@ class SoundManager {
       if (end > maxEndTime) maxEndTime = end;
     });
 
-    // Silencio meditativo entre frases (armoniza con el sonido ambiente de agua)
-    const pauseBetween = 4.0;
+    // Pausa meditativa musical: breve entre frases (1.2s), y al completar el ciclo (frase 4 -> frase 1) un respiro de 1.8s
+    const isCycleEnd = (this.lagunaPhraseIdx === 0);
+    const pauseBetween = isCycleEnd ? 1.8 : 1.2;
     const nextCallMs = (maxEndTime + pauseBetween) * 1000;
 
     this.lagunaThemeTimer = setTimeout(() => {
@@ -389,29 +408,59 @@ class SoundManager {
 
   // Entra al tema musical de la Laguna del Maestro
   enterLagunaTheme() {
-    if (this.isLagunaActive && this.lagunaThemeTimer) return;
+    if (this.lagunaFadeTimer) {
+      clearTimeout(this.lagunaFadeTimer);
+      this.lagunaFadeTimer = null;
+    }
+
     this.isLagunaActive = true;
     if (!this.ctx) return;
 
     this.setBiomeAmbience('laguna');
 
-    if (this.lagunaThemeTimer) {
-      clearTimeout(this.lagunaThemeTimer);
-      this.lagunaThemeTimer = null;
+    const masterGain = this.ensureLagunaGain();
+    if (masterGain) {
+      const now = this.ctx.currentTime;
+      masterGain.gain.cancelScheduledValues(now);
+      const currentGain = Math.max(0.00001, masterGain.gain.value);
+      masterGain.gain.setValueAtTime(currentGain, now);
+      masterGain.gain.linearRampToValueAtTime(1.0, now + 1.5);
     }
 
-    this.lagunaPhraseIdx = 0;
-    this.scheduleNextLagunaPhrase();
+    if (!this.lagunaThemeTimer) {
+      this.lagunaPhraseIdx = 0;
+      this.scheduleNextLagunaPhrase();
+    }
   }
 
-  // Sale del tema de la Laguna del Maestro y restaura el bioma de destino
+  // Sale del tema de la Laguna del Maestro y restaura el bioma de destino de forma gradual
   leaveLagunaTheme(targetBiome = 'pradera') {
     this.isLagunaActive = false;
-    if (this.lagunaThemeTimer) {
-      clearTimeout(this.lagunaThemeTimer);
-      this.lagunaThemeTimer = null;
-    }
     this.setBiomeAmbience(targetBiome);
+
+    if (this.lagunaFadeTimer) {
+      clearTimeout(this.lagunaFadeTimer);
+      this.lagunaFadeTimer = null;
+    }
+
+    if (this.lagunaGain && this.ctx) {
+      const now = this.ctx.currentTime;
+      this.lagunaGain.gain.cancelScheduledValues(now);
+      const currentGain = Math.max(0.00001, this.lagunaGain.gain.value);
+      this.lagunaGain.gain.setValueAtTime(currentGain, now);
+      this.lagunaGain.gain.linearRampToValueAtTime(0.00001, now + 2.5);
+    }
+
+    // Cancelar el temporizador del secuenciador tras completar el fade-out
+    this.lagunaFadeTimer = setTimeout(() => {
+      if (!this.isLagunaActive) {
+        if (this.lagunaThemeTimer) {
+          clearTimeout(this.lagunaThemeTimer);
+          this.lagunaThemeTimer = null;
+        }
+      }
+      this.lagunaFadeTimer = null;
+    }, 2600);
   }
 }
 

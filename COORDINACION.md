@@ -404,4 +404,22 @@ Formato: `- [fecha] Qué cambió · archivos · qué probar.` Claude lo prueba y
   - Se afinó el decaimiento de las notas (`exponentialRampToValueAtTime`) a valores asintóticos inaudibles (`0.00001`) antes del `stop()` para evitar cualquier micro-clic al cortar la reproducción.
   - Verificado con `node scripts/check-project.js` (0 errores).
 
+## Cambio puntual de Gemini (11/11, pedido del usuario): Eliminación del hilo punteado entre Ruben y la esfera guiada de agua
+- **js/water.js** (`drawControl`):
+  - A petición explícita del usuario ("elmina los puntos que unen la esfera de agua con ruben al usar la habilidad"), se eliminó el trazo punteado/hilo de agua (`ctx.setLineDash([3, 7])`) que unía la mano de Ruben con la esfera guiada (`guide.on`).
+  - Se conserva íntegro el halo celeste radial exterior de la esfera, su estela de partículas y el renderizado principal del orbe (`drawOrbAt`).
+  - Verificado con `node scripts/check-project.js` (0 errores).
+
+## Ajuste de Audio de Gemini (11/11, pedido del usuario): Bucle continuo y Crossfade gradual en la Laguna del Maestro
+- **js/audio.js** (Zona libre de Gemini):
+  - Solucionado el problema reportado por el usuario ("solo se reproduce una vez el tema, tiene que sonar mientras este en la sala y al salir de ella debe cambiar gradualmente"):
+    - **Bucle musical continuo ininterrumpido**: El secuenciador `scheduleNextLagunaPhrase()` encadena cíclicamente las 4 frases melódicas en Re Lidio con una cadencia natural (pausa de 1.2s entre frases y 1.8s de respiro lírico al culminar la Frase 4 antes de reiniciar la Frase 1), manteniéndose activo sin detenerse mientras Ruben permanezca en la Laguna (Sala 12).
+    - **Master Gain y Crossfade gradual**:
+      - Se implementó `this.lagunaGain` como Master Gain de la laguna, conectando tanto las notas directas como sus ecos a dicho nodo.
+      - `enterLagunaTheme()`: Desvanece la ganancia hacia 1.0 en ~1.5s mediante `linearRampToValueAtTime`, arrancando el bucle si no estaba activo y cancelando cualquier temporizador de fade previo.
+      - `leaveLagunaTheme(targetBiome)`: Marca la sala como inactiva, restaura de inmediato el bioma ambiental objetivo y realiza un fade-out gradual en `this.lagunaGain.gain` de su volumen actual a `0.00001` en 2.5s. Cancela el secuenciador a los 2.6s tras culminar el desvanecimiento para evitar cortes secos de notas en reproducción.
+  - Verificado con `node scripts/check-project.js` (0 errores).
+
+
+
 
