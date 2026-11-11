@@ -512,3 +512,8 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/journal.js`: fuera `totalPoints`/`availablePoints`/`fragments`, el contador de puntos de la cabecera, el badge ✦ del HUD y sus notificaciones. El subtítulo del Diario muestra `EMBLEMAS x/y · VALOR n`. `css/journal.css`: fuera `.journal-points`.
 - `js/npcs.js` y `MAPA.md`: textos actualizados (ya no dicen "1 ✦").
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador: entrenamientos sin puntos suben dmg/move/def, sin errores de consola y sin badge ni contador en el HUD/Diario.
+
+## Radar: contraste entrenado vs. pendiente (Claude, 11/11, pedido del usuario)
+- `js/journal.js` `statRadar()`: la zona pendiente (máximo 5 en cada eje) se dibuja rayada en azul con `<pattern id="radar-hatch">`; la zona entrenada es sólida naranja (`#e0892b`) con borde marrón grueso; los puntos tienen borde crema. Se agregó leyenda "Entrenado / Por entrenar".
+- `css/journal.css`: reglas `.radar-pending`, `.radar-shape`, `.radar-dot`, `.stat-radar-legend`.
+- Verificado: `scripts/check-project.js` (0 errores). Pendiente: playtest visual con niveles entrenados en el Diario (el navegador integrado no pudo abrir el juego en vivo).

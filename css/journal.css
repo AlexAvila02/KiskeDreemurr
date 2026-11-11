@@ -220,12 +220,17 @@
 .stat-name { font-weight: 700; font-size: 14px; }
 .stat-value { font-size: 12.5px; color: #7a5230; font-variant-numeric: tabular-nums; }
 /* Radar de estadísticas (journal.js → statRadar) */
-.stat-radar-wrap { display: flex; justify-content: center; margin: 2px 0 10px; }
+.stat-radar-wrap { display: flex; flex-direction: column; align-items: center; margin: 2px 0 10px; }
 .stat-radar { width: 100%; max-width: 280px; height: auto; overflow: visible; }
 .stat-radar .radar-ring { fill: rgba(255, 250, 235, 0.45); stroke: rgba(58, 36, 22, 0.35); stroke-width: 1; stroke-dasharray: 3 3; }
 .stat-radar .radar-axis { stroke: rgba(58, 36, 22, 0.35); stroke-width: 1; }
-.stat-radar .radar-shape { fill: rgba(217, 166, 52, 0.35); stroke: #3a2416; stroke-width: 2; stroke-linejoin: round; }
-.stat-radar .radar-dot { stroke: #3a2416; stroke-width: 1.5; }
+.stat-radar .radar-pending { fill: url(#radar-hatch); stroke: #4a6fa5; stroke-width: 1.5; stroke-dasharray: 4 3; stroke-linejoin: round; }
+.stat-radar .radar-shape { fill: #e0892b; fill-opacity: 0.85; stroke: #3a2416; stroke-width: 2.5; stroke-linejoin: round; }
+.stat-radar .radar-dot { stroke: #fffaf0; stroke-width: 2; }
+.stat-radar-legend { display: flex; justify-content: center; gap: 16px; font-size: 12px; font-weight: 700; color: #3a2416; margin-top: 2px; }
+.stat-radar-legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -2px; border: 1.5px solid #3a2416; }
+.stat-radar-legend .lg-trained::before { background: #e0892b; }
+.stat-radar-legend .lg-pending::before { border-color: #4a6fa5; background: repeating-linear-gradient(45deg, #4a6fa5 0 2px, #fffaf0 2px 6px); }
 .stat-radar .radar-dot.stat-dmg { fill: #b83b3b; }
 .stat-radar .radar-dot.stat-atk { fill: #d9a634; }
 .stat-radar .radar-dot.stat-def { fill: #4a6fa5; }

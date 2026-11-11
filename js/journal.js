@@ -927,15 +927,23 @@
         const a = -Math.PI / 2 + i * (Math.PI / 2); // eje 0 arriba, luego sentido horario
         return [cx + Math.cos(a) * R * frac, cy + Math.sin(a) * R * frac];
       };
-      let svg = '';
+      // Patrón rayado para la zona pendiente (lo que aún no se entrena)
+      let svg = '<defs><pattern id="radar-hatch" patternUnits="userSpaceOnUse" width="6" height="6">' +
+        '<rect width="6" height="6" fill="#fffaf0"/>' +
+        '<path d="M0,6 L6,0 M-3,3 L3,-3 M3,9 L9,3" stroke="#4a6fa5" stroke-width="1.3"/>' +
+        '</pattern></defs>';
       for (let ring = 1; ring <= STAT_MAX; ring++) {
         const pts = STAT_ORDER.map((_, i) => pt(i, ring / STAT_MAX).map(f).join(',')).join(' ');
         svg += `<polygon class="radar-ring" points="${pts}"/>`;
       }
+      // Zona pendiente: el máximo en cada eje, rayada en azul (lo que falta por entrenar)
+      const maxPts = STAT_ORDER.map((_, i) => pt(i, 1).map(f).join(',')).join(' ');
+      svg += `<polygon class="radar-pending" points="${maxPts}"/>`;
       STAT_ORDER.forEach((_, i) => {
         const [x, y] = pt(i, 1);
         svg += `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${f(x)}" y2="${f(y)}"/>`;
       });
+      // Zona entrenada: sólida en naranja fuerte, encima de la zona pendiente
       const shape = STAT_ORDER.map((id, i) => pt(i, this.statLevel(id) / STAT_MAX).map(f).join(',')).join(' ');
       svg += `<polygon class="radar-shape" points="${shape}"/>`;
       STAT_ORDER.forEach((id, i) => {
@@ -951,7 +959,9 @@
       });
       const wrap = el('div', 'stat-radar-wrap');
       wrap.innerHTML = `<svg class="stat-radar" viewBox="0 0 260 232" role="img" ` +
-        `aria-label="Gráfico de radar de las estadísticas de Ruben">${svg}</svg>`;
+        `aria-label="Gráfico de radar de las estadísticas de Ruben">${svg}</svg>` +
+        `<div class="stat-radar-legend"><span class="lg-trained">Entrenado</span>` +
+        `<span class="lg-pending">Por entrenar</span></div>`;
       return wrap;
     }
 
