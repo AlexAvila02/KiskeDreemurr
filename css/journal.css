@@ -244,15 +244,19 @@
 .stat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .stat-name { font-weight: 700; font-size: 14px; }
 .stat-value { font-size: 12.5px; color: #7a5230; font-variant-numeric: tabular-nums; }
-.stat-bar { display: flex; gap: 4px; margin: 4px 0 2px; }
-.stat-pip {
-  flex: 1; height: 9px; border: 1.5px solid #3a2416; border-radius: 3px; background: rgba(255, 250, 235, 0.6);
-}
-.stat-pip.on { background: #d9a634; box-shadow: 0 0 4px rgba(217, 166, 52, 0.6); }
-.stat-dmg .stat-pip.on { background: #b83b3b; box-shadow: 0 0 4px rgba(184, 59, 59, 0.5); }
-.stat-atk .stat-pip.on { background: #d9a634; }
-.stat-def .stat-pip.on { background: #4a6fa5; box-shadow: 0 0 4px rgba(74, 111, 165, 0.5); }
-.stat-move .stat-pip.on { background: #3f7d5a; box-shadow: 0 0 4px rgba(63, 125, 90, 0.5); }
+/* Radar de estadísticas (journal.js → statRadar) */
+.stat-radar-wrap { display: flex; justify-content: center; margin: 2px 0 10px; }
+.stat-radar { width: 100%; max-width: 280px; height: auto; overflow: visible; }
+.stat-radar .radar-ring { fill: rgba(255, 250, 235, 0.45); stroke: rgba(58, 36, 22, 0.35); stroke-width: 1; stroke-dasharray: 3 3; }
+.stat-radar .radar-axis { stroke: rgba(58, 36, 22, 0.35); stroke-width: 1; }
+.stat-radar .radar-shape { fill: rgba(217, 166, 52, 0.35); stroke: #3a2416; stroke-width: 2; stroke-linejoin: round; }
+.stat-radar .radar-dot { stroke: #3a2416; stroke-width: 1.5; }
+.stat-radar .radar-dot.stat-dmg { fill: #b83b3b; }
+.stat-radar .radar-dot.stat-atk { fill: #d9a634; }
+.stat-radar .radar-dot.stat-def { fill: #4a6fa5; }
+.stat-radar .radar-dot.stat-move { fill: #3f7d5a; }
+.stat-radar .radar-label { font-family: 'Cinzel', serif; font-weight: 700; font-size: 11px; fill: #3a2416; }
+.stat-radar .radar-level { font-size: 10px; fill: #7a5230; font-variant-numeric: tabular-nums; }
 .stat-meta { font-size: 11.5px; color: #8c5a2b; font-style: italic; }
 .stats-equip-list { display: flex; flex-direction: column; gap: 6px; }
 .stat-equip {

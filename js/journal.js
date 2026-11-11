@@ -87,10 +87,10 @@
   const BASE_DAMAGE = 15;            // daño del tajo básico (player.js: 15 * mods.attackDamage)
   const BASE_ATTACK_FRAMES = 18;     // cuadros entre tajos sin mejoras (player.js)
   const STATS = {
-    dmg:  { name: 'Daño básico', step: 0.10, trainText: 'El maestro te hace repetir el tajo hasta que los brazos pesan, y el golpe pesa más.' },
-    atk:  { name: 'Velocidad de ataque', step: 0.08, trainText: 'Te enseña a volver a la guardia sin pensarlo: las manos ganan ritmo.' },
-    def:  { name: 'Defensa', step: 0.06, trainText: 'Te hace cubrirte con el brazo una y otra vez: ahora los golpes te encuentran menos.' },
-    move: { name: 'Velocidad de movimiento', step: 0.05, trainText: 'Corren cuesta arriba y cuesta abajo: el cuerpo aprende a ir liviano.' }
+    dmg:  { name: 'Daño básico', short: 'Daño', step: 0.10, trainText: 'El maestro te hace repetir el tajo hasta que los brazos pesan, y el golpe pesa más.' },
+    atk:  { name: 'Velocidad de ataque', short: 'Ritmo', step: 0.08, trainText: 'Te enseña a volver a la guardia sin pensarlo: las manos ganan ritmo.' },
+    def:  { name: 'Defensa', short: 'Defensa', step: 0.06, trainText: 'Te hace cubrirte con el brazo una y otra vez: ahora los golpes te encuentran menos.' },
+    move: { name: 'Velocidad de movimiento', short: 'Veloc.', step: 0.05, trainText: 'Corren cuesta arriba y cuesta abajo: el cuerpo aprende a ir liviano.' }
   };
   const STAT_ORDER = ['dmg', 'atk', 'def', 'move'];
   const EQUIP_SLOTS = 2;             // objetos equipados a la vez
@@ -956,22 +956,57 @@
       }
     }
 
-    // Pestaña ESTADÍSTICAS: las 4 estadísticas de Ruben y los objetos equipados
+    // Gráfico de radar de las 4 estadísticas: cada eje es una estadística y el nivel
+    // (0 a STAT_MAX) indica qué tan lejos del centro llega la forma. Al inicio todas están en 0.
+    statRadar() {
+      const cx = 130, cy = 112, R = 70, labelR = R + 22;
+      const f = n => n.toFixed(1);
+      const pt = (i, frac) => {
+        const a = -Math.PI / 2 + i * (Math.PI / 2); // eje 0 arriba, luego sentido horario
+        return [cx + Math.cos(a) * R * frac, cy + Math.sin(a) * R * frac];
+      };
+      let svg = '';
+      for (let ring = 1; ring <= STAT_MAX; ring++) {
+        const pts = STAT_ORDER.map((_, i) => pt(i, ring / STAT_MAX).map(f).join(',')).join(' ');
+        svg += `<polygon class="radar-ring" points="${pts}"/>`;
+      }
+      STAT_ORDER.forEach((_, i) => {
+        const [x, y] = pt(i, 1);
+        svg += `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${f(x)}" y2="${f(y)}"/>`;
+      });
+      const shape = STAT_ORDER.map((id, i) => pt(i, this.statLevel(id) / STAT_MAX).map(f).join(',')).join(' ');
+      svg += `<polygon class="radar-shape" points="${shape}"/>`;
+      STAT_ORDER.forEach((id, i) => {
+        const lvl = this.statLevel(id);
+        if (lvl > 0) {
+          const [x, y] = pt(i, lvl / STAT_MAX);
+          svg += `<circle class="radar-dot stat-${id}" cx="${f(x)}" cy="${f(y)}" r="3.5"/>`;
+        }
+        const [lx, ly] = pt(i, labelR / R);
+        const anchor = i === 1 ? 'start' : (i === 3 ? 'end' : 'middle');
+        svg += `<text class="radar-label" x="${f(lx)}" y="${f(ly)}" text-anchor="${anchor}">${STATS[id].short}</text>`;
+        svg += `<text class="radar-level" x="${f(lx)}" y="${f(ly + 12)}" text-anchor="${anchor}">${lvl}/${STAT_MAX}</text>`;
+      });
+      const wrap = el('div', 'stat-radar-wrap');
+      wrap.innerHTML = `<svg class="stat-radar" viewBox="0 0 260 232" role="img" ` +
+        `aria-label="Gráfico de radar de las estadísticas de Ruben">${svg}</svg>`;
+      return wrap;
+    }
+
+    // Pestaña ESTADÍSTICAS: las 4 estadísticas de Ruben (radar + filas de texto) y los objetos equipados
     renderStats() {
       const box = this.modal.querySelector('#journal-stats');
       box.innerHTML = '';
 
       const sec = el('div', 'stats-section');
       sec.appendChild(el('div', 'stats-title', 'RUBEN'));
+      sec.appendChild(this.statRadar());
       for (const id of STAT_ORDER) {
         const row = el('div', 'stat-row stat-' + id);
         const head = el('div', 'stat-head');
         head.appendChild(el('span', 'stat-name', STATS[id].name));
         head.appendChild(el('span', 'stat-value', this.statText(id)));
         row.appendChild(head);
-        const bar = el('div', 'stat-bar');
-        for (let i = 0; i < STAT_MAX; i++) bar.appendChild(el('span', 'stat-pip' + (i < this.statLevel(id) ? ' on' : '')));
-        row.appendChild(bar);
         const eb = this.equipBonus(id);
         const meta = `Entrenamiento ${this.statLevel(id)}/${STAT_MAX}` + (eb ? ` · equipo +${Math.round(eb * 100)}%` : '') +
           ` · Entrenan: ${this.trainersOf(id)}`;

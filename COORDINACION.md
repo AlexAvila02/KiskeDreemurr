@@ -500,3 +500,9 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - **css/style.css**: bloque `.stamina-bar` / `.stamina-fill`.
 - Verificado: `check-project.js` (0 errores) y playtest en Chromium (Playwright): barra visible tras desbloquear el viento, baja al usar, sube al soltar, se agota y no reactiva bloqueada, recarga y reinicio. Sin errores de consola.
 - **Falta playtest** del agua con la barra (sala del Maestro del Agua) y del ajuste de tiempos con mando.
+
+## Radar de estadísticas (Claude, 11/11, pedido del usuario)
+- El Diario → ESTADÍSTICAS ya no usa barras de pips: ahora hay un **gráfico de radar** (SVG) con los cuatro ejes (Daño arriba, Ritmo derecha, Defensa abajo, Veloc. izquierda), escala 0 a 5 por eje, con el nivel de cada una marcado y su valor al lado del eje.
+- Al iniciar el juego todas las estadísticas están en **0** (mínimo), así que la forma arranca como un rombo vacío en el centro.
+- `js/journal.js`: nuevo `statRadar()`, nombre corto `short` en `STATS`, y `renderStats()` lo muestra arriba de las filas de texto. `css/journal.css`: bloque `.stat-radar` (se quitaron las reglas `.stat-bar`/`.stat-pip`).
+- Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (Nueva partida → Diario → Estadísticas): el radar renderiza con las cuatro etiquetas y todos los ejes en 0/5. Pendiente: ver el radar con niveles entrenados (polígono relleno y puntos de color).
