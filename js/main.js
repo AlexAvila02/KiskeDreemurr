@@ -595,6 +595,15 @@ class Game {
     if (this.typeInterval) clearInterval(this.typeInterval);
     this.dialogTyping = false;
     this.dialogBox.classList.add('hidden');
+    this.placeNotification();
+  }
+
+  // Diálogo y aviso ocupan el mismo lugar (arriba al centro). Si hay un diálogo abierto,
+  // el aviso baja a la parte inferior para que no se encimen.
+  placeNotification() {
+    if (!this.notification) return;
+    const dialogOpen = !!this.dialogBox && !this.dialogBox.classList.contains('hidden');
+    this.notification.classList.toggle('notif-low', dialogOpen);
   }
 
   checkInteractions() {
@@ -614,6 +623,7 @@ class Game {
       if (Math.hypot(px - nx, py - ny) < 50) {
         if (this.player.keys >= room.door.requiredKeys) {
           room.door.isLocked = false;
+          room.door.openedAt = Date.now(); // dispara la animación de apertura (js/world.js)
           window.soundManager.playDoorUnlock();
           this.triggerScreenShake(8, 250);
           this.showNotification("¡El Portón Norte se abrió!");
@@ -697,12 +707,10 @@ class Game {
   }
 
   showDialog(speaker, text, auto = false) {
-    // Las notas usan el mismo lugar que los avisos: ocultar el aviso para que no se encimen
-    if (this.notificationTimer) clearTimeout(this.notificationTimer);
-    this.notification.classList.add('hidden');
     this.dialogSpeaker.textContent = speaker;
     this.dialogBox.classList.remove('hidden', 'typed');
     this.dialogBox.classList.toggle('auto', !!auto);
+    this.placeNotification(); // el aviso (si sigue en pantalla) se mueve abajo, no se encima
     this.retriggerClass(this.dialogBox, 'dialog-pop');
     window.soundManager.playPickup();
 
@@ -738,6 +746,7 @@ class Game {
   showNotification(msg) {
     if (this.notificationTimer) clearTimeout(this.notificationTimer);
     this.notification.textContent = msg;
+    this.placeNotification();
     this.notification.classList.remove('hidden');
     this.retriggerClass(this.notification, 'notify-pop');
     this.notificationTimer = setTimeout(() => {

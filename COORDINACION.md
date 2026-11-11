@@ -476,3 +476,11 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - **js/water-core.js** (`addPuddle`):
   - Conectado el disparo de `window.soundManager.playWaterGroundImpact(intensity)` cada vez que el agua cae y choca contra una plataforma o el suelo (`pl`), cubriendo orbes lanzados, esfera guiada reventada y agua caída de la mano.
 - Verificado con `node scripts/check-project.js` (0 errores).
+
+## Pantalla de inicio, portón animado y avisos (Claude, 11/11, pedido del usuario)
+- **js/main.js**: el aviso (`notification`) baja abajo (`placeNotification`) mientras hay un diálogo abierto (Maestro, notas), así no se encima con el diálogo. Al desbloquear el portón se fija `door.openedAt`.
+- **js/world.js**: el portón abierto anima la hoja girando hacia atrás sobre la bisagra y queda abierta, sin marco.
+- **js/save-game.js** (nuevo): botones NUEVA PARTIDA · CONTINUAR · OPCIONES. Guarda sala, posición, llaves y estado de salas en `ruben_partida_v1` (al cambiar de sala, al ir al menú y cada ~2 s). NUEVA PARTIDA pide confirmación si hay partida guardada.
+- **index.html / css/style.css**: botones nuevos, CONTINUAR apagado sin partida guardada.
+- Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (menú, puerta, aviso sobre diálogo, continuar, nueva partida). Sin errores de consola.
+- Pendiente: el estado de la escena del Maestro (macetas/campanas) no se guarda; al continuar se reinicia esa sala.

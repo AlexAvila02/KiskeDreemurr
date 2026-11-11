@@ -519,30 +519,52 @@ class World {
 
     // 5. Dibujar Portón Norte
     if (room.door) {
-      const dx = room.door.x - camera.x;
-      const dy = room.door.y - camera.y;
+      const d = room.door;
+      const dx = d.x - camera.x;
+      const dy = d.y - camera.y;
 
       ctx.save();
-      if (room.door.isLocked) {
+      if (d.isLocked) {
         ctx.fillStyle = '#593a22';
         ctx.strokeStyle = OUT;
         ctx.lineWidth = 2.5;
-        ctx.fillRect(dx, dy, room.door.width, room.door.height);
-        ctx.strokeRect(dx, dy, room.door.width, room.door.height);
+        ctx.fillRect(dx, dy, d.width, d.height);
+        ctx.strokeRect(dx, dy, d.width, d.height);
 
         // Herrajes de hierro y candado dorado
         ctx.fillStyle = '#d9a634';
         ctx.shadowColor = '#ffb700';
         ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(dx + room.door.width / 2, dy + room.door.height / 2, 7, 0, Math.PI * 2);
+        ctx.arc(dx + d.width / 2, dy + d.height / 2, 7, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       } else {
-        ctx.fillStyle = 'rgba(180, 140, 80, 0.18)';
-        ctx.strokeStyle = '#7c5e3d';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(dx, dy, room.door.width, room.door.height);
+        // Portón abierto: la hoja gira hacia atrás sobre la bisagra (borde izquierdo),
+        // se aleja del jugador (se encoge y se oscurece) y queda abierta. Sin marco.
+        // openedAt lo fija main.js al desbloquear; si falta (sala restaurada) queda abierta de una.
+        const t = d.openedAt ? Math.min(1, (Date.now() - d.openedAt) / 700) : 1;
+        const e = 1 - Math.pow(1 - t, 3);            // ease-out
+        const swing = e * 0.82 * (Math.PI / 2);      // ángulo de giro
+        const leafW = d.width * Math.cos(swing);     // ancho aparente de la hoja
+        const taper = d.height * 0.05 * e;           // el borde lejano se achica en altura
+        const shade = 1 - 0.5 * e;                   // se oscurece al alejarse
+
+        // Vano: hueco oscuro que queda detrás de la hoja
+        ctx.fillStyle = 'rgba(28, 16, 9, 0.35)';
+        ctx.fillRect(dx, dy, d.width, d.height);
+
+        ctx.beginPath();
+        ctx.moveTo(dx, dy);
+        ctx.lineTo(dx + leafW, dy + taper);
+        ctx.lineTo(dx + leafW, dy + d.height - taper);
+        ctx.lineTo(dx, dy + d.height);
+        ctx.closePath();
+        ctx.fillStyle = `rgb(${Math.round(89 * shade)}, ${Math.round(58 * shade)}, ${Math.round(34 * shade)})`;
+        ctx.fill();
+        ctx.strokeStyle = OUT;
+        ctx.lineWidth = 2;
+        ctx.stroke();
       }
       ctx.restore();
     }

@@ -1000,6 +1000,20 @@ body {
   100% { transform: translate(-50%, 0) scale(1);        opacity: 1; }
 }
 
+/* Aviso mientras hay un diálogo abierto (Maestro, notas): va abajo para no encimarse */
+.notification.notif-low {
+  top: auto;
+  bottom: 84px;
+}
+
+/* CONTINUAR sin partida guardada: visible pero apagado */
+.btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* ---------- Ventanas modales ---------- */
 .modal-overlay {
   transition: opacity var(--dur-med) var(--ease-out), backdrop-filter var(--dur-med) var(--ease-out);

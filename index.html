@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Ruben: En Busca de Angelo - Metroidvania 2D</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
   <link rel="stylesheet" href="css/journal.css?v=1">
   <link rel="stylesheet" href="css/ui-icons.css?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -67,8 +67,9 @@
           <p class="game-subtitle">EN BUSCA DE ANGELO</p>
         </div>
         <div class="menu-actions">
-          <button id="btn-start" class="btn-start">JUGAR</button>
-          <button id="btn-open-controls-menu" class="btn-secondary">CONTROLES</button>
+          <button id="btn-start" class="btn-start">NUEVA PARTIDA</button>
+          <button id="btn-continue" class="btn-secondary" disabled>CONTINUAR</button>
+          <button id="btn-open-controls-menu" class="btn-secondary">OPCIONES</button>
         </div>
         <p class="press-hint">Presioná ENTER · <span class="ui-icon" data-icon="gamepad"></span> Cruceta para elegir, A para confirmar</p>
       </div>
@@ -137,7 +138,7 @@
   <script src="js/enemies.js?v=2"></script>
   <script src="js/controls.js?v=9"></script>
   <script src="js/player.js?v=6"></script>
-  <script src="js/world.js?v=11"></script>
+  <script src="js/world.js?v=12"></script>
   <script src="js/menu-nav.js?v=2"></script>
   <!-- Expansión (Claude): fondo continuo entre secciones, salas 4-10 y Diario de Ruben -->
   <script src="js/bg-continuity.js?v=2"></script>
@@ -157,6 +158,8 @@
   <script src="js/water-core.js?v=2"></script>
   <script src="js/water-quest.js?v=2"></script>
   <script src="js/water-power.js?v=2"></script>
-  <script src="js/main.js?v=8"></script>
+  <!-- Partida guardada (CONTINUAR): hooks onInit/onRoomLoad/onAfterUpdate, antes de main.js -->
+  <script src="js/save-game.js?v=1"></script>
+  <script src="js/main.js?v=9"></script>
 </body>
 </html>
