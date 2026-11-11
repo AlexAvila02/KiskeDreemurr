@@ -64,6 +64,9 @@ class Player {
     this.armPoses = {};
     this._arm = { pose: 0, aim: 0 };
 
+    // Cansancio (lo escribe js/stamina.js): { tired, kneel, collapse (0..1), breath (fase) }
+    this.fatigue = null;
+
     // Modificadores que ajustan las estadísticas del Diario (journal.js → applyPassives)
     this.mods = {
       attackDamage: 1,      // multiplica el daño del tajo
@@ -501,7 +504,8 @@ class Player {
     const SEG = 8;
     const anchor = this.capePoints[0];
     anchor.x = this.x + this.width / 2 - this.facing * 3;
-    anchor.y = this.y + 17;
+    const fg = this.fatigue;
+    anchor.y = this.y + 17 + (fg ? 7 * fg.kneel + 2 * fg.collapse : 0);   // de rodillas baja
 
     // El viento que jala Ruben empuja la bufanda hacia atrás
     const speed = Math.max(Math.min(1, Math.abs(this.vx) / this.speed), this.armPose().pose * 0.95);
@@ -544,11 +548,21 @@ class Player {
     const arm = this.armPose();
     const wp = arm.pose;
     const windTremble = wp ? Math.sin(t * 47) * 0.5 * wp : 0;
+    // Cansancio (js/stamina.js): cansado (respira rápido y suda), de rodillas sosteniendo el
+    // poder con una mano y apoyado en la espada, o tirado con las dos manos en el suelo
+    const fg = this.dead ? null : this.fatigue;
+    const tired = fg ? fg.tired : 0;
+    const kn = fg ? fg.kneel : 0;
+    const col = fg ? fg.collapse : 0;
+    const brW = fg ? Math.sin(fg.breath) : Math.sin(t * 2.6);   // onda de respiración
+    const drop = 7 * kn + 2 * col;                                // el cuerpo baja al arrodillarse
 
     // Squash & stretch: resorte (aterrizaje/salto/golpe) + estirón por velocidad vertical
     let stretchY = a.sy;
     if (!this.isGrounded && !this.dead) stretchY *= 1 + Math.min(0.12, Math.abs(this.vy) * 0.011);
-    if (idle) stretchY *= 1 + Math.sin(t * 2.6) * 0.018; // respiración en reposo
+    // Respiración: suave en reposo; cansado, de rodillas o en el suelo cada vez más honda
+    const breathAmp = (idle ? 0.018 : 0) + 0.022 * tired + 0.012 * kn + 0.02 * col;
+    if (breathAmp) stretchY *= 1 + brW * breathAmp;
     if (wp) stretchY *= 1 - 0.1 * wp;                   // se agacha para afirmarse
     const scaleY = stretchY * (1 + (1 - a.sx) * 0.5);
     const scaleX = a.sx / stretchY;
@@ -596,7 +610,8 @@ class Player {
 
     // Escalado desde los pies (squash & stretch) + inclinación + avance del tajo
     ctx.translate(cx + lungeX + windTremble, feetY);
-    ctx.rotate(a.lean - f * 0.17 * wp);
+    const bodyRot = a.lean - f * 0.17 * wp + f * (0.07 * kn + 0.24 * col);
+    ctx.rotate(bodyRot);
     ctx.scale(scaleX, scaleY);
     ctx.translate(-cx, -feetY);
 
@@ -634,26 +649,48 @@ class Player {
       const airTuck = this.isGrounded ? 0 : (rising ? 4 : 1);
       const airSpread = this.isGrounded || rising ? 0 : k * 1.5;
       const footAng = this.walkPhase ? -Math.sin(ph) * 0.25 * f : 0; // la punta acompaña el paso
+      let fx = cx + k * (4 + 3.2 * wp) + stepX + airSpread + f * 0.8;
+      let fy = feetY - 3 - lift - airTuck, rx = 5, ry = 3.5;
+      if (kn > 0.01) {
+        // De rodillas: el pie de adelante plantado, la otra pierna con la canilla en el suelo
+        const front = k === f;
+        fx += ((front ? cx + f * 7 : cx - f * 8) - fx) * kn;
+        fy += ((front ? feetY - 3 : feetY - 2.6) - fy) * kn;
+        rx += ((front ? 5 : 6.8) - rx) * kn;
+        ry += ((front ? 3.5 : 2.7) - ry) * kn;
+      }
       ctx.beginPath();
-      ctx.ellipse(cx + k * (4 + 3.2 * wp) + stepX + airSpread + f * 0.8, feetY - 3 - lift - airTuck, 5, 3.5, footAng, 0, Math.PI * 2);
+      ctx.ellipse(fx, fy, rx, ry, footAng, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
     }
 
     // Todo lo de arriba de las piernas rebota con el paso
-    ctx.translate(0, bob);
+    ctx.translate(0, bob + drop);
+    // Altura del suelo en este marco (ya inclinado y bajado), para apoyar manos y espada
+    const tanRot = Math.tan(bodyRot);
+    const groundAt = (x) => feetY - drop - bob - (x - cx) * tanRot;
 
-    // 3. Cuerpo: túnica en forma de pera con cinturón (el ruedo flamea al moverse)
+    // 3. Cuerpo: túnica en forma de pera con cinturón (el ruedo flamea al moverse).
+    //    De rodillas el ruedo se apoya en el suelo y se abre sobre las piernas.
     const hemSwing = Math.sin(this.walkPhase * 2) * 1.2 - (this.vx / this.speed) * 1.5;
+    const hemY = feetY - 5 - drop + 4 * kn;
+    const flare = 3 * kn;
     ctx.fillStyle = TUNIC;
     ctx.beginPath();
     ctx.moveTo(cx - 6, sy + 17);
-    ctx.quadraticCurveTo(cx - 12 + hemSwing, feetY - 4, cx - 9 + hemSwing, feetY - 5);
-    ctx.lineTo(cx + 9 + hemSwing, feetY - 5);
-    ctx.quadraticCurveTo(cx + 12 + hemSwing, feetY - 4, cx + 6, sy + 17);
+    ctx.quadraticCurveTo(cx - 12 - flare + hemSwing, hemY + 1, cx - 9 - flare + hemSwing, hemY);
+    ctx.lineTo(cx + 9 + flare + hemSwing, hemY);
+    ctx.quadraticCurveTo(cx + 12 + flare + hemSwing, hemY + 1, cx + 6, sy + 17);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
+    // Rodilla de adelante levantada
+    if (kn > 0.35) {
+      ctx.beginPath();
+      ctx.ellipse(cx + f * 7.5, groundAt(cx + f * 7.5) - 8.5, 4.6, 3.8, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
     ctx.fillStyle = BOOT;
-    ctx.fillRect(cx - 10, sy + 28, 20, 3);
+    ctx.fillRect(cx - 10, Math.min(sy + 28, hemY - 4), 20, 3);
 
     // Morral con las notas de Angelo (se mece con el paso)
     const bagSwing = Math.sin(this.walkPhase + 0.6) * 1.2;
@@ -678,8 +715,21 @@ class Player {
     }
     // Jalando el aire: la espada baja y queda atrás
     if (wp) swordAng += (2.05 - swordAng) * wp;
-    const hx = shoulderX + f * Math.cos(swordAng * 0.5) * 5;
-    const hy = shoulderY + Math.sin(swordAng * 0.5) * 5 + 2;
+    let hx = shoulderX + f * Math.cos(swordAng * 0.5) * 5;
+    let hy = shoulderY + Math.sin(swordAng * 0.5) * 5 + 2;
+    if (kn > 0.01) {
+      // De rodillas: la espada clavada adelante, Ruben se apoya en ella.
+      // En el suelo: la espada cae plana y la mano queda apoyada en el piso.
+      const px = cx + f * 9, py = shoulderY + 2;
+      const pAng = Math.asin(Math.max(0.2, Math.min(1, (groundAt(px + f * 8) - py) / 16.5)));
+      const cxH = cx + f * 9.5;
+      const tx = px + (cxH - px) * col;
+      const ty = py + (groundAt(cxH) - 2.5 - py) * col;
+      const tAng = pAng + (0.06 - pAng) * col;
+      hx += (tx - hx) * kn;
+      hy += (ty - hy) * kn;
+      swordAng += (tAng - swordAng) * kn;
+    }
     // Hoja
     ctx.strokeStyle = flash ? W : '#e4e9ee';
     ctx.lineWidth = 3;
@@ -742,6 +792,27 @@ class Player {
       ctx.lineWidth = 2;
     }
 
+    // 4c. En el suelo: la otra mano también apoyada en el piso
+    if (col > 0.05 && wp < 0.5) {
+      const ax0 = cx + f * 1, ay0 = sy + 20;
+      const ax1 = ax0 + (cx + f * 3.5 - ax0) * col;
+      const ay1 = ay0 + (groundAt(cx + f * 3.5) - 2.5 - ay0) * col;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 6.5;
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      ctx.strokeStyle = TUNIC;
+      ctx.lineWidth = 3.8;
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      ctx.fillStyle = SKIN;
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(ax1 + f * 1.5, ay1 + 0.5, 3.4, 2.3, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 2;
+    }
+
     // 5. Nudo de la bufanda al cuello
     ctx.fillStyle = SCARF;
     ctx.beginPath();
@@ -751,8 +822,10 @@ class Player {
     // 6. Cabeza redonda grande (proporciones de cartoon). Se retrasa un poco
     //    respecto del cuerpo ("follow-through") para que el movimiento se sienta vivo.
     const headLag = -a.lean * 6;
-    const headY = sy + 7 + (idle ? Math.sin(t * 2.6 - 0.5) * 0.4 : 0);
-    const hcx = cx + headLag;
+    // Cansado: los hombros suben y bajan con cada respiración; en el suelo, cabeza gacha
+    const heave = brW * (idle ? 0.4 : 0) + brW * (0.7 * tired + 0.5 * kn + 0.6 * col);
+    const headY = sy + 7 + heave + 4.5 * col;
+    const hcx = cx + headLag + f * 3.5 * col;
     ctx.fillStyle = SKIN;
     ctx.beginPath();
     ctx.ellipse(hcx, headY, 10, 10.5, 0, 0, Math.PI * 2);
@@ -793,9 +866,11 @@ class Player {
         ctx.moveTo(exx - 2 * k, headY - 1); ctx.lineTo(exx + 2 * k, headY + 1); ctx.lineTo(exx - 2 * k, headY + 3);
         ctx.stroke();
         ctx.lineWidth = 2;
-      } else if (blink) {
+      } else if (blink || col > 0.5) {
+        // Parpadeo, o en el suelo: ojos cerrados con fuerza, mirando abajo
         ctx.beginPath();
-        ctx.moveTo(exx - 2, headY + 1); ctx.lineTo(exx + 2, headY + 1);
+        if (col > 0.5) ctx.arc(exx, headY + 1, 2, 0.15, Math.PI - 0.15);
+        else { ctx.moveTo(exx - 2, headY + 1); ctx.lineTo(exx + 2, headY + 1); }
         ctx.stroke();
       } else {
         ctx.fillStyle = '#ffffff';
@@ -811,7 +886,41 @@ class Player {
         ctx.beginPath();
         ctx.arc(exx + f * 0.8 + 0.6, headY + 0.8 + lookY, 0.6, 0, Math.PI * 2);
         ctx.fill();
+        if (tired > 0.3) {
+          // Párpados caídos de cansancio (cubren la parte de arriba del ojo)
+          //  caídos hacia afuera (cara de agotado, no de enojo) y cejas preocupadas
+          const lidY = headY + 1 - 3.4 + 3.4 * (0.35 + 0.3 * Math.min(1, kn));
+          const inX = exx - k * 2.8, outX = exx + k * 2.8;
+          const inY = lidY - 0.9, outY = lidY + 1.1;
+          ctx.fillStyle = SKIN;
+          ctx.beginPath();
+          ctx.moveTo(inX, headY - 3.2); ctx.lineTo(outX, headY - 3.2);
+          ctx.lineTo(outX, outY); ctx.lineTo(inX, inY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(inX, inY); ctx.lineTo(outX, outY);
+          ctx.moveTo(exx - k * 2.4, headY - 4.6); ctx.lineTo(exx + k * 2, headY - 3.6);
+          ctx.stroke();
+          ctx.lineWidth = 2;
+        }
       }
+    }
+    // Gota de sudor que resbala por la sien
+    if (tired > 0.3 && !this.dead) {
+      const slide = (t * (0.7 + kn * 0.6)) % 1;
+      const dx = hcx - f * 8.5, dy = headY - 4 + slide * 6;
+      ctx.save();
+      ctx.globalAlpha *= Math.min(1, tired) * (1 - slide * 0.6);
+      ctx.fillStyle = '#85d7f8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(dx, dy - 3.2);
+      ctx.quadraticCurveTo(dx + 2.2, dy, dx, dy + 1.6);
+      ctx.quadraticCurveTo(dx - 2.2, dy, dx, dy - 3.2);
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
     }
     // Mejillas y boca (sonrisa decidida / grito al atacar / mueca al recibir daño)
     ctx.fillStyle = 'rgba(224, 120, 100, 0.45)';
@@ -820,11 +929,18 @@ class Player {
     ctx.arc(ex + 6, headY + 5, 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = 1.3;
+    const pant = tired > 0.3 && !hurt && !this.dead ? (0.5 + 0.5 * brW) * (0.6 + 0.25 * kn + 0.25 * col) : 0;
     if (wp > 0.35 && !hurt && !this.dead) {
-      // Boca en "O": está aspirando el aire con fuerza
+      // Boca en "O": está aspirando el aire con fuerza (y jadea si está cansado)
       ctx.fillStyle = '#5a2418';
       ctx.beginPath();
-      ctx.ellipse(ex + f * 1.5, headY + 6, 1.6 + wp * 0.4, 2 + wp * 0.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(ex + f * 1.5, headY + 6, 1.6 + wp * 0.4, 2 + wp * 0.6 + pant * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    } else if (pant > 0 && !this.isAttacking) {
+      // Jadeo: boca abierta que se abre y cierra con la respiración
+      ctx.fillStyle = '#5a2418';
+      ctx.beginPath();
+      ctx.ellipse(ex + f * 1.2, headY + 6, 1.8, 0.8 + pant * 1.3, 0, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
     } else if (this.isAttacking || hurt || this.dead) {
       ctx.fillStyle = '#5a2418';

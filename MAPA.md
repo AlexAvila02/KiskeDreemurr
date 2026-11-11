@@ -75,6 +75,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `animation-registry.js` | Gemini | Capas, skins y FX de animación | `AnimationRegistry` |
 | `aim.js` | Claude | Apuntado compartido: ratón sobre el canvas y stick derecho (un solo lector) | `Aim` |
 | `sound-kit.js` | Claude | Sonidos sintetizados compartidos: ruidos blanco/rosado/marrón, bucles con filtro, golpes y tonos | `SoundKit` |
+| `stamina.js` | Claude | Barra de energía elemental y cansancio de Ruben (`player.fatigue`: cansado / de rodillas / agotado 5 s) | `Stamina` |
 | `wind-pull.js` | Claude | Jalar / soplar el aire, aturdir enemigos, molino → usa `Aim`, `SoundKit` | `WindPull` |
 | `ambience.js` | Claude | Brisa de sala (`ambience: 'breeze'`) con sonido → usa `SoundKit` | `Ambience` |
 | `props.js` | Claude | Decorados de sala (`props`: cabaña, ovejas) → usa `Ambience` | — |
