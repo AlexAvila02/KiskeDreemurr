@@ -506,3 +506,9 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - Al iniciar el juego todas las estadísticas están en **0** (mínimo), así que la forma arranca como un rombo vacío en el centro.
 - `js/journal.js`: nuevo `statRadar()`, nombre corto `short` en `STATS`, y `renderStats()` lo muestra arriba de las filas de texto. `css/journal.css`: bloque `.stat-radar` (se quitaron las reglas `.stat-bar`/`.stat-pip`).
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (Nueva partida → Diario → Estadísticas): el radar renderiza con las cuatro etiquetas y todos los ejes en 0/5. Pendiente: ver el radar con niveles entrenados (polígono relleno y puntos de color).
+
+## Sin sistema de puntos (Claude, 11/11, pedido del usuario)
+- Se quitaron los puntos de entrenamiento ✦ (25 fragmentos por punto, emblemas y enemigos). Entrenar ya no cuesta nada: cada charla con un maestro sube su estadística más baja un nivel (máximo 5). Lo único que mejora a Ruben es entrenar y equipar objetos.
+- `js/journal.js`: fuera `totalPoints`/`availablePoints`/`fragments`, el contador de puntos de la cabecera, el badge ✦ del HUD y sus notificaciones. El subtítulo del Diario muestra `EMBLEMAS x/y · VALOR n`. `css/journal.css`: fuera `.journal-points`.
+- `js/npcs.js` y `MAPA.md`: textos actualizados (ya no dicen "1 ✦").
+- Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador: entrenamientos sin puntos suben dmg/move/def, sin errores de consola y sin badge ni contador en el HUD/Diario.

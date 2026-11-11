@@ -5,10 +5,10 @@
  * - Menú "Diario" con tres pestañas: OBJETOS · ESTADÍSTICAS · NOTAS DE ANGELO.
  * - ESTADÍSTICAS de Ruben: daño básico, velocidad de ataque, defensa (probabilidad de
  *   bloquear un golpe) y velocidad de movimiento.
- *     · Se suben ENTRENANDO con los maestros: hablá con ellos después de sus líneas;
- *       cada nivel cuesta 1 ✦ (punto de entrenamiento). Máximo STAT_MAX niveles por stat.
+ *     · Se suben ENTRENANDO con los maestros: hablá con ellos después de sus líneas y cada
+ *       charla sube su estadística más baja un nivel, sin costo. Máximo STAT_MAX por stat.
  *     · Se potencian EQUIPANDO objetos del diario (hasta EQUIP_SLOTS a la vez).
- * - Puntos (✦): 25 fragmentos = 1 punto; Emblema = 5 fragmentos, cada enemigo = 1 fragmento.
+ * - Sin sistema de puntos: el entrenamiento y los objetos equipados son la única progresión.
  * - Progreso guardado en localStorage ('ruben_diario_v1').
  *
  * Abrir / cerrar: I o Tab (si no están asignadas a otra acción) · botón del HUD ·
@@ -25,10 +25,6 @@
 
   const SAVE_KEY = 'ruben_diario_v1';
   const INK = '#3a2416';
-  // Ganancia de virtudes reducida un 80% (pedido del usuario, 8/11): un punto cuesta
-  // 25 fragmentos. Cada Emblema = 5 fragmentos, cada enemigo = 1 fragmento.
-  const FRAGMENTS_PER_POINT = 25;
-  const FRAGMENTS_PER_EMBLEM = 5;
 
 
   // ------------------------------------------------------------------
@@ -42,7 +38,7 @@
     },
     emblema: {
       name: 'Emblema del Reino',
-      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo: vale una quinta parte de un punto de entrenamiento.',
+      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo.',
       kind: 'Reliquia · se acumula',
       stack: true
     },
@@ -476,11 +472,7 @@
     emblemCount() {
       return Object.values(this.save.collected).filter(v => v === 'emblema').length;
     }
-    fragments() { return this.emblemCount() * FRAGMENTS_PER_EMBLEM + this.save.valor; }
-    totalPoints() { return Math.floor(this.fragments() / FRAGMENTS_PER_POINT); }
     statLevel(id) { return Math.max(0, Math.min(STAT_MAX, this.save.stats[id] || 0)); }
-    spentPoints() { return STAT_ORDER.reduce((s, id) => s + this.statLevel(id), 0); }
-    availablePoints() { return Math.max(0, this.totalPoints() - this.spentPoints()); }
     ownsItem(id) {
       if (id === 'llave') return this.game.player.keys > 0 || !!(this.game.world.rooms[2] && this.game.world.rooms[2].keyItem && this.game.world.rooms[2].keyItem.collected);
       return Object.values(this.save.collected).includes(id);
@@ -559,18 +551,13 @@
       const ids = (npc.trains || []).filter(id => STATS[id]);
       const open = ids.filter(id => this.statLevel(id) < STAT_MAX);
       if (!open.length) return null;
-      if (this.availablePoints() < 1) {
-        this.game.showNotification('Entrenar cuesta ✦: consigue puntos de entrenamiento (Emblemas y enemigos)');
-        return null;
-      }
-      // Entrena la estadística más baja de ese maestro
+      // Entrena la estadística más baja de ese maestro (sin costo)
       open.sort((a, b) => this.statLevel(a) - this.statLevel(b));
       const id = open[0];
       this.save.stats[id] = this.statLevel(id) + 1;
       this.persist();
       this.applyPassives();
       this.refreshHeader();
-      this.refreshHud();
       const sm = window.soundManager;
       if (sm && sm.playUnlockAbility) try { sm.playUnlockAbility(); } catch (e) { /* */ }
       this.game.showNotification(`${STATS[id].name} · nivel ${this.statLevel(id)}/${STAT_MAX}`);
@@ -594,7 +581,6 @@
       this.applyPassives();
       this.renderStats();
       this.refreshHeader();
-      this.refreshHud();
       return true;
     }
 
@@ -653,14 +639,8 @@
     }
 
     onEnemyDefeated() {
-      const before = this.totalPoints();
       this.save.valor += 1;
       this.persist();
-      if (this.totalPoints() > before) {
-        this.game.showNotification(`✦ ¡Nuevo punto de entrenamiento! · abrí el Diario (${this.openKeyLabel()})`);
-        if (window.soundManager && window.soundManager.playUnlockAbility) window.soundManager.playUnlockAbility();
-      }
-      this.refreshHud();
     }
 
     collect(roomId, index, c) {
@@ -674,15 +654,12 @@
       const sm = window.soundManager;
       if (c.item === 'emblema') {
         if (sm && sm.playPickup) sm.playPickup();
-        const pointsBefore = Math.floor((this.fragments() - FRAGMENTS_PER_EMBLEM) / FRAGMENTS_PER_POINT);
-        if (this.totalPoints() > pointsBefore) this.game.showNotification(`Emblema del Reino · ✦ ¡nuevo punto de entrenamiento! (${this.openKeyLabel()})`);
-        else this.game.showNotification(`Emblema del Reino · progreso de entrenamiento ${this.fragments() % FRAGMENTS_PER_POINT}/${FRAGMENTS_PER_POINT}`);
+        this.game.showNotification(`Emblema del Reino · ${this.emblemCount()}/${this.worldCount('emblema')}`);
       } else {
         if (sm && sm.playUnlockAbility) sm.playUnlockAbility();
         this.game.showNotification(`Encontraste: ${info.name} · miralo en el Diario (${this.openKeyLabel()})`);
       }
       this.selectedItem = c.item;
-      this.refreshHud();
     }
 
     // ---------------- Dibujo en el mundo ----------------
@@ -753,8 +730,6 @@
         btn.appendChild(el('span', 'slot-text', 'Diario'));
         this.hudKey = el('span', 'journal-key', this.openKeyLabel());
         btn.appendChild(this.hudKey);
-        this.hudBadge = el('span', 'journal-badge hidden', '');
-        btn.appendChild(this.hudBadge);
         btn.addEventListener('click', () => { if (this.isOpen()) this.close(); else this.open(); });
         slots.appendChild(btn);
         this.hudBtn = btn;
@@ -782,7 +757,6 @@
               <h2 class="modal-title">DIARIO DE RUBEN</h2>
               <p class="modal-subtitle" id="journal-subtitle"></p>
             </div>
-            <div class="journal-points" id="journal-points" title="Puntos de entrenamiento disponibles"></div>
             <button class="btn-close" id="journal-close" type="button" title="Cerrar">✕</button>
           </div>
           <div class="journal-tabs" role="tablist">
@@ -881,26 +855,14 @@
 
     refreshHeader() {
       if (!this.modal) return;
-      const pts = this.availablePoints();
-      const v = this.fragments() % FRAGMENTS_PER_POINT;
-      this.modal.querySelector('#journal-points').innerHTML =
-        `<span class="pts-num">${pts}</span><span class="pts-star">✦</span><span class="pts-label">puntos de<br>entrenamiento</span>`;
       this.modal.querySelector('#journal-subtitle').textContent =
-        `PRÓXIMO PUNTO ${v}/${FRAGMENTS_PER_POINT} · EMBLEMAS ${this.emblemCount()}/${this.worldCount('emblema')} · VALOR ${this.save.valor}`;
+        `EMBLEMAS ${this.emblemCount()}/${this.worldCount('emblema')} · VALOR ${this.save.valor}`;
       const fk = this.modal.querySelector('#journal-footer-key');
       if (fk) fk.textContent = this.openKeyLabel();
     }
 
     refreshHud() {
-      if (!this.hudBadge) return;
-      const pts = this.availablePoints();
-      this.hudBadge.textContent = `✦${pts}`;
-      this.hudBadge.classList.toggle('hidden', pts <= 0);
       if (this.hudKey) this.hudKey.textContent = this.openKeyLabel();
-      if (this.lastHudPts !== undefined && pts > this.lastHudPts && this.hudBtn && this.game.retriggerClass) {
-        this.game.retriggerClass(this.hudBtn, 'slot-pulse');
-      }
-      this.lastHudPts = pts;
     }
 
     renderItems() {
@@ -1041,7 +1003,7 @@
       box.appendChild(eq);
 
       box.appendChild(el('p', 'stats-foot',
-        'Los maestros entrenan en persona: hablá con ellos cuando terminen sus líneas. Cada nivel cuesta 1 ✦.'));
+        'Los maestros entrenan en persona: hablá con ellos cuando terminen sus líneas. Cada charla sube una estadística.'));
     }
 
     renderNotes() {

@@ -64,31 +64,6 @@
   gap: 16px;
 }
 .journal-title-wrap { flex: 1; }
-.journal-points {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(217, 166, 52, 0.12);
-  border: 1.5px solid #8a623e;
-  border-radius: 8px;
-  padding: 3px 10px;
-}
-.journal-points .pts-num {
-  font-family: 'Cinzel', serif;
-  font-size: 24px;
-  font-weight: 800;
-  color: #ffe28a;
-  text-shadow: 0 2px 0 #3a2416;
-}
-.journal-points .pts-star { color: #d9a634; font-size: 18px; }
-.journal-points .pts-label {
-  font-size: 9.5px;
-  line-height: 1.1;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: #d1b899;
-  margin-left: 4px;
-}
 
 /* ---------- Pestañas ---------- */
 .journal-tabs {

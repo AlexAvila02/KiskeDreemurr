@@ -64,7 +64,7 @@
       if (n.lineIdx < n.lines.length) text += '  ▸';
     } else {
       // Maestros que entrenan (n.trains): tras sus líneas, cada charla sube una estadística
-      // (1 ✦). Si no hay nada que entrenar, sigue la despedida de siempre.
+      // (sin costo). Si no hay nada que entrenar, sigue la despedida de siempre.
       const trained = g.journal && g.journal.trainNpc ? g.journal.trainNpc(n) : null;
       text = trained || farewellText(n, g.world.getCurrentRoom());
     }

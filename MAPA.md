@@ -89,7 +89,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 
 - **Pose del brazo extendido**: `player.setArmPose(fuente, pose 0..1, ángulo)` (fuentes: `'wind'`, `'water'`). Cada habilidad escribe la suya cada cuadro y `player.armPose()` devuelve la más fuerte; el orden de los hooks no importa.
 - **Modificadores** `player.mods`: `attackDamage`, `attackCooldown`, `throwDamage`, `throwSpeed`, `throwLift`, `hurtInvuln`, `blockChance`. Los ajusta el Diario (`journal.js → applyPassives`) según las estadísticas (daño, velocidad de ataque, defensa = `blockChance`); `player.js` los usa al atacar, lanzar y recibir daño (`takeDamage` puede bloquear el golpe). La velocidad de movimiento se aplica directo a `player.speed`. Nadie envuelve los métodos del jugador.
-- **Maestros que entrenan**: un NPC de la sala con `trains: ['move', 'def' …]` (ids `dmg`, `atk`, `def`, `move`). `npcs.js` llama `game.journal.trainNpc(npc)` cuando ya dijo sus líneas: cada charla sube una estadística (1 ✦ por nivel, máximo 5).
+- **Maestros que entrenan**: un NPC de la sala con `trains: ['move', 'def' …]` (ids `dmg`, `atk`, `def`, `move`). `npcs.js` llama `game.journal.trainNpc(npc)` cuando ya dijo sus líneas: cada charla sube una estadística un nivel, sin costo (máximo 5).
 
 ## Reglas para no perderse
 
