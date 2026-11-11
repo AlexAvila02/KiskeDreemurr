@@ -390,6 +390,7 @@
       {
         id: 'tobias',
         name: 'Tobías, el viejo pastor',
+        trains: ['move', 'def'],   // entrena Velocidad de movimiento y Defensa (Diario → ESTADÍSTICAS)
         x: 1215, y: 460, facing: 1,
         lines: [
           '¡Vaya, un muchacho que cae del cielo! Tranquilo, el pasto de esta hondonada es blando. Me llamo Tobías; cuidaba ovejas cuando el reino todavía tenía rey.',
@@ -458,6 +459,7 @@
         id: 'arroyo',
         look: 'water-master',
         teaches: 'water',
+        trains: ['atk', 'dmg'],    // entrena Velocidad de ataque y Daño básico (Diario → ESTADÍSTICAS)
         name: 'Maestro Arroyo',
         x: 300, y: 400, facing: 1,
         lines: [

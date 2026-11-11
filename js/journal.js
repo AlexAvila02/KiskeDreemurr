@@ -1,31 +1,35 @@
 /**
- * Diario de Ruben - Objetos, Notas de Angelo y Árbol de Virtudes (Claude)
+ * Diario de Ruben - Objetos, Notas de Angelo y Estadísticas (Claude)
  *
  * - Objetos coleccionables en las salas (`room.collectibles: [{ item, x, y }]`).
- * - Menú "Diario" con tres pestañas: OBJETOS · VIRTUDES · NOTAS DE ANGELO.
- * - Árbol de virtudes PASIVAS (3 ramas x 3 niveles) que se compran con puntos:
- *     ✦ (desde 8/11: 80% menos) 25 fragmentos = 1 punto; Emblema = 5, enemigo = 1
+ * - Menú "Diario" con tres pestañas: OBJETOS · ESTADÍSTICAS · NOTAS DE ANGELO.
+ * - ESTADÍSTICAS de Ruben: daño básico, velocidad de ataque, defensa (probabilidad de
+ *   bloquear un golpe) y velocidad de movimiento.
+ *     · Se suben ENTRENANDO con los maestros: hablá con ellos después de sus líneas;
+ *       cada nivel cuesta 1 ✦ (punto de entrenamiento). Máximo STAT_MAX niveles por stat.
+ *     · Se potencian EQUIPANDO objetos del diario (hasta EQUIP_SLOTS a la vez).
+ * - Puntos (✦): 25 fragmentos = 1 punto; Emblema = 5 fragmentos, cada enemigo = 1 fragmento.
  * - Progreso guardado en localStorage ('ruben_diario_v1').
  *
  * Abrir / cerrar: I o Tab (si no están asignadas a otra acción) · botón del HUD ·
  * "DIARIO" en el menú de pausa · 🎮 Select/Back. Dentro: Q/E o LB/RB cambian de pestaña,
  * flechas o cruceta mueven la selección, Enter / A elige, Esc / B cierra.
  *
- * Se integra con GameHooks (onInit, onAfterUpdate, onRoomLoad, onBeforeTogglePause,
- *   onPlayerHurt, onRenderWorld; ver MAPA.md), ajusta player.mods (virtudes de combate)
- *   y amplía MenuNavigator (js/menu-nav.js) para que el mando navegue el Diario.
+ * Se integra con GameHooks (onInit, onAfterUpdate, onBeforeTogglePause, onRenderWorld;
+ *   ver MAPA.md), ajusta player.mods (estadísticas) y amplía MenuNavigator (js/menu-nav.js)
+ *   para que el mando navegue el Diario. Los maestros llaman a `game.journal.trainNpc(npc)`
+ *   desde npcs.js.
  */
 (function () {
   'use strict';
 
   const SAVE_KEY = 'ruben_diario_v1';
   const INK = '#3a2416';
-  // Ganancia de virtudes reducida un 80% (pedido del usuario, 8/11): un punto ahora cuesta
-  // 5 veces más. Se cuenta en "fragmentos": cada Emblema = 5 fragmentos, cada enemigo = 1
-  // fragmento (2 con Botín del Cazador) y 25 fragmentos = 1 punto de virtud.
+  // Ganancia de virtudes reducida un 80% (pedido del usuario, 8/11): un punto cuesta
+  // 25 fragmentos. Cada Emblema = 5 fragmentos, cada enemigo = 1 fragmento.
   const FRAGMENTS_PER_POINT = 25;
   const FRAGMENTS_PER_EMBLEM = 5;
-  const REGEN_FRAMES = 900;          // 15 s sin recibir daño (Respiro del Prado)
+
 
   // ------------------------------------------------------------------
   // Catálogo de objetos
@@ -38,7 +42,7 @@
     },
     emblema: {
       name: 'Emblema del Reino',
-      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo: vale una quinta parte de un punto de virtud.',
+      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo: vale una quinta parte de un punto de entrenamiento.',
       kind: 'Reliquia · se acumula',
       stack: true
     },
@@ -75,33 +79,27 @@
   };
   const ITEM_ORDER = ['llave', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla', 'retrato', 'sello'];
 
+
   // ------------------------------------------------------------------
-  // Árbol de virtudes pasivas
+  // Estadísticas de Ruben (pestaña ESTADÍSTICAS del Diario)
   // ------------------------------------------------------------------
-  const BRANCHES = [
-    { id: 'corazon', name: 'CORAZÓN', tagline: 'Resistir', nodes: ['c1', 'c2', 'c3'] },
-    { id: 'espada', name: 'ESPADA', tagline: 'Pelear', nodes: ['e1', 'e2', 'e3'] },
-    { id: 'ingenio', name: 'INGENIO', tagline: 'Moverse', nodes: ['i1', 'i2', 'i3'] }
-  ];
-  const SKILLS = {
-    c1: { name: 'Corazón de Bellota', icon: 'bellota', cost: 1, req: null, branch: 'corazon',
-      desc: '+1 corazón de vida máxima.' },
-    c2: { name: 'Respiro del Prado', icon: 'brote', cost: 1, req: 'c1', branch: 'corazon',
-      desc: 'Si pasan 15 segundos sin recibir daño, Ruben recupera 1 corazón.' },
-    c3: { name: 'Piel de Roble', icon: 'roble', cost: 2, req: 'c2', branch: 'corazon',
-      desc: '+1 corazón de vida máxima y, tras un golpe, Ruben queda invulnerable un 50% más de tiempo.' },
-    e1: { name: 'Filo Templado', icon: 'espada', cost: 1, req: null, branch: 'espada',
-      desc: 'La espada hace un 50% más de daño: las polillas caen de un solo tajo.' },
-    e2: { name: 'Tajo Veloz', icon: 'tajos', cost: 1, req: 'e1', branch: 'espada',
-      desc: 'Ruben vuelve a atacar un tercio más rápido.' },
-    e3: { name: 'Botín del Cazador', icon: 'botin', cost: 2, req: 'e2', branch: 'espada',
-      desc: 'Cada enemigo derrotado da el doble de Valor y a veces suelta un corazón.' },
-    i1: { name: 'Pies Ligeros', icon: 'bota', cost: 1, req: null, branch: 'ingenio',
-      desc: 'Ruben corre un 12% más rápido.' },
-    i2: { name: 'Brazo de Molinero', icon: 'piedra', cost: 1, req: 'i1', branch: 'ingenio',
-      desc: 'Las piedras lanzadas vuelan más lejos y hacen el doble de daño.' },
-    i3: { name: 'Pluma del Viento', icon: 'pluma', cost: 2, req: 'i2', branch: 'ingenio',
-      desc: 'Saltos un 10% más potentes.' }
+  const STAT_MAX = 5;                // niveles de entrenamiento por estadística
+  const BASE_DAMAGE = 15;            // daño del tajo básico (player.js: 15 * mods.attackDamage)
+  const BASE_ATTACK_FRAMES = 18;     // cuadros entre tajos sin mejoras (player.js)
+  const STATS = {
+    dmg:  { name: 'Daño básico', step: 0.10, trainText: 'El maestro te hace repetir el tajo hasta que los brazos pesan, y el golpe pesa más.' },
+    atk:  { name: 'Velocidad de ataque', step: 0.08, trainText: 'Te enseña a volver a la guardia sin pensarlo: las manos ganan ritmo.' },
+    def:  { name: 'Defensa', step: 0.06, trainText: 'Te hace cubrirte con el brazo una y otra vez: ahora los golpes te encuentran menos.' },
+    move: { name: 'Velocidad de movimiento', step: 0.05, trainText: 'Corren cuesta arriba y cuesta abajo: el cuerpo aprende a ir liviano.' }
+  };
+  const STAT_ORDER = ['dmg', 'atk', 'def', 'move'];
+  const EQUIP_SLOTS = 2;             // objetos equipados a la vez
+  // Objetos del diario que se equipan: suman un % a una estadística
+  const EQUIP = {
+    brujula:    { stat: 'move', bonus: 0.12 },
+    campanilla: { stat: 'atk',  bonus: 0.15 },
+    retrato:    { stat: 'dmg',  bonus: 0.15 },
+    sello:      { stat: 'def',  bonus: 0.12 }
   };
 
   // ------------------------------------------------------------------
@@ -411,31 +409,32 @@
     return e;
   }
 
+
   // ------------------------------------------------------------------
   // Diario
   // ------------------------------------------------------------------
+  function emptySave() {
+    return { collected: {}, notes: {}, valor: 0, stats: { dmg: 0, atk: 0, def: 0, move: 0 }, equipped: [] };
+  }
+
   class Journal {
     constructor(game) {
       this.game = game;
       this.save = this.load();
       this.counted = new WeakSet();   // enemigos ya contados como derrotados
-      this.hearts = [];               // corazones soltados por enemigos (Botín del Cazador)
-      this.sinceHurt = 0;
       this.tab = 'items';
       this.selectedItem = 'llave';
-      this.selectedSkill = 'c1';
       this.openedFromPause = false;
       this.resetArmed = 0;
 
       const p = game.player;
       this.base = {
-        maxHp: p.maxHp, speed: p.speed,
-        jumpForce: p.jumpForce
+        maxHp: p.maxHp, speed: p.speed, jumpForce: p.jumpForce,
+        attackCooldown: p.mods ? p.mods.attackCooldown : BASE_ATTACK_FRAMES
       };
 
       this.syncRoomsWithSave();
       this.wrapGame();
-      this.hookPlayer();
       this.buildUI();
       this.hookMenuNav();
       this.setupKeys();
@@ -445,19 +444,21 @@
 
     // ---------------- Guardado ----------------
     load() {
-      const empty = { collected: {}, notes: {}, valor: 0, skills: {} };
       try {
         const raw = window.localStorage.getItem(SAVE_KEY);
-        if (!raw) return empty;
+        if (!raw) return emptySave();
         const data = JSON.parse(raw);
-        return {
-          collected: data.collected || {},
-          notes: data.notes || {},
-          valor: Number(data.valor) || 0,
-          skills: data.skills || {}
-        };
+        const s = emptySave();
+        s.collected = data.collected || {};
+        s.notes = data.notes || {};
+        s.valor = Number(data.valor) || 0;
+        for (const id of STAT_ORDER) {
+          s.stats[id] = Math.max(0, Math.min(STAT_MAX, Number(data.stats && data.stats[id]) || 0));
+        }
+        s.equipped = Array.isArray(data.equipped) ? data.equipped.filter(id => EQUIP[id]).slice(0, EQUIP_SLOTS) : [];
+        return s;
       } catch (e) {
-        return empty;
+        return emptySave();
       }
     }
     persist() {
@@ -472,22 +473,14 @@
     }
 
     // ---------------- Cuentas ----------------
-    has(id) { return !!this.save.skills[id]; }
     emblemCount() {
       return Object.values(this.save.collected).filter(v => v === 'emblema').length;
     }
     fragments() { return this.emblemCount() * FRAGMENTS_PER_EMBLEM + this.save.valor; }
     totalPoints() { return Math.floor(this.fragments() / FRAGMENTS_PER_POINT); }
-    spentPoints() {
-      return Object.keys(this.save.skills).reduce((s, id) => s + (this.save.skills[id] && SKILLS[id] ? SKILLS[id].cost : 0), 0);
-    }
+    statLevel(id) { return Math.max(0, Math.min(STAT_MAX, this.save.stats[id] || 0)); }
+    spentPoints() { return STAT_ORDER.reduce((s, id) => s + this.statLevel(id), 0); }
     availablePoints() { return Math.max(0, this.totalPoints() - this.spentPoints()); }
-    canLearn(id) {
-      const s = SKILLS[id];
-      if (!s || this.has(id)) return false;
-      if (s.req && !this.has(s.req)) return false;
-      return this.availablePoints() >= s.cost;
-    }
     ownsItem(id) {
       if (id === 'llave') return this.game.player.keys > 0 || !!(this.game.world.rooms[2] && this.game.world.rooms[2].keyItem && this.game.world.rooms[2].keyItem.collected);
       return Object.values(this.save.collected).includes(id);
@@ -511,45 +504,97 @@
       return null;
     }
 
-    // ---------------- Pasivas ----------------
+    // ---------------- Estadísticas ----------------
+    // Bonus de los objetos equipados sobre una estadística (fracción: 0.15 = +15%)
+    equipBonus(id) {
+      let sum = 0;
+      for (const eid of this.save.equipped) {
+        const e = EQUIP[eid];
+        if (e && e.stat === id) sum += e.bonus;
+      }
+      return sum;
+    }
+    // Multiplicador de daño, velocidad de ataque o de movimiento (1 = sin mejoras)
+    statMult(id) { return 1 + STATS[id].step * this.statLevel(id) + this.equipBonus(id); }
+    blockChance() { return Math.min(0.5, STATS.def.step * this.statLevel('def') + this.equipBonus('def')); }
+    attackCooldown() { return Math.max(6, Math.round(this.base.attackCooldown / this.statMult('atk'))); }
+
     applyPassives() {
       const p = this.game.player, b = this.base;
-      const newMax = b.maxHp + (this.has('c1') ? 1 : 0) + (this.has('c3') ? 1 : 0);
-      const diff = newMax - p.maxHp;
-      p.maxHp = newMax;
-      if (diff > 0) p.hp = Math.min(newMax, p.hp + diff);
-      else p.hp = Math.min(p.hp, newMax);
-      p.speed = b.speed * (this.has('i1') ? 1.12 : 1);
-      const jm = this.has('i3') ? 1.1 : 1;
-      p.jumpForce = b.jumpForce * jm;
-      // Virtudes de combate: player.js las lee de player.mods
+      p.maxHp = b.maxHp;
+      p.hp = Math.min(p.hp, p.maxHp);
+      p.speed = b.speed * this.statMult('move');
+      p.jumpForce = b.jumpForce;
+      // Estadísticas de combate: player.js las lee de player.mods
       if (p.mods) {
-        p.mods.attackDamage = this.has('e1') ? 1.5 : 1;     // Acero: +50% de daño
-        p.mods.attackCooldown = this.has('e2') ? 12 : 18;   // ataque más rápido
-        const i2 = this.has('i2');                          // piedras al doble, más lejos
-        p.mods.throwDamage = i2 ? 2 : 1;
-        p.mods.throwSpeed = i2 ? 1.3 : 1;
-        p.mods.throwLift = i2 ? 1.15 : 1;
-        p.mods.hurtInvuln = this.has('c3') ? 1.5 : 1;       // invulnerabilidad más larga
+        p.mods.attackDamage = this.statMult('dmg');
+        p.mods.attackCooldown = this.attackCooldown();
+        p.mods.blockChance = this.blockChance();
       }
       if (this.game.updateHUD) this.game.updateHUD();
     }
 
-    learn(id) {
-      if (!this.canLearn(id)) return false;
-      this.save.skills[id] = true;
+    // Texto de cada fila de la pestaña ESTADÍSTICAS
+    statText(id) {
+      if (id === 'def') return `bloquea ${Math.round(this.blockChance() * 100)}% de golpes`;
+      const m = this.statMult(id);
+      const pct = Math.round((m - 1) * 100);
+      const sign = pct >= 0 ? '+' : '';
+      if (id === 'dmg') return `${Math.round(BASE_DAMAGE * m)} · ${sign}${pct}%`;
+      if (id === 'atk') return `tajo cada ${this.attackCooldown()} cuadros · ${sign}${pct}%`;
+      return `${(this.base.speed * m).toFixed(1)} · ${sign}${pct}%`;
+    }
+    trainersOf(id) {
+      const names = [];
+      for (const room of this.game.world.rooms) {
+        if (!room || !room.npcs) continue;
+        room.npcs.forEach(n => { if ((n.trains || []).includes(id)) names.push(n.name.split(',')[0]); });
+      }
+      return names.length ? names.join(' · ') : 'nadie todavía';
+    }
+
+    // Lo llama npcs.js cuando el maestro ya dijo sus líneas y Ruben vuelve a hablarle.
+    // Devuelve el texto del entrenamiento, o null si no hay nada que entrenar (sigue la despedida).
+    trainNpc(npc) {
+      const ids = (npc.trains || []).filter(id => STATS[id]);
+      const open = ids.filter(id => this.statLevel(id) < STAT_MAX);
+      if (!open.length) return null;
+      if (this.availablePoints() < 1) {
+        this.game.showNotification('Entrenar cuesta ✦: consigue puntos de entrenamiento (Emblemas y enemigos)');
+        return null;
+      }
+      // Entrena la estadística más baja de ese maestro
+      open.sort((a, b) => this.statLevel(a) - this.statLevel(b));
+      const id = open[0];
+      this.save.stats[id] = this.statLevel(id) + 1;
       this.persist();
       this.applyPassives();
-      const sm = window.soundManager;
-      if (sm && sm.playUnlockAbility) try { sm.playUnlockAbility(); } catch (e) { /* */ }
-      this.renderSkills(id);
       this.refreshHeader();
       this.refreshHud();
-      const node = this.skillButtons && this.skillButtons[id];
-      if (node) {
-        node.classList.remove('just-learned'); void node.offsetWidth; node.classList.add('just-learned');
-        if (this.game.menuNav) this.game.menuNav.setFocus(node, false);
+      const sm = window.soundManager;
+      if (sm && sm.playUnlockAbility) try { sm.playUnlockAbility(); } catch (e) { /* */ }
+      this.game.showNotification(`${STATS[id].name} · nivel ${this.statLevel(id)}/${STAT_MAX}`);
+      return `${STATS[id].trainText} (${STATS[id].name}: nivel ${this.statLevel(id)}/${STAT_MAX}).`;
+    }
+
+    // Equipa / quita un objeto del diario (hasta EQUIP_SLOTS)
+    toggleEquip(id) {
+      if (!EQUIP[id] || !this.ownsItem(id)) return false;
+      const i = this.save.equipped.indexOf(id);
+      if (i >= 0) {
+        this.save.equipped.splice(i, 1);
+      } else {
+        if (this.save.equipped.length >= EQUIP_SLOTS) {
+          this.game.showNotification(`Ya tenés ${EQUIP_SLOTS} objetos equipados: quitá uno primero`);
+          return false;
+        }
+        this.save.equipped.push(id);
       }
+      this.persist();
+      this.applyPassives();
+      this.renderStats();
+      this.refreshHeader();
+      this.refreshHud();
       return true;
     }
 
@@ -557,20 +602,13 @@
     wrapGame() {
       const H = window.GameHooks;
       H.onAfterUpdate.push(() => this.tick());
-      H.onRoomLoad.push(() => { this.hearts.length = 0; });
       // Con el Diario abierto, "pausa" lo cierra (en vez de abrir el menú de pausa)
       H.onBeforeTogglePause.push(() => {
         if (!this.isOpen()) return false;
         this.close(false);
         return true;
       });
-
-      window.GameHooks.onRenderWorld.push((game, ctx, cam) => this.renderWorld(ctx, cam));
-    }
-
-    // Ser golpeado reinicia la cuenta de la regeneración (virtud Corazón)
-    hookPlayer() {
-      window.GameHooks.onPlayerHurt.push(() => { this.sinceHurt = 0; });
+      H.onRenderWorld.push((game, ctx, cam) => this.renderWorld(ctx, cam));
     }
 
     // ---------------- Lógica por cuadro ----------------
@@ -612,47 +650,14 @@
           this.onEnemyDefeated(e);
         }
       }
-
-      // Respiro del Prado
-      this.sinceHurt++;
-      if (this.has('c2') && p.hp < p.maxHp && this.sinceHurt >= REGEN_FRAMES) {
-        this.sinceHurt = 0;
-        p.hp = Math.min(p.maxHp, p.hp + 1);
-        window.particleSystem.createDoubleJumpSparks(px, py);
-        if (window.soundManager && window.soundManager.playPickup) window.soundManager.playPickup();
-        g.updateHUD();
-      }
-
-      // Corazones sueltos
-      for (const h of this.hearts) {
-        h.life--;
-        h.t += 0.08;
-        if (h.vy !== 0) {
-          h.vy = Math.min(4, h.vy + 0.25);
-          h.y += h.vy;
-          if (h.y >= h.restY) { h.y = h.restY; h.vy = 0; }
-        }
-        if (p.hp < p.maxHp && Math.hypot(px - h.x, py - h.y) < 28) {
-          h.life = 0;
-          p.hp = Math.min(p.maxHp, p.hp + 1);
-          window.particleSystem.createDust(h.x, h.y, 10, '#f08a7a');
-          if (window.soundManager && window.soundManager.playPickup) window.soundManager.playPickup();
-          g.updateHUD();
-        }
-      }
-      if (this.hearts.length) this.hearts = this.hearts.filter(h => h.life > 0);
     }
 
-    onEnemyDefeated(e) {
+    onEnemyDefeated() {
       const before = this.totalPoints();
-      this.save.valor += this.has('e3') ? 2 : 1;
+      this.save.valor += 1;
       this.persist();
-      if (this.has('e3') && Math.random() < 0.25) {
-        const cx = e.x + (e.width || 30) / 2, cy = e.y + (e.height || 24) / 2;
-        this.hearts.push({ x: cx, y: cy - 10, restY: Math.min(cy, 440), vy: -3, life: 540, t: 0 });
-      }
       if (this.totalPoints() > before) {
-        this.game.showNotification(`✦ ¡Nuevo punto de virtud! · abrí el Diario (${this.openKeyLabel()})`);
+        this.game.showNotification(`✦ ¡Nuevo punto de entrenamiento! · abrí el Diario (${this.openKeyLabel()})`);
         if (window.soundManager && window.soundManager.playUnlockAbility) window.soundManager.playUnlockAbility();
       }
       this.refreshHud();
@@ -670,8 +675,8 @@
       if (c.item === 'emblema') {
         if (sm && sm.playPickup) sm.playPickup();
         const pointsBefore = Math.floor((this.fragments() - FRAGMENTS_PER_EMBLEM) / FRAGMENTS_PER_POINT);
-        if (this.totalPoints() > pointsBefore) this.game.showNotification(`Emblema del Reino · ✦ ¡nuevo punto de virtud! (${this.openKeyLabel()})`);
-        else this.game.showNotification(`Emblema del Reino · progreso de virtud ${this.fragments() % FRAGMENTS_PER_POINT}/${FRAGMENTS_PER_POINT}`);
+        if (this.totalPoints() > pointsBefore) this.game.showNotification(`Emblema del Reino · ✦ ¡nuevo punto de entrenamiento! (${this.openKeyLabel()})`);
+        else this.game.showNotification(`Emblema del Reino · progreso de entrenamiento ${this.fragments() % FRAGMENTS_PER_POINT}/${FRAGMENTS_PER_POINT}`);
       } else {
         if (sm && sm.playUnlockAbility) sm.playUnlockAbility();
         this.game.showNotification(`Encontraste: ${info.name} · miralo en el Diario (${this.openKeyLabel()})`);
@@ -705,13 +710,6 @@
           if (tw < 0.5) sparkle(ctx, sx + 11, sy - 11, 3 * Math.sin(tw * Math.PI * 2));
           ctx.restore();
         }
-      }
-
-      // Corazones soltados
-      for (const h of this.hearts) {
-        if (h.life < 120 && Math.floor(h.life / 6) % 2 === 0) continue; // parpadeo antes de desaparecer
-        const sx = h.x - cam.x, sy = h.y - cam.y + Math.sin(h.t) * 3;
-        drawIcon(ctx, 'corazon', sx, sy, 18 + Math.sin(h.t * 2) * 1.2);
       }
 
       // Bajadas (salidas con hint 'down')
@@ -750,7 +748,7 @@
         const btn = el('button', 'item-slot journal-hud-btn');
         btn.id = 'journal-hud-btn';
         btn.type = 'button';
-        btn.title = 'Diario de Ruben: objetos, virtudes y notas';
+        btn.title = 'Diario de Ruben: objetos, estadísticas y notas';
         btn.appendChild(iconCanvas('diario', 16));
         btn.appendChild(el('span', 'slot-text', 'Diario'));
         this.hudKey = el('span', 'journal-key', this.openKeyLabel());
@@ -784,27 +782,26 @@
               <h2 class="modal-title">DIARIO DE RUBEN</h2>
               <p class="modal-subtitle" id="journal-subtitle"></p>
             </div>
-            <div class="journal-points" id="journal-points" title="Puntos de virtud disponibles"></div>
+            <div class="journal-points" id="journal-points" title="Puntos de entrenamiento disponibles"></div>
             <button class="btn-close" id="journal-close" type="button" title="Cerrar">✕</button>
           </div>
           <div class="journal-tabs" role="tablist">
             <button class="journal-tab" type="button" data-tab="items" id="journal-tab-items">OBJETOS</button>
-            <button class="journal-tab" type="button" data-tab="skills" id="journal-tab-skills">VIRTUDES</button>
+            <button class="journal-tab" type="button" data-tab="stats" id="journal-tab-stats">ESTADÍSTICAS</button>
             <button class="journal-tab" type="button" data-tab="notes" id="journal-tab-notes">NOTAS DE ANGELO</button>
           </div>
           <div class="journal-page" data-page="items">
             <div class="journal-items-grid" id="journal-items-grid"></div>
             <div class="journal-detail" id="journal-item-detail"></div>
           </div>
-          <div class="journal-page" data-page="skills">
-            <div class="journal-tree" id="journal-tree"></div>
-            <div class="journal-skill-detail" id="journal-skill-detail"></div>
+          <div class="journal-page" data-page="stats">
+            <div class="journal-stats" id="journal-stats"></div>
           </div>
           <div class="journal-page" data-page="notes">
             <div class="journal-notes" id="journal-notes"></div>
           </div>
           <div class="journal-footer">
-            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> aprender · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
+            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> equipar · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
             <button class="journal-reset" id="journal-reset" type="button">Borrar diario</button>
           </div>
         </div>`;
@@ -824,45 +821,6 @@
         reset.textContent = '¿Seguro? Tocá otra vez';
         setTimeout(() => { if (Date.now() >= this.resetArmed) reset.textContent = 'Borrar diario'; }, 3100);
       });
-
-      this.buildTree();
-    }
-
-    buildTree() {
-      const tree = this.modal.querySelector('#journal-tree');
-      tree.innerHTML = '';
-      this.skillButtons = {};
-      for (const br of BRANCHES) {
-        const col = el('div', `journal-branch branch-${br.id}`);
-        const head = el('div', 'journal-branch-head');
-        head.appendChild(el('span', 'journal-branch-name', br.name));
-        head.appendChild(el('span', 'journal-branch-tag', br.tagline));
-        col.appendChild(head);
-        br.nodes.forEach((id, i) => {
-          if (i > 0) col.appendChild(el('div', 'journal-link'));
-          const s = SKILLS[id];
-          const b = el('button', 'journal-node');
-          b.type = 'button';
-          b.dataset.skill = id;
-          const ring = el('span', 'journal-node-ring');
-          ring.appendChild(iconCanvas(s.icon, 34));
-          b.appendChild(ring);
-          b.appendChild(el('span', 'journal-node-name', s.name));
-          b.appendChild(el('span', 'journal-node-cost', '✦'.repeat(s.cost)));
-          // Elegir una virtud la muestra; si se puede aprender, pasa el foco al botón APRENDER para confirmar (sin gastos accidentales)
-          b.addEventListener('click', () => {
-            this.renderSkills(id);
-            const learnBtn = this.modal && this.modal.querySelector('#journal-learn');
-            if (learnBtn && this.game.menuNav) {
-              this.game.menuNav.setFocus(learnBtn);
-            }
-          });
-          b.addEventListener('focus', () => { if (this.selectedSkill !== id) this.renderSkills(id); });
-          col.appendChild(b);
-          this.skillButtons[id] = b;
-        });
-        tree.appendChild(col);
-      }
     }
 
     isOpen() { return !!this.modal && !this.modal.classList.contains('hidden'); }
@@ -904,13 +862,13 @@
       this.modal.querySelectorAll('.journal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
       this.modal.querySelectorAll('.journal-page').forEach(p => p.classList.toggle('hidden', p.dataset.page !== tab));
       if (tab === 'items') this.renderItems();
-      if (tab === 'skills') this.renderSkills();
+      if (tab === 'stats') this.renderStats();
       if (tab === 'notes') this.renderNotes();
       const nav = this.game.menuNav;
       if (nav) { nav.clearHighlight(); nav.focused = null; }
     }
     cycleTab(dir) {
-      const order = ['items', 'skills', 'notes'];
+      const order = ['items', 'stats', 'notes'];
       const i = (order.indexOf(this.tab) + dir + order.length) % order.length;
       this.setTab(order[i]);
       if (window.soundManager && window.soundManager.playJump) try { window.soundManager.playJump(); } catch (e) { /* */ }
@@ -926,7 +884,7 @@
       const pts = this.availablePoints();
       const v = this.fragments() % FRAGMENTS_PER_POINT;
       this.modal.querySelector('#journal-points').innerHTML =
-        `<span class="pts-num">${pts}</span><span class="pts-star">✦</span><span class="pts-label">puntos<br>de virtud</span>`;
+        `<span class="pts-num">${pts}</span><span class="pts-star">✦</span><span class="pts-label">puntos de<br>entrenamiento</span>`;
       this.modal.querySelector('#journal-subtitle').textContent =
         `PRÓXIMO PUNTO ${v}/${FRAGMENTS_PER_POINT} · EMBLEMAS ${this.emblemCount()}/${this.worldCount('emblema')} · VALOR ${this.save.valor}`;
       const fk = this.modal.querySelector('#journal-footer-key');
@@ -998,53 +956,57 @@
       }
     }
 
-    renderSkills(selectId) {
-      if (selectId) this.selectedSkill = selectId;
-      for (const id of Object.keys(SKILLS)) {
-        const b = this.skillButtons[id];
-        if (!b) continue;
-        const s = SKILLS[id];
-        const learned = this.has(id);
-        const reqOk = !s.req || this.has(s.req);
-        b.classList.toggle('learned', learned);
-        b.classList.toggle('available', !learned && reqOk && this.availablePoints() >= s.cost);
-        b.classList.toggle('locked', !learned && !reqOk);
-        b.classList.toggle('selected', id === this.selectedSkill);
-        const link = b.previousElementSibling;
-        if (link && link.classList.contains('journal-link')) link.classList.toggle('filled', learned);
-      }
-
-      const box = this.modal.querySelector('#journal-skill-detail');
-      const id = this.selectedSkill;
-      const s = SKILLS[id];
-      const learned = this.has(id);
-      const reqOk = !s.req || this.has(s.req);
+    // Pestaña ESTADÍSTICAS: las 4 estadísticas de Ruben y los objetos equipados
+    renderStats() {
+      const box = this.modal.querySelector('#journal-stats');
       box.innerHTML = '';
-      const left = el('div', 'journal-skill-text');
-      const branch = BRANCHES.find(b => b.id === s.branch);
-      left.appendChild(el('div', 'journal-detail-kind', `Rama del ${branch ? branch.name.charAt(0) + branch.name.slice(1).toLowerCase() : ''} · pasiva`));
-      left.appendChild(el('h3', 'journal-detail-name', s.name));
-      left.appendChild(el('p', 'journal-detail-desc', s.desc));
-      box.appendChild(left);
 
-      const right = el('div', 'journal-skill-action');
-      if (learned) {
-        right.appendChild(el('div', 'journal-skill-state ok', '✔ APRENDIDA'));
-      } else {
-        right.appendChild(el('div', 'journal-skill-cost', `Cuesta ${s.cost} ✦`));
-        if (!reqOk) {
-          right.appendChild(el('div', 'journal-skill-state', `Primero aprendé «${SKILLS[s.req].name}»`));
-        } else if (this.availablePoints() < s.cost) {
-          right.appendChild(el('div', 'journal-skill-state', 'Te faltan puntos: buscá Emblemas o ganá Valor'));
-        } else {
-          const btn = el('button', 'btn-start journal-learn', 'APRENDER');
-          btn.type = 'button';
-          btn.id = 'journal-learn';
-          btn.addEventListener('click', () => this.learn(id));
-          right.appendChild(btn);
-        }
+      const sec = el('div', 'stats-section');
+      sec.appendChild(el('div', 'stats-title', 'RUBEN'));
+      for (const id of STAT_ORDER) {
+        const row = el('div', 'stat-row stat-' + id);
+        const head = el('div', 'stat-head');
+        head.appendChild(el('span', 'stat-name', STATS[id].name));
+        head.appendChild(el('span', 'stat-value', this.statText(id)));
+        row.appendChild(head);
+        const bar = el('div', 'stat-bar');
+        for (let i = 0; i < STAT_MAX; i++) bar.appendChild(el('span', 'stat-pip' + (i < this.statLevel(id) ? ' on' : '')));
+        row.appendChild(bar);
+        const eb = this.equipBonus(id);
+        const meta = `Entrenamiento ${this.statLevel(id)}/${STAT_MAX}` + (eb ? ` · equipo +${Math.round(eb * 100)}%` : '') +
+          ` · Entrenan: ${this.trainersOf(id)}`;
+        row.appendChild(el('div', 'stat-meta', meta));
+        sec.appendChild(row);
       }
-      box.appendChild(right);
+      box.appendChild(sec);
+
+      const eq = el('div', 'stats-section');
+      eq.appendChild(el('div', 'stats-title', `OBJETOS EQUIPADOS · ${this.save.equipped.length}/${EQUIP_SLOTS}`));
+      const list = el('div', 'stats-equip-list');
+      for (const id of Object.keys(EQUIP)) {
+        const info = ITEMS[id];
+        const owned = this.ownsItem(id);
+        const on = this.save.equipped.includes(id);
+        const b = el('button', 'stat-equip' + (on ? ' equipped' : '') + (owned ? '' : ' unknown'));
+        b.type = 'button';
+        b.dataset.item = id;
+        b.disabled = !owned;
+        b.appendChild(iconCanvas(id, 32, !owned));
+        const txt = el('span', 'stat-equip-text');
+        txt.appendChild(el('span', 'stat-equip-name', owned ? info.name : '???'));
+        txt.appendChild(el('span', 'stat-equip-desc', owned
+          ? `${STATS[EQUIP[id].stat].name} +${Math.round(EQUIP[id].bonus * 100)}%`
+          : 'Por descubrir'));
+        b.appendChild(txt);
+        b.appendChild(el('span', 'stat-equip-state', on ? 'EQUIPADO' : (owned ? 'Equipar' : '')));
+        b.addEventListener('click', () => this.toggleEquip(id));
+        list.appendChild(b);
+      }
+      eq.appendChild(list);
+      box.appendChild(eq);
+
+      box.appendChild(el('p', 'stats-foot',
+        'Los maestros entrenan en persona: hablá con ellos cuando terminen sus líneas. Cada nivel cuesta 1 ✦.'));
     }
 
     renderNotes() {
@@ -1076,7 +1038,7 @@
     }
 
     resetAll() {
-      this.save = { collected: {}, notes: {}, valor: 0, skills: {} };
+      this.save = emptySave();
       this.persist();
       this.syncRoomsWithSave();
       this.applyPassives();
@@ -1096,14 +1058,7 @@
       nav.handlePad = (pressed, prev) => {
         const just = (i) => pressed[i] && !prev[i];
         if (this.isOpen()) {
-          if (just(1)) {
-            if (this.tab === 'skills' && nav.focused && nav.focused.id === 'journal-learn' && this.skillButtons && this.skillButtons[this.selectedSkill]) {
-              nav.setFocus(this.skillButtons[this.selectedSkill]);
-              return true;
-            }
-            this.close();
-            return true;
-          }
+          if (just(1)) { this.close(); return true; }
           if (just(8)) { this.close(); return true; }
           if (just(9)) { this.close(false); return true; }
           if (just(4)) { this.cycleTab(-1); return true; }
@@ -1131,12 +1086,6 @@
 
         if (this.isOpen()) {
           e.stopImmediatePropagation();
-          if (e.code === 'Escape' && this.tab === 'skills' && document.activeElement && document.activeElement.id === 'journal-learn' && this.skillButtons && this.skillButtons[this.selectedSkill]) {
-            e.preventDefault();
-            if (g.menuNav) g.menuNav.setFocus(this.skillButtons[this.selectedSkill]);
-            else this.skillButtons[this.selectedSkill].focus();
-            return;
-          }
           if (e.code === 'Escape' || isToggle) { e.preventDefault(); this.close(); return; }
           if (e.code === 'KeyQ') { e.preventDefault(); this.cycleTab(-1); return; }
           if (e.code === 'KeyE') { e.preventDefault(); this.cycleTab(1); return; }
@@ -1167,7 +1116,7 @@
     }
   }
 
-  window.JournalData = { ITEMS, ITEM_ORDER, SKILLS, BRANCHES, drawIcon };
+  window.JournalData = { ITEMS, ITEM_ORDER, STATS, STAT_ORDER, EQUIP, drawIcon };
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
   window.GameHooks.onInit = window.GameHooks.onInit || [];
   window.GameHooks.onRenderWorld = window.GameHooks.onRenderWorld || [];
@@ -1176,9 +1125,7 @@
   window.GameHooks.onRestartGame.push((game) => {
     const j = game.journal;
     if (!j) return;
-    j.hearts.length = 0;
-    j.sinceHurt = 0;
-    j.save = { collected: {}, notes: {}, valor: 0, skills: {} };
+    j.save = emptySave();
     j.persist();
     j.syncRoomsWithSave();
     j.applyPassives();

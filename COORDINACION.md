@@ -477,6 +477,14 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
   - Conectado el disparo de `window.soundManager.playWaterGroundImpact(intensity)` cada vez que el agua cae y choca contra una plataforma o el suelo (`pl`), cubriendo orbes lanzados, esfera guiada reventada y agua caída de la mano.
 - Verificado con `node scripts/check-project.js` (0 errores).
 
+## Estadísticas en lugar del árbol de virtudes (Claude, 11/11, pedido del usuario)
+- El Diario ya no tiene árbol de virtudes: la pestaña VIRTUDES pasó a **ESTADÍSTICAS** (`js/journal.js`).
+- Cuatro estadísticas de Ruben: **daño básico**, **velocidad de ataque**, **defensa** (probabilidad de bloquear un golpe) y **velocidad de movimiento**.
+- Se suben **entrenando con los maestros**: Tobías (movimiento y defensa) y Maestro Arroyo (ataque y daño), en `js/levels-expansion.js` con `trains`. Cada nivel cuesta 1 ✦ (punto de entrenamiento), máximo 5 por estadística.
+- Se potencian **equipando objetos** del diario (máximo 2): Brújula (movimiento +12%), Campanilla (ataque +15%), Retrato (daño +15%), Sello (defensa +12%).
+- Los puntos ✦ siguen saliendo de Emblemas y enemigos. Las virtudes viejas (salto, piedras, vida máxima extra, regeneración, botín) se quitaron; los puntos ya gastados en virtudes vuelven a estar disponibles al cargar.
+- `js/npcs.js` (`talk`) llama `journal.trainNpc(n)` tras las líneas del NPC; `js/player.js` suma `mods.blockChance` en `takeDamage`.
+
 ## Pantalla de inicio, portón animado y avisos (Claude, 11/11, pedido del usuario)
 - **js/main.js**: el aviso (`notification`) baja abajo (`placeNotification`) mientras hay un diálogo abierto (Maestro, notas), así no se encima con el diálogo. Al desbloquear el portón se fija `door.openedAt`.
 - **js/world.js**: el portón abierto anima la hoja girando hacia atrás sobre la bisagra y queda abierta, sin marco.

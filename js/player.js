@@ -64,14 +64,15 @@ class Player {
     this.armPoses = {};
     this._arm = { pose: 0, aim: 0 };
 
-    // Modificadores que ajustan las virtudes del Diario (journal.js → applyPassives)
+    // Modificadores que ajustan las estadísticas del Diario (journal.js → applyPassives)
     this.mods = {
       attackDamage: 1,      // multiplica el daño del tajo
       attackCooldown: 18,   // cuadros entre tajos
       throwDamage: 1,       // multiplica el daño de la piedra lanzada
       throwSpeed: 1,        // multiplica la velocidad horizontal del lanzamiento
       throwLift: 1,         // multiplica la velocidad vertical del lanzamiento
-      hurtInvuln: 1         // multiplica la invulnerabilidad tras un golpe
+      hurtInvuln: 1,        // multiplica la invulnerabilidad tras un golpe
+      blockChance: 0        // probabilidad (0..1) de bloquear un golpe (Defensa)
     };
 
     // Estado de animación (solo visual: no afecta física ni hitboxes)
@@ -257,6 +258,14 @@ class Player {
 
   takeDamage(amount, knockback = 0) {
     if (this.invulnerableTimer > 0 || this.dead) return;
+    // Defensa (Diario → ESTADÍSTICAS): a veces el golpe no hace daño. Igual activa la
+    // invulnerabilidad, así un mismo contacto no tira el dado cada cuadro.
+    if (this.mods.blockChance > 0 && Math.random() < this.mods.blockChance) {
+      this.invulnerableTimer = Math.round(55 * this.mods.hurtInvuln);
+      this.vx = knockback * 0.5;
+      if (window.particleSystem) window.particleSystem.createDust(this.x + this.width / 2, this.y + this.height / 2, 8, '#e8dcc0');
+      return;
+    }
     this.hp = Math.max(0, this.hp - amount);
     this.invulnerableTimer = Math.round(55 * this.mods.hurtInvuln);
     if (window.gameInstance && window.gameInstance.runHooks) window.gameInstance.runHooks('onPlayerHurt', amount);

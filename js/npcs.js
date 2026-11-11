@@ -63,7 +63,10 @@
       n.lineIdx++;
       if (n.lineIdx < n.lines.length) text += '  ▸';
     } else {
-      text = farewellText(n, g.world.getCurrentRoom());
+      // Maestros que entrenan (n.trains): tras sus líneas, cada charla sube una estadística
+      // (1 ✦). Si no hay nada que entrenar, sigue la despedida de siempre.
+      const trained = g.journal && g.journal.trainNpc ? g.journal.trainNpc(n) : null;
+      text = trained || farewellText(n, g.world.getCurrentRoom());
     }
     g.activeNote = n;
     g.showDialog(n.name, text, true);
