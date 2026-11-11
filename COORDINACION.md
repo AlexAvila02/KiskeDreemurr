@@ -545,3 +545,9 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - Choques: contra plataformas se apoya/desliza (movimiento por ejes; si nace metida en una, se mueve libre hasta salir); queda dentro de los bordes de la sala; sobre la laguna **flota** en la superficie en vez de fundirse.
 - `index.html`: `water-power.js?v=4`.
 - Verificado: `scripts/check-project.js` (0 errores) y playtest (sala 12): la esfera flota sobre la laguna, se apoya en paredes/techo, sigue tras 17 s y tras un golpe; G la revienta; caminar, saltar y cambiar de sala OK. Sin errores de consola.
+
+## La Laguna del Maestro crece hacia la izquierda: hogar, prado y rueda hidráulica (Claude, 11/11, pedido del usuario)
+- `js/levels-expansion.js` (sala 12): ancho 1600 → 2800; todo lo anterior se corrió +1200 (orilla, laguna, hueco del techo, ruinas, campanas, macetas, maestro, emblema, enemigo, piedras). La orilla oeste ahora va de x 0 a 1720, con dos piedras planas sobre el prado. La bajada desde la sala 4 aterriza en `targetX: 1928`.
+- Nuevo `js/master-home.js` (decorados sin colisión, capa world orden 48): `'water-wheel'` (manantial en la pared → canal sobre pilotes → rueda que gira con cangilones llenos, estanque, dinamo con engranaje y bombilla, cable con pulsos de luz hasta la casa), `'master-house'` (hogar del Maestro Arroyo: techo de tejas azul verdoso con remate de gota, ventana redonda y farol encendidos por la rueda, tonel de lluvia, juncos, banco y regadera) y `'flower-meadow'` (flores que se mecen, pasto y mariposas; x 800–1420).
+- `index.html`: `levels-expansion.js?v=12`, `master-home.js?v=1`.
+- Verificado: `scripts/check-project.js` (0 errores) y playtest: entrar desde el barranco de la sala 4, caminar hasta la rueda cruzando la laguna, saltar y volver a subir a la sala 4. Sin errores de consola.

@@ -68,7 +68,7 @@
       { x: 0, y: 340, w: 40, h: 120, targetRoom: 3, targetX: 1190, targetY: 410 },
       { x: 1720, y: 340, w: 40, h: 120, targetRoom: 5, targetX: 60, targetY: 410 },
       // Primer barranco (x 560-700): baja a la Laguna del Maestro (sala 12)
-      { x: 560, y: 500, w: 140, h: 60, targetRoom: 12, targetX: 728, targetY: 30,
+      { x: 560, y: 500, w: 140, h: 60, targetRoom: 12, targetX: 1928, targetY: 30,
         hint: { dir: 'down', x: 560, w: 140 } }
     ],
     spawnEnemies: () => [
@@ -418,41 +418,54 @@
   // laguna con física de olas (js/water.js) y el Maestro Arroyo, que enseña el Dominio
   // del Agua. Tres campanas sobre la laguna sirven de práctica.
   // Para volver: subir por las ruinas hasta la saliente y saltar por el hueco.
+  // 11/11 (pedido del usuario): la sala se agrandó 1200 px hacia la izquierda (todo lo
+  // anterior está corrido +1200). A la izquierda: la rueda hidráulica que genera energía
+  // (alimentada por un manantial de la pared), el hogar del maestro y un prado de flores
+  // que llega hasta él. Decorados sin colisión en js/master-home.js.
   // ==========================================================
   R({
     id: 12,
     name: 'LAGUNA DEL MAESTRO',
     biome: 'bosque',
-    width: 1600,
+    width: 2800,
     height: 540,
     platforms: [
-      { x: 0, y: 400, w: 520, h: 140, type: 'ground' },     // orilla oeste (el maestro)
-      { x: 1080, y: 400, w: 520, h: 140, type: 'ground' },  // orilla este
-      { x: 520, y: 520, w: 560, h: 20, type: 'ground' },    // fondo de la laguna
-      ceiling(0, 640), ceiling(800, 800),                    // hueco del techo (x 640-800)
-      wall(0), wall(1570),
-      ruin(680, 140, 140),                                   // saliente bajo el hueco
-      ruin(1000, 220, 120),
-      ruin(1180, 310, 120)
+      { x: 0, y: 400, w: 1720, h: 140, type: 'ground' },    // orilla oeste: rueda, hogar, prado y el maestro
+      { x: 2280, y: 400, w: 520, h: 140, type: 'ground' },  // orilla este
+      { x: 1720, y: 520, w: 560, h: 20, type: 'ground' },   // fondo de la laguna
+      ceiling(0, 1840), ceiling(2000, 800),                  // hueco del techo (x 1840-2000)
+      wall(0), wall(2770),
+      ruin(1880, 140, 140),                                  // saliente bajo el hueco
+      ruin(2200, 220, 120),
+      ruin(2380, 310, 120),
+      // Prado: dos piedras planas para mirar las flores desde arriba
+      ruin(980, 320, 110),
+      ruin(1180, 250, 100)
     ],
     // Laguna: superficie en y 412 (12 px bajo las orillas), 108 px de hondo
-    water: [{ x: 520, y: 412, w: 560, h: 108 }],
+    water: [{ x: 1720, y: 412, w: 560, h: 108 }],
     waterBells: [
-      { x: 600, y: 210, pitch: 660 },
-      { x: 880, y: 262, pitch: 784 },
-      { x: 1420, y: 170, pitch: 988 },
+      { x: 1800, y: 210, pitch: 660 },
+      { x: 2080, y: 262, pitch: 784 },
+      { x: 2620, y: 170, pitch: 988 },
       // Campana del techo, sobre el maestro: la bola lanzada se deshace antes de llegar;
       // solo la alcanza la esfera guiada (habilidad mejorada)
-      { x: 300, y: 32, pitch: 1320, ceiling: true }
+      { x: 1500, y: 32, pitch: 1320, ceiling: true }
     ],
     collectibles: [
-      { item: 'emblema', x: 1240, y: 274 }
+      { item: 'emblema', x: 2440, y: 274 }
+    ],
+    // Decorados sin colisión (js/master-home.js): rueda hidráulica, hogar y prado de flores
+    props: [
+      { type: 'water-wheel', x: 250, y: 400 },
+      { type: 'master-house', x: 620, y: 400 },
+      { type: 'flower-meadow', x: 800, y: 400, w: 620 }
     ],
     // Macetas que el maestro coloca al sonar la última campana (escena en js/water.js)
     potSpots: [
-      { x: 352, y: 400, color: '#e2705a' },
-      { x: 386, y: 400, color: '#f2d29b' },
-      { x: 420, y: 400, color: '#9fdcef' }
+      { x: 1552, y: 400, color: '#e2705a' },
+      { x: 1586, y: 400, color: '#f2d29b' },
+      { x: 1620, y: 400, color: '#9fdcef' }
     ],
     npcs: [
       {
@@ -461,7 +474,7 @@
         teaches: 'water',
         trains: ['atk', 'dmg'],    // entrena Velocidad de ataque y Daño básico (Diario → ESTADÍSTICAS)
         name: 'Maestro Arroyo',
-        x: 300, y: 400, facing: 1,
+        x: 1500, y: 400, facing: 1,
         lines: [
           'Ah, un muchacho que cae del cielo y todavía no se moja. Soy el Maestro Arroyo. El agua de esta laguna escucha a quien sabe pedirle.',
           'Tu hermano Angelo se sentó en esta misma orilla. Quería aprender, pero tenía prisa; siempre la tuvo. Me dijo que vendría alguien más paciente.',
@@ -474,11 +487,11 @@
       }
     ],
     exits: [
-      { x: 0, y: -400, w: 1600, h: 390, targetRoom: 4, targetX: 720, targetY: 410,
-        hint: { dir: 'up', x: 640, w: 160 } }
+      { x: 0, y: -400, w: 2800, h: 390, targetRoom: 4, targetX: 720, targetY: 410,
+        hint: { dir: 'up', x: 1840, w: 160 } }
     ],
-    spawnEnemies: () => [new FlyingShadeEnemy(1350, 250)],
-    spawnDebris: () => [stone(160, 400), stone(1300, 400)]
+    spawnEnemies: () => [new FlyingShadeEnemy(2550, 250)],
+    spawnDebris: () => [stone(1360, 400), stone(2500, 400)]
   });
 
   // ==========================================================
