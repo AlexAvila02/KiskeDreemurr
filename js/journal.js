@@ -373,17 +373,6 @@
     ctx.restore();
   }
 
-  // Objetos no conseguidos: sin ícono, solo un "?" en su lugar
-  function slotIcon(key, size, owned) {
-    if (owned) return iconCanvas(key, size);
-    const q = el('span', 'journal-unknown-mark', '?');
-    q.style.width = size + 'px';
-    q.style.height = size + 'px';
-    q.style.lineHeight = size + 'px';
-    q.style.fontSize = Math.round(size * 0.5) + 'px';
-    return q;
-  }
-
   // Lienzo nítido (alta densidad) con un ícono dibujado; `hidden` = silueta "por descubrir"
   function iconCanvas(key, size, hidden = false) {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -879,16 +868,18 @@
     renderItems() {
       const grid = this.modal.querySelector('#journal-items-grid');
       grid.innerHTML = '';
-      for (const id of ITEM_ORDER) {
+      // Solo se muestran los objetos ya conseguidos: nada revela cuántos faltan
+      const ownedIds = ITEM_ORDER.filter(id => this.ownsItem(id));
+      if (!ownedIds.includes(this.selectedItem)) this.selectedItem = ownedIds[0] || null;
+      for (const id of ownedIds) {
         const info = ITEMS[id];
-        const owned = this.ownsItem(id);
-        const b = el('button', 'journal-slot' + (owned ? ' owned' : ' unknown') + (id === this.selectedItem ? ' selected' : ''));
+        const b = el('button', 'journal-slot owned' + (id === this.selectedItem ? ' selected' : ''));
         b.type = 'button';
-        b.appendChild(slotIcon(id, 40, owned));
+        b.appendChild(iconCanvas(id, 40));
         if (info.stack) {
-          b.appendChild(el('span', 'journal-slot-count', `${this.itemCount(id)}/${this.worldCount(id)}`));
+          b.appendChild(el('span', 'journal-slot-count', `${this.itemCount(id)}`));
         }
-        b.title = owned ? info.name : '???';
+        b.title = info.name;
         const select = () => {
           this.selectedItem = id;
           grid.querySelectorAll('.journal-slot').forEach(s => s.classList.remove('selected'));
@@ -900,8 +891,9 @@
         b.addEventListener('mouseenter', select);
         grid.appendChild(b);
       }
-      const ownedCount = ITEM_ORDER.filter(id => this.ownsItem(id)).length;
-      const foot = el('div', 'journal-grid-foot', `Objetos encontrados: ${ownedCount} de ${ITEM_ORDER.length}`);
+      const foot = el('div', 'journal-grid-foot', ownedIds.length
+        ? `Objetos encontrados: ${ownedIds.length}`
+        : 'Todavía no encontraste ningún objeto.');
       grid.appendChild(foot);
       this.renderItemDetail();
       this.itemsDirty = false;
@@ -910,23 +902,22 @@
     renderItemDetail() {
       const box = this.modal.querySelector('#journal-item-detail');
       const id = this.selectedItem;
-      const info = ITEMS[id];
-      const owned = this.ownsItem(id);
       box.innerHTML = '';
-      const frame = el('div', 'journal-detail-frame');
-      frame.appendChild(slotIcon(id, 88, owned));
-      box.appendChild(frame);
-      box.appendChild(el('div', 'journal-detail-kind', owned ? info.kind : 'Por descubrir'));
-      box.appendChild(el('h3', 'journal-detail-name', owned ? info.name : '? ? ?'));
-      box.appendChild(el('p', 'journal-detail-desc', owned
-        ? info.desc
-        : 'Todavía no lo encontraste. Las notas de Angelo dan pistas de dónde buscar.'));
-      if (owned) {
-        const where = this.whereFound(id);
-        let meta = where ? `Encontrado en: ${where}` : '';
-        if (info.stack) meta = `Tenés ${this.itemCount(id)} de ${this.worldCount(id)}` + (where ? ` · el primero, en ${where}` : '');
-        if (meta) box.appendChild(el('div', 'journal-detail-meta', meta));
+      if (!id || !this.ownsItem(id)) {
+        box.appendChild(el('p', 'journal-detail-desc', 'Las notas de Angelo dan pistas de dónde buscar.'));
+        return;
       }
+      const info = ITEMS[id];
+      const frame = el('div', 'journal-detail-frame');
+      frame.appendChild(iconCanvas(id, 88));
+      box.appendChild(frame);
+      box.appendChild(el('div', 'journal-detail-kind', info.kind));
+      box.appendChild(el('h3', 'journal-detail-name', info.name));
+      box.appendChild(el('p', 'journal-detail-desc', info.desc));
+      const where = this.whereFound(id);
+      let meta = where ? `Encontrado en: ${where}` : '';
+      if (info.stack) meta = `Tenés ${this.itemCount(id)}` + (where ? ` · el primero, en ${where}` : '');
+      if (meta) box.appendChild(el('div', 'journal-detail-meta', meta));
     }
 
     // Gráfico de radar de las 4 estadísticas: cada eje es una estadística y el nivel
@@ -1004,20 +995,18 @@
       const list = el('div', 'stats-equip-list');
       for (const id of Object.keys(EQUIP)) {
         const info = ITEMS[id];
-        const owned = this.ownsItem(id);
+        if (!this.ownsItem(id)) continue; // los no conseguidos no se muestran
         const on = this.save.equipped.includes(id);
-        const b = el('button', 'stat-equip' + (on ? ' equipped' : '') + (owned ? '' : ' unknown'));
+        const b = el('button', 'stat-equip' + (on ? ' equipped' : ''));
         b.type = 'button';
         b.dataset.item = id;
-        b.disabled = !owned;
-        b.appendChild(slotIcon(id, 32, owned));
+        b.appendChild(iconCanvas(id, 32));
         const txt = el('span', 'stat-equip-text');
-        txt.appendChild(el('span', 'stat-equip-name', owned ? info.name : '???'));
-        txt.appendChild(el('span', 'stat-equip-desc', owned
-          ? `${STATS[EQUIP[id].stat].name} +${Math.round(EQUIP[id].bonus * 100)}%`
-          : 'Por descubrir'));
+        txt.appendChild(el('span', 'stat-equip-name', info.name));
+        txt.appendChild(el('span', 'stat-equip-desc',
+          `${STATS[EQUIP[id].stat].name} +${Math.round(EQUIP[id].bonus * 100)}%`));
         b.appendChild(txt);
-        b.appendChild(el('span', 'stat-equip-state', on ? 'EQUIPADO' : (owned ? 'Equipar' : '')));
+        b.appendChild(el('span', 'stat-equip-state', on ? 'EQUIPADO' : 'Equipar'));
         b.addEventListener('click', () => this.toggleEquip(id));
         list.appendChild(b);
       }

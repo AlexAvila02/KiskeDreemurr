@@ -160,15 +160,6 @@
 }
 .journal-slot.unknown { background: radial-gradient(circle at 50% 40%, #e9d6ae 0%, #d3b98a 100%); }
 .journal-slot.unknown .journal-icon { opacity: 0.45; }
-.journal-unknown-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: Georgia, serif;
-  font-weight: bold;
-  color: rgba(58, 36, 22, 0.55);
-  user-select: none;
-}
 .journal-slot:hover { transform: translateY(-2px); }
 .journal-slot.selected { border-color: #3a2416; box-shadow: 0 0 0 2px #d9a634, 0 3px 0 rgba(58, 36, 22, 0.35); }
 .journal-slot-count {
