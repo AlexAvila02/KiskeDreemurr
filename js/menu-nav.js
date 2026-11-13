@@ -41,7 +41,7 @@ class MenuNavigator {
 
   /** Devuelve el contenedor del menú que está al frente, o null si se está jugando */
   getActiveMenu() {
-    const order = ['controls-modal', 'pause-modal', 'overlay-screen'];
+    const order = ['mp-modal', 'controls-modal', 'pause-modal', 'overlay-screen'];
     for (const id of order) {
       const el = document.getElementById(id);
       if (this.isVisible(el)) return el;

@@ -68,6 +68,8 @@
 
   function saveNow(game) {
     if (!game || !game.isPlaying || !game.player || game.player.dead) return;
+    // De invitado en una sala multijugador el mundo es del anfitrión: no pisar la partida propia
+    if (window.Multiplayer && window.Multiplayer.isGuest()) return;
     const data = snapshot(game);
     if (data) writeSave(data);
   }

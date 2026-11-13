@@ -576,8 +576,9 @@ class Player {
     const W = '#fff8ec';        // color del destello de daño
     const SKIN = flash ? W : '#f2c79b';
     const HAIR = flash ? W : '#b5562b';     // pelo cobrizo
-    const TUNIC = flash ? W : '#3f7d5a';    // túnica verde bosque
-    const SCARF = flash ? W : '#d9a634';    // bufanda mostaza (el color de la familia)
+    const pal = this.palette;               // colores propios (multijugador: cada jugador el suyo)
+    const TUNIC = flash ? W : (pal && pal.tunic) || '#3f7d5a';    // túnica verde bosque
+    const SCARF = flash ? W : (pal && pal.scarf) || '#d9a634';    // bufanda mostaza (el color de la familia)
     const BOOT = flash ? W : '#6b3f22';
 
     // Sombra de contacto en el suelo (se encoge al aplastarse/estirarse)

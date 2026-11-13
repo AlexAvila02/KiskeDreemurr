@@ -97,7 +97,20 @@ class Game {
   static get HOOK_NAMES() {
     return ['onInit', 'onBeforeUpdate', 'onAfterUpdate', 'onUpdate', 'onAction', 'onBeforeRoomLoad',
       'onRoomLoad', 'onFreezeInput', 'onAfterPlayerUpdate', 'onBlockExits', 'onKeepDialog',
-      'onBeforeTogglePause', 'onPlayerHurt', 'onRestartGame', 'onRenderWorld', 'onRenderHUD'];
+      'onBeforeTogglePause', 'onPlayerHurt', 'onRestartGame', 'onRenderWorld', 'onRenderHUD',
+      'onEnemyTarget'];
+  }
+
+  // A quién persigue/ataca un enemigo este cuadro: el primer hook onEnemyTarget que devuelva
+  // un objeto con { x, y, width, height, takeDamage } (multijugador: el jugador más cercano)
+  enemyTarget(enemy) {
+    const list = window.GameHooks && window.GameHooks.onEnemyTarget;
+    if (list && list.length) {
+      for (let i = 0; i < list.length; i++) {
+        try { const t = list[i](this, enemy); if (t) return t; } catch (e) { console.error('[GameHooks.onEnemyTarget]', e); }
+      }
+    }
+    return this.player;
   }
 
   // Llama a todos los hooks `name` (un error en uno no frena a los demás)
@@ -931,7 +944,7 @@ class Game {
 
     // Actualizar Enemigos
     for (const enemy of this.enemies) {
-      enemy.update(this.world, this.player);
+      enemy.update(this.world, this.enemyTarget(enemy));
     }
 
     // Actualizar Escombros Arrojables
