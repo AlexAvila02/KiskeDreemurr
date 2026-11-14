@@ -160,8 +160,7 @@
     if (st.d && !gh.dead) { gh.dead = true; if (gh.startDeath) gh.startDeath(); }
     else if (!st.d && gh.dead) { gh.dead = false; gh.anim.deathY = 0; gh.anim.deathVy = 0; gh.anim.deathRot = 0; pl.snap = true; }
     if (gh.dead) { if (gh.updateDeath) gh.updateDeath(); return; }
-    if (gh.isGrounded && Math.abs(gh.vx) > 0.4) gh.walkPhase += Math.abs(gh.vx) * 0.11;
-    else gh.walkPhase = 0;
+    gh.stepWalkCycle();
     const moveDir = Math.abs(gh.vx) > 0.4 ? Math.sign(gh.vx) : 0;
     try { gh.updateAnimation(moveDir); } catch (e) { /* */ }
     try { gh.updateCapePhysics(); } catch (e) { /* */ }

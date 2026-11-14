@@ -81,7 +81,7 @@ class ThrowableDebris {
       const targetX = player.x + player.width / 2 - this.width / 2;
       this.carryLag += ((targetX - this.x) - this.carryLag) * 0.35;
       this.x = targetX;
-      const bob = player.walkPhase ? Math.abs(Math.sin(player.walkPhase)) * 2 : 0;
+      const bob = Math.abs(Math.sin(player.walkPhase)) * 2 * ((player.anim && player.anim.walk) || 0);
       this.y = player.y - this.height - 4 - bob;
       this.rot += (-this.carryLag * 0.04 - this.rot) * 0.25;
       return;

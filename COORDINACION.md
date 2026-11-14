@@ -588,3 +588,13 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `index.html`: `enemies.js?v=3`, `player.js?v=9`, `main.js?v=11`.
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador: salto normal y en espera (apretado a 25 px del suelo, salta 2 cuadros después), respingo del escarabajo (12 cuadros quieto y luego carga), piedra que rebota, golpe a la polilla, muerte y reaparición, caminar/saltar/atacar, cambio de sala; consola sin errores. **No probado en vivo:** el escarabajo esperando en el borde de un precipicio.
 - **Sin revisar todavía:** `world.js`, `journal.js`, `multiplayer.js`, `controls.js`, `audio.js`, `particles.js`, `code-art-engine.js`, `animation-registry.js` y el dibujo de Ruben (`player.render`).
+
+## Animaciones de Ruben: caminar, saltar, caer, atacar (Claude, 14/11, pedido del usuario)
+- **`js/player.js`:**
+  - Nuevo `stepWalkCycle()` y `anim.walk` (0..1): al frenar o saltar las piernas ya no saltan de golpe a la pose de reposo; la amplitud del paso se apaga suave y recién ahí se reinicia la fase. `anim.air` (0..1) mezcla la pose de aire.
+  - **Brazo libre** (antes Ruben solo tenía el brazo de la espada): se mece al revés que las piernas, se abre en el salto, aletea al caer, hace de contrapeso en el tajo y sube a sostener la piedra. Sigue su pose con retraso (`anim.armX/armY`). Con viento/agua o agotado se sigue usando el brazo de 4b / 4c.
+  - Salto: rodilla de adelante arriba y pierna de atrás estirada. Caída: piernas abiertas que patalean según la velocidad; la espada queda en alto. Aterrizaje: los pies se abren mientras dura el aplastamiento. Tajo: da un paso adelante con el pie de adelante.
+  - La bufanda usa un búfer fijo (`CAPE_SCREEN`) en vez de crear un arreglo por cuadro.
+- `js/multiplayer.js`: los otros jugadores usan `stepWalkCycle()` (misma caminata). `js/enemies.js`: el rebote de la piedra cargada usa `anim.walk`.
+- `index.html`: `player.js?v=10`, `enemies.js?v=4`, `multiplayer.js?v=3`.
+- Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador con capturas cuadro por cuadro (reposo, paso, subida, caída, aterrizaje, frenada, tajo, cargando piedra), cambio de sala, y agua contra el maestro; consola sin errores. **No probado:** multijugador con dos pestañas tras el cambio de `stepWalkCycle`.

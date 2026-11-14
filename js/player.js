@@ -6,6 +6,8 @@
 const SLASH_N = 18;
 const SLASH_OUT = new Float32Array((SLASH_N + 1) * 2);
 const SLASH_IN = new Float32Array((SLASH_N + 1) * 2);
+// Puntos de la bufanda en pantalla (búfer fijo: sin basura por cuadro)
+const CAPE_SCREEN = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
 // Traza la media luna completa (borde exterior y vuelta por el interior)
 function slashShape(ctx) {
   ctx.beginPath();
@@ -92,6 +94,9 @@ class Player {
       runDust: 0,           // temporizador de bocanadas de polvo al correr
       lastFacing: 1,
       fallSpeed: 0,         // velocidad de caída previa al aterrizaje
+      walk: 0,              // 0..1: cuánto del ciclo de caminata se ve (entra y sale suave)
+      armX: -7, armY: 27,   // mano libre (relativa al cuerpo), sigue su pose con retraso
+      air: 0,               // 0..1: cuánto lleva en el aire (pose de salto / caída)
       deathVy: 0, deathY: 0, deathRot: 0
     };
 
@@ -401,18 +406,27 @@ class Player {
       if (this.isGrounded) this.jump();
     }
 
-    // Ciclo de caminata ligado a la velocidad real (no al reloj)
-    if (this.isGrounded && Math.abs(this.vx) > 0.4) {
-      this.walkPhase += Math.abs(this.vx) * 0.11;
-    } else {
-      this.walkPhase = 0;
-    }
+    this.stepWalkCycle();
 
     // Actualizar física de la bufanda
     this.updateCapePhysics();
 
     // Animación procedural (resortes, inclinación, polvo)
     this.updateAnimation(moveDir);
+  }
+
+  // Ciclo de caminata ligado a la velocidad real (no al reloj). Al frenar o saltar la fase
+  // no vuelve a 0 de golpe: la amplitud (anim.walk) se apaga y recién ahí se reinicia, así
+  // las piernas se acomodan en vez de saltar a la pose de reposo.
+  stepWalkCycle() {
+    const a = this.anim;
+    const moving = this.isGrounded && Math.abs(this.vx) > 0.4;
+    if (moving) this.walkPhase += Math.abs(this.vx) * 0.11;
+    a.walk += ((moving ? 1 : 0) - a.walk) * (moving ? 0.3 : (this.isGrounded ? 0.2 : 0.4));
+    if (!moving && a.walk < 0.03) { a.walk = 0; this.walkPhase = 0; }
+    // Pose de aire: entra rápido al despegar y sale rápido al aterrizar
+    a.air += ((this.isGrounded ? 0 : 1) - a.air) * (this.isGrounded ? 0.45 : 0.3);
+    if (a.air < 0.02) a.air = 0;
   }
 
   // Resortes amortiguados: dan un rebote orgánico en lugar de cambios bruscos
@@ -580,10 +594,14 @@ class Player {
     const scaleY = stretchY * (1 + (1 - a.sx) * 0.5);
     const scaleX = a.sx / stretchY;
 
-    // Balanceo al caminar: el cuerpo rebota dos veces por ciclo
-    const bob = this.walkPhase ? -Math.abs(Math.sin(this.walkPhase)) * 2.5 : 0;
+    // Balanceo al caminar: el cuerpo rebota dos veces por ciclo (wk = amplitud del paso)
+    const wk = a.walk || 0, wph = this.walkPhase, air = a.air || 0;
+    const bob = -Math.abs(Math.sin(wph)) * 2.5 * wk;
+    const lungeK = Math.sin(a.lunge * Math.PI);          // 0 → 1 → 0 durante el tajo
+    // Aterrizaje: mientras el cuerpo está aplastado, los pies se abren
+    const landSpread = this.isGrounded ? Math.max(0, 1 - a.sy) * 9 : 0;
     // Pequeño avance del cuerpo al lanzar el tajo
-    const lungeX = f * Math.sin(a.lunge * Math.PI) * 3;
+    const lungeX = f * lungeK * 3;
 
     const OUT = '#3a2416';      // contorno marrón cálido (tinta de animación)
     const W = '#fff8ec';        // color del destello de daño
@@ -641,7 +659,8 @@ class Player {
 
     // 1. Cola de la bufanda (cinta que se afina)
     {
-      const P = this.capePoints.map(p => ({ x: p.x - camera.x - lungeX, y: p.y - camera.y + bob }));
+      const P = CAPE_SCREEN;
+      for (let i = 0; i < 3; i++) { P[i].x = this.capePoints[i].x - camera.x - lungeX; P[i].y = this.capePoints[i].y - camera.y + bob; }
       ctx.fillStyle = SCARF;
       ctx.beginPath();
       ctx.moveTo(P[0].x, P[0].y - 3);
@@ -652,22 +671,36 @@ class Player {
       ctx.fill(); ctx.stroke();
     }
 
-    // 2. Piernas y botas: paso alternado (un pie adelante y levantado)
-    //    En el aire: recogidas al subir, abiertas al caer.
+    // 2. Piernas y botas: paso alternado (un pie adelante y levantado).
+    //    En el aire: al subir, la rodilla de adelante arriba y la otra pierna estirada atrás;
+    //    al caer, piernas abiertas que patalean buscando el suelo. Al atacar da un paso
+    //    adelante; al aterrizar los pies se abren con el aplastamiento.
     ctx.fillStyle = BOOT;
     const rising = this.vy < -1;
-    for (const k of [-1, 1]) {
-      const ph = this.walkPhase + (k === 1 ? 0 : Math.PI);
-      const stepX = this.walkPhase ? Math.cos(ph) * 4.5 * f : 0;
-      const lift = this.walkPhase ? Math.max(0, Math.sin(ph)) * 3.5 : 0;
-      const airTuck = this.isGrounded ? 0 : (rising ? 4 : 1);
-      const airSpread = this.isGrounded || rising ? 0 : k * 1.5;
-      const footAng = this.walkPhase ? -Math.sin(ph) * 0.25 * f : 0; // la punta acompaña el paso
-      let fx = cx + k * (4 + 3.2 * wp) + stepX + airSpread + f * 0.8;
+    const fallK = this.dead ? 0 : Math.min(1, Math.max(0, this.vy) / 7) * air;
+    for (let k = -1; k <= 1; k += 2) {
+      const front = k === f;
+      const ph = wph + (k === 1 ? 0 : Math.PI);
+      const stepX = Math.cos(ph) * 4.5 * f * wk;
+      const lift = Math.max(0, Math.sin(ph)) * 3.5 * wk;
+      let airTuck = 0, airX = 0, airAng = 0;
+      if (air > 0) {
+        if (rising) {
+          airTuck = (front ? 6.5 : 1.5) * air;
+          airX = f * (front ? 2.5 : -3.5) * air;
+          airAng = f * (front ? -0.35 : 0.45) * air;
+        } else {
+          const kick = Math.sin(t * 15 + k * 1.6) * 1.6 * fallK;
+          airTuck = (1.5 + kick) * air;
+          airX = k * (1.5 + 3 * fallK) * air;
+          airAng = k * 0.3 * fallK;
+        }
+      }
+      const footAng = -Math.sin(ph) * 0.25 * f * wk + airAng; // la punta acompaña el paso
+      let fx = cx + k * (4 + 3.2 * wp + landSpread * 0.5) + stepX + airX + f * 0.8 + (front ? f * 3.5 * lungeK : -f * 1.5 * lungeK);
       let fy = feetY - 3 - lift - airTuck, rx = 5, ry = 3.5;
       if (kn > 0.01) {
         // De rodillas: el pie de adelante plantado, la otra pierna con la canilla en el suelo
-        const front = k === f;
         fx += ((front ? cx + f * 7 : cx - f * 8) - fx) * kn;
         fy += ((front ? feetY - 3 : feetY - 2.6) - fy) * kn;
         rx += ((front ? 5 : 6.8) - rx) * kn;
@@ -686,7 +719,7 @@ class Player {
 
     // 3. Cuerpo: túnica en forma de pera con cinturón (el ruedo flamea al moverse).
     //    De rodillas el ruedo se apoya en el suelo y se abre sobre las piernas.
-    const hemSwing = Math.sin(this.walkPhase * 2) * 1.2 - (this.vx / this.speed) * 1.5;
+    const hemSwing = Math.sin(wph * 2) * 1.2 * wk - (this.vx / this.speed) * 1.5;
     const hemY = feetY - 5 - drop + 4 * kn;
     const flare = 3 * kn;
     ctx.fillStyle = TUNIC;
@@ -707,11 +740,40 @@ class Player {
     ctx.fillRect(cx - 10, Math.min(sy + 28, hemY - 4), 20, 3);
 
     // Morral con las notas de Angelo (se mece con el paso)
-    const bagSwing = Math.sin(this.walkPhase + 0.6) * 1.2;
+    const bagSwing = Math.sin(wph + 0.6) * 1.2 * wk + Math.max(-1.5, Math.min(1.5, -this.vy * 0.15)) * air;
     ctx.fillStyle = flash ? W : '#c08a4e';
     ctx.beginPath();
     ctx.roundRect(cx - f * 9 - 4 - f * bagSwing * 0.5, sy + 24 + Math.abs(bagSwing) * 0.4, 8, 7, 2);
     ctx.fill(); ctx.stroke();
+
+    // 3b. Brazo libre (el otro lleva la espada). Se mece al revés que las
+    //     piernas, se abre para equilibrarse en el aire, se echa atrás en el tajo y sube a
+    //     sostener la piedra. Sigue su pose con retraso (follow-through). Con los poderes
+    //     o agotado en el suelo, ese brazo se dibuja más abajo (4b / 4c).
+    if (wp <= 0.02 && col <= 0.05) {
+      let tx = -7, ty = 27;                                   // colgando junto al cuerpo
+      tx += Math.sin(wph) * 4.5 * wk; ty -= Math.abs(Math.sin(wph)) * 1.2 * wk;
+      if (air > 0 && !this.dead) {
+        if (rising) { tx += -3 * air; ty += -7 * air; }       // al subir: atrás y arriba
+        else { tx += -4 * air; ty += (-13 - Math.sin(t * 15) * 1.5) * air * (0.4 + 0.6 * fallK); }  // al caer: aletea arriba
+      }
+      if (this.isAttacking) { tx = -11.5; ty = 23; }          // contrapeso del tajo
+      if (this.carriedItem) { tx = -10; ty = -3; }            // sostiene la piedra sobre la cabeza
+      if (kn > 0.01) { tx += (-9 - tx) * kn; ty += (25 - ty) * kn; }
+      if (this.dead) { tx = -10; ty = 12; }
+      a.armX += (tx - a.armX) * 0.3; a.armY += (ty - a.armY) * 0.3;
+      const ax0 = cx - f * 5, ay0 = sy + 20;
+      const ax1 = cx + f * a.armX, ay1 = sy + a.armY;
+      ctx.strokeStyle = OUT; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      ctx.strokeStyle = flash ? W : TUNIC;
+      ctx.lineWidth = 3.4;
+      ctx.beginPath(); ctx.moveTo(ax0, ay0); ctx.lineTo(ax1, ay1); ctx.stroke();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 1.6;
+      ctx.fillStyle = SKIN;
+      ctx.beginPath(); ctx.arc(ax1, ay1, 2.7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 2;
+    }
 
     // 4. Brazo y espada. Al atacar, la espada barre por delante (alternando arriba/abajo).
     const shoulderX = cx + f * 6, shoulderY = sy + 21;
@@ -725,7 +787,9 @@ class Player {
       swordAng = from + (to - from) * e + (this.attackAim || 0);
     } else {
       // Reposo: la espada respira y acompaña el paso
-      swordAng = -1.25 + Math.sin(this.walkPhase) * 0.15 + (idle ? Math.sin(t * 2.6) * 0.04 : 0);
+      // (en el aire: sube al saltar y queda en alto al caer, lista para el tajo hacia abajo)
+      swordAng = -1.25 + Math.sin(wph) * 0.15 * wk + (idle ? Math.sin(t * 2.6) * 0.04 : 0) +
+        (rising ? 0.25 : -0.35 * fallK) * air;
     }
     // Jalando el aire: la espada baja y queda atrás
     if (wp) swordAng += (2.05 - swordAng) * wp;
@@ -863,7 +927,7 @@ class Player {
     const hurt = a.hurtFlash > 0 || (this.invulnerableTimer > 40 && !this.dead);
     const ex = hcx + f * 3;
     const lookY = Math.max(-1, Math.min(1.2, this.vy * 0.15)); // mira hacia donde va
-    for (const k of [-1, 1]) {
+    for (let k = -1; k <= 1; k += 2) {
       const exx = ex + k * 3.5;
       if (this.dead) {
         // Ojos en cruz de cartoon
