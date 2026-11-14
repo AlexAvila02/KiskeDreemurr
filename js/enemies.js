@@ -92,8 +92,10 @@ class ThrowableDebris {
       this.x += this.vx;
       this.y += this.vy;
       this.rot += this.vx * 0.045; // gira en el aire
-      this.trail.push({ x: this.x + this.width / 2, y: this.y + this.height / 2 });
-      if (this.trail.length > 7) this.trail.shift();
+      // Estela: al llenarse se recicla el punto más viejo (sin basura por cuadro)
+      const tp = this.trail.length >= 7 ? this.trail.shift() : { x: 0, y: 0 };
+      tp.x = this.x + this.width / 2; tp.y = this.y + this.height / 2;
+      this.trail.push(tp);
 
       // Colisión con enemigos
       for (const enemy of enemies) {
@@ -170,9 +172,17 @@ class ThrowableDebris {
           prevBottom <= plat.y + 16 &&
           this.vy >= 0
         ) {
+          const impact = this.vy;
           this.y = plat.y - this.height;
-          this.vy = 0;
-          this.isGrounded = true;
+          if (impact > 3.2) {
+            // Cae con fuerza: rebota una vez, gira un poco y levanta polvo
+            this.vy = -impact * 0.28;
+            this.rot = (this.vx >= 0 ? 1 : -1) * 0.35;
+            if (window.particleSystem) window.particleSystem.createDust(this.x + this.width / 2, plat.y, 3);
+          } else {
+            this.vy = 0;
+            this.isGrounded = true;
+          }
           break;
         }
       }
@@ -291,6 +301,7 @@ class CrawlerEnemy {
     this.sx = 1; this.vsx = 0;   // resorte de aplastamiento (giros y golpes)
     this.dyingTimer = 0;         // animación de derrota tras morir
     this.DYING_FRAMES = 26;
+    this.edgeWait = 0;           // cuadros esperando al borde de un precipicio
   }
 
   takeDamage(amount, knockback = 0) {
@@ -389,7 +400,9 @@ class CrawlerEnemy {
       if (!this.isChasing) {
         this.isChasing = true;
         this.alert = 32;
-        this.sx = 0.84; this.vsx = 0;
+        // Anticipación: da un respingo de sorpresa antes de cargar
+        this.sx = 0.8; this.vsx = 0;
+        if (this.isGrounded) { this.vy = -3; this.isGrounded = false; }
       }
       const desiredFacing = Math.sign(dx);
       if (desiredFacing !== 0 && desiredFacing !== this.facing && this.turnCooldown === 0 && Math.abs(dx) > 12) {
@@ -408,10 +421,19 @@ class CrawlerEnemy {
       this.knockbackVx *= 0.82;
       if (Math.abs(this.knockbackVx) <= 0.1) this.knockbackVx = 0;
     } else {
-      const currentSpeed = this.isChasing ? this.chaseSpeed : this.speed;
+      let currentSpeed = this.isChasing ? this.chaseSpeed : this.speed;
+      // Durante el respingo de sorpresa se queda en el lugar
+      if (this.isChasing && this.alert > 20) currentSpeed = 0;
 
       // Antes de avanzar, comprobar si hay precipicio adelante
-      if (this.isGrounded && !this.hasGroundAhead(world, this.facing)) {
+      const atEdge = this.isGrounded && !this.hasGroundAhead(world, this.facing);
+      if (atEdge && this.isChasing && Math.sign(dx) === this.facing) {
+        // Ruben está del otro lado del precipicio: lo espera en el borde, impaciente
+        // (antes se daba vuelta y volvía cada pocos cuadros, temblando en el borde)
+        currentSpeed = 0;
+        if (this.edgeWait++ % 34 === 0) { this.sx = 0.86; this.vsx = 0; }
+      } else if (atEdge) {
+        this.edgeWait = 0;
         this.turnAround();
         // Reanclar el centro de patrulla para no quedar atrapado contra un borde
         this.startX = this.x + this.facing * Math.min(60, this.patrolDistance * 0.5);
@@ -424,7 +446,7 @@ class CrawlerEnemy {
       }
 
       moveVx = currentSpeed * this.facing;
-      this.animT += currentSpeed * 0.22;
+      this.animT += currentSpeed > 0 ? currentSpeed * 0.22 : 0.05;
     }
 
     // Aplicar desplazamiento X y resolver colisiones con muros/plataformas
@@ -470,6 +492,11 @@ class CrawlerEnemy {
     for (const plat of plats) {
       if (aabbOverlap(this.x, this.y, this.width, this.height, plat.x, plat.y, plat.w, plat.h)) {
         if (this.vy > 0) {
+          // Aterrizaje con peso: se aplasta y levanta polvo según la caída
+          if (this.vy > 4.5) {
+            this.sx = 1.22; this.vsx = 0;
+            window.particleSystem.createDust(this.x + this.width / 2, plat.y, 4);
+          }
           this.y = plat.y - this.height;
           this.vy = 0;
           this.isGrounded = true;
@@ -852,6 +879,11 @@ class FlyingShadeEnemy {
 
     ctx.translate(cx, cy + bodyBob);
     ctx.rotate(this.alive ? this.tilt : this.dyingTimer * 0.3);
+    // Golpe: se aplasta y vuelve con un rebote (squash & stretch)
+    if (this.alive && this.hitCooldown > 0) {
+      const hk = this.hitCooldown / 15, wob = Math.sin(hk * Math.PI * 2.5) * hk;
+      ctx.scale(1 + wob * 0.28, 1 - wob * 0.24);
+    }
     ctx.translate(-cx, -cy);
 
     // Alas etéreas y cuerpo acordes a la zona
@@ -912,6 +944,14 @@ class FlyingShadeEnemy {
         ctx.moveTo(ex + 1.5, cy - 2.5); ctx.lineTo(ex - 1.5, cy + 0.5);
         ctx.stroke();
       }
+    } else if (((Date.now() * 0.001 + this.originX * 0.013) % 3.4) < 0.11) {
+      // Parpadeo
+      ctx.strokeStyle = '#2b1a10';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5.5, cy - 1); ctx.lineTo(cx - 1.5, cy - 1);
+      ctx.moveTo(cx + 1.5, cy - 1); ctx.lineTo(cx + 5.5, cy - 1);
+      ctx.stroke();
     } else {
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();

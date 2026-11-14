@@ -53,6 +53,8 @@ class Player {
     this.attackCooldown = 0;
     this.attackBox = { x: 0, y: 0, w: 51, h: 46 };
 
+    this.jumpBuffer = 0;  // cuadros que un salto apretado en el aire sigue en espera
+
     // Mecánica de Agarre / Lanzamiento
     this.carriedItem = null;
 
@@ -121,7 +123,12 @@ class Player {
   }
 
   jump() {
-    if (this.isGrounded || this.coyoteTime > 0) {
+    if (this.dead) return;
+    // En el aire: el salto queda "en espera" unos cuadros y sale solo al tocar el suelo
+    // (apretar un instante antes de aterrizar ya no se pierde)
+    if (!this.isGrounded && this.coyoteTime <= 0) { this.jumpBuffer = 7; return; }
+    this.jumpBuffer = 0;
+    {
       this.vy = this.jumpForce;
       this.isGrounded = false;
       this.coyoteTime = 0;
@@ -386,6 +393,12 @@ class Player {
       this.coyoteTime = 6;
     } else if (this.coyoteTime > 0) {
       this.coyoteTime--;
+    }
+
+    // Salto en espera: sale apenas Ruben toca el suelo
+    if (this.jumpBuffer > 0) {
+      this.jumpBuffer--;
+      if (this.isGrounded) this.jump();
     }
 
     // Ciclo de caminata ligado a la velocidad real (no al reloj)

@@ -577,3 +577,14 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/wind-pull.js`: API nueva `forceAt(x, y, roce)`. **Bugs arreglados:** (1) con la habilidad bloqueada se leía `localStorage` + `JSON.parse` dos veces por cuadro; ahora se mira el Diario en memoria. (2) Tras pausar con el viento activo, el sonido del viento no volvía.
 - `index.html`: `npcs.js?v=15`, `npc-reactions.js?v=1`, `wind-pull.js?v=8`, `water-core.js?v=3`, `water-power.js?v=5`. `MAPA.md` y `AGENTS.md` actualizados.
 - Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador (sala 12): bola de agua real contra el maestro → fases hit → gather → windup → throw → recover, Ruben empujado sin perder vida, charco; viento sopla/jala → pelo y ojos; viento sobre la laguna (horizontal y apuntando abajo) salpica; caminar, saltar y cambiar de sala OK; consola sin errores. **No verificado a la vista:** la sacudida de Tobías (sala 11) corrió sin errores, pero el panel del navegador quedó oculto y no pude mirar el dibujo.
+
+## Revisión de enemigos, jugador y bucle principal (Claude, 14/11, pedido del usuario)
+- **`js/main.js`:** el bucle pide el cuadro siguiente antes de simular y atrapa los errores de `update`/`render` (un aviso por segundo): antes, un error en un cuadro dejaba el juego congelado para siempre. `restartRoom` pone `vx`/`vy` en 0 (reaparecía con la velocidad de la caída). Fuera dos variables sin usar en `renderLighting`.
+- **`js/player.js`:** salto en espera (`jumpBuffer`, 7 cuadros): apretar saltar un instante antes de aterrizar ya no se pierde. `jump()` no hace nada si Ruben está muerto.
+- **`js/enemies.js`:**
+  - Escarabajo: al ver a Ruben da un respingo y se queda quieto 12 cuadros antes de cargar (anticipación). **Bug:** si Ruben estaba del otro lado de un precipicio, el escarabajo se daba vuelta y volvía cada pocos cuadros (temblaba en el borde); ahora lo espera en el borde. Se aplasta y levanta polvo al aterrizar de una caída.
+  - Polilla: se aplasta y rebota al recibir un golpe; parpadea.
+  - Piedras: rebotan una vez al caer con fuerza; la estela recicla sus puntos (sin basura por cuadro).
+- `index.html`: `enemies.js?v=3`, `player.js?v=9`, `main.js?v=11`.
+- Verificado: `scripts/check-project.js` (0 errores) y playtest en navegador: salto normal y en espera (apretado a 25 px del suelo, salta 2 cuadros después), respingo del escarabajo (12 cuadros quieto y luego carga), piedra que rebota, golpe a la polilla, muerte y reaparición, caminar/saltar/atacar, cambio de sala; consola sin errores. **No probado en vivo:** el escarabajo esperando en el borde de un precipicio.
+- **Sin revisar todavía:** `world.js`, `journal.js`, `multiplayer.js`, `controls.js`, `audio.js`, `particles.js`, `code-art-engine.js`, `animation-registry.js` y el dibujo de Ruben (`player.render`).

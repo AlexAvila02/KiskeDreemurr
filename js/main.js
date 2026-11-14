@@ -713,6 +713,9 @@ class Game {
     p.invulnerableTimer = 60;
     p.isAttacking = false;
     p.attackTimer = 0;
+    p.vx = 0;
+    p.vy = 0;   // (antes reaparecía con la velocidad de la caída que lo mató)
+    p.jumpBuffer = 0;
     const rp = this.respawnPoint;
     this.loadRoom(this.world.currentRoomIndex, rp.x, rp.y);
     this.showNotification(this.deathCause === 'fall' ? 'Ruben cayó al vacío... vuelve a intentarlo' : 'Ruben vuelve a levantarse...');
@@ -1107,8 +1110,6 @@ class Game {
   }
 
   renderLighting() {
-    const rx = this.player.x + this.player.width / 2 - this.camera.x;
-    const ry = this.player.y + this.player.height / 2 - this.camera.y;
     const biome = this.world.getCurrentBiome ? this.world.getCurrentBiome() : null;
     const edgeTint = (biome && biome.vignetteTint) || 'rgba(48, 26, 12, 0.24)';
 
@@ -1134,15 +1135,26 @@ class Game {
     const dt = Math.min(250, currentTime - this.lastTime);
     this.lastTime = currentTime;
 
+    // El siguiente cuadro se pide antes de simular: si un cuadro falla, el juego sigue
+    // (antes un error en update/render dejaba la pantalla congelada para siempre)
+    requestAnimationFrame((ts) => this.gameLoop(ts));
+
     try { this.pollGamepad(); } catch (e) { console.warn('[Mando] error:', e); }
     this.accumulator += dt;
-    while (this.accumulator >= this.STEP) {
-      this.update(this.STEP);
-      this.accumulator -= this.STEP;
+    try {
+      while (this.accumulator >= this.STEP) {
+        this.accumulator -= this.STEP;
+        this.update(this.STEP);
+      }
+      this.render();
+    } catch (e) {
+      this.accumulator = 0;
+      // Un aviso por segundo como mucho (no inundar la consola)
+      if (!this.loopErrorAt || currentTime - this.loopErrorAt > 1000) {
+        this.loopErrorAt = currentTime;
+        console.error('[Juego] error en el cuadro:', e);
+      }
     }
-    this.render();
-
-    requestAnimationFrame((ts) => this.gameLoop(ts));
   }
 }
 
