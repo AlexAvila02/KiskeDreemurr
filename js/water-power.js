@@ -9,6 +9,7 @@
  *    - Apuntar con el ratón o el stick derecho (sin ninguno: adelante y un poco arriba).
  *    - Soltar: el orbe sale disparado con gravedad real. Empuja y aturde enemigos (sin
  *      daño), rompe muros quebradizos, hace sonar campanas y deja un charco al caer.
+ *      Si moja a un maestro, este reacciona (npc-reactions.js).
  *    - Arriba/Abajo + F/L2 siguen siendo Soplar/Jalar el Aire (wind-pull.js).
  *    - La bola lanzada se deshace a los ~22 cuadros (alcance limitado).
  *    - LLEVARLA: con F / L2 mantenido Ruben camina y salta con la bola en la mano. Crece
@@ -35,7 +36,7 @@
   'use strict';
 
   const OUT = '#3a2416';
-  const { ws, EVAP_FRAMES, surfaceAt, splashAt, bodyAt, spawnDrop, burst, addPuddle,
+  const { ws, EVAP_FRAMES, surfaceAt, splashAt, bodyAt, spawnDrop, burst, addPuddle, drawOrb: drawOrbAt,
     playSplash, playWhoosh, streamSound } = window.WaterCore;
   const { ringBell, potCatch, fillPot } = window.WaterQuest;
   const SAVE_KEY = 'ruben_agua_v1';
@@ -320,6 +321,15 @@
           hit = true; break;
         }
       }
+      // Maestros y vecinos: el agua los moja y reaccionan (npc-reactions.js). Sin charco:
+      // el agua queda sobre ellos.
+      const NR = window.NpcReactions;
+      const wetNpc = !hit && NR ? NR.hitTest(room, s.x, s.y, s.r) : null;
+      if (wetNpc) {
+        NR.splash(g, wetNpc, 0.35 + s.size * 0.65, s.vx);
+        if (window.particleSystem) window.particleSystem.createShockwave(s.x, s.y, 12 + s.size * 12, 'rgba(200, 236, 255, 0.85)', 2);
+        s.on = false; continue;
+      }
       // Macetas del maestro
       const sp = !hit ? potCatch(room, s.x, s.y, s.r) : null;
       if (sp) { fillPot(g, room, sp); s.on = false; continue; }
@@ -484,6 +494,15 @@
         if (Math.hypot(guide.x - b.x, guide.y - (b.y + 10)) < R + 13) { ringBell(g, room, b, guide.vx); popGuide(g); return; }
       }
     }
+    const NR = window.NpcReactions;
+    const wetNpc = NR && guide.t > 24 ? NR.hitTest(room, guide.x, guide.y, R) : null;
+    if (wetNpc) {
+      // Se gasta sobre el maestro (sin charco: el agua queda sobre él)
+      guide.on = false;
+      playSplash(0.45);
+      NR.splash(g, wetNpc, 0.4 + guide.vol * 0.6, guide.vx);
+      return;
+    }
     for (const e of g.enemies) {
       if (!e.alive) continue;
       const nx = Math.max(e.x, Math.min(guide.x, e.x + e.width)), ny = Math.max(e.y, Math.min(guide.y, e.y + e.height));
@@ -494,24 +513,6 @@
     }
   }
 
-
-  function drawOrbAt(ctx, x, y, r, t) {
-    ctx.save();
-    const wob = Math.sin(t * 0.3) * 0.08;
-    ctx.translate(x, y);
-    ctx.scale(1 + wob, 1 - wob);
-    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.35, 1, 0, 0, r);
-    g.addColorStop(0, 'rgba(240, 253, 255, 0.95)');
-    g.addColorStop(0.45, 'rgba(126, 204, 220, 0.9)');
-    g.addColorStop(1, 'rgba(48, 120, 150, 0.9)');
-    ctx.fillStyle = g;
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.4, r * 0.28, r * 0.16, -0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
 
   function drawControl(ctx, g, cam, t) {
     const p = g.player;

@@ -18,7 +18,7 @@
  * se incline el stick derecho del mando (gana el último que se movió). Sin ninguno de los
  * dos, apunta hacia adelante y Izquierda/Derecha giran a Ruben. Vale para jalar y soplar.
  *
- * API: window.WindPull.isActive() · window.WindPull.getState()
+ * API: window.WindPull.isActive() · .getState() · .getBand() · .forceAt(x, y, roce) · .stun(enemigo, cuadros)
  */
 (function () {
   'use strict';
@@ -45,6 +45,7 @@
 
   const state = {
     unlocked: false,
+    storageChecked: false,
     active: false,
     power: 0,        // 0..1 (crece al mantener)
     pose: 0,         // 0..1 (suavizado para la animación de Ruben)
@@ -127,6 +128,25 @@
     return RANGE * e;
   }
   function halfAt(u) { return HALF_NEAR + (HALF_FAR - HALF_NEAR) * u; }
+  // Fuerza del viento (0..1) en el punto (x, y) del mundo. Dentro de la franja es más
+  // fuerte en el centro y cerca de la mano; `skim` px por fuera de la franja queda un roce
+  // que se apaga. 0 = el viento no llega.
+  function forceAt(x, y, skim = 0) {
+    const g = window.gameInstance;
+    if (!g || !g.player || state.power <= 0.05) return 0;
+    const reach = currentReach();
+    if (reach < 8) return 0;
+    const h = handPoint(g.player);
+    const rx = x - h.x, ry = y - h.y;
+    const along = rx * state.dirX + ry * state.dirY;
+    if (along < -6 || along > reach) return 0;
+    const u = Math.max(0, along / RANGE);
+    const perp = Math.abs(ry * state.dirX - rx * state.dirY);
+    const edge = halfAt(u) + 10;
+    if (perp > edge + skim) return 0;
+    const core = perp <= edge ? 1 - perp / edge * 0.6 : 0.4 * (1 - (perp - edge) / skim);
+    return state.power * (1 - u * 0.55) * core;
+  }
   // ¿El punto (x, y) está dentro de la franja? Devuelve u (0 = mano, 1 = extremo) o -1
   function bandU(p, x, y) {
     const h = handPoint(p);
@@ -317,17 +337,17 @@
       state.unlocked = true;
       return true;
     }
-    try {
-      const raw = window.localStorage.getItem('ruben_diario_v1');
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data && data.notes && data.notes['1:0']) {
-          state.unlocked = true;
-          return true;
-        }
-      }
-    } catch (e) { /* */ }
-    return false;
+    // Respaldo sin Diario: se mira el guardado una sola vez (no en cada cuadro)
+    if (g && g.journal) return false;
+    if (!state.storageChecked) {
+      state.storageChecked = true;
+      try {
+        const raw = window.localStorage.getItem('ruben_diario_v1');
+        const data = raw ? JSON.parse(raw) : null;
+        if (data && data.notes && data.notes['1:0']) state.unlocked = true;
+      } catch (e) { /* */ }
+    }
+    return state.unlocked;
   }
 
   function checkUnlock(g) {
@@ -452,6 +472,7 @@
     }
 
     if (state.active) {
+      startSound();   // (si una pausa lo cortó, vuelve a sonar)
       updateAim(g, p);
       state.power = Math.min(1, state.power + 0.045);
       p.facing = state.facing;
@@ -658,6 +679,8 @@
       if ('vy' in e) e.vy = 0;
       if (!state.stunned.includes(e)) state.stunned.push(e);
     },
+    // Fuerza del viento (0..1) en un punto del mundo; skim = px de roce fuera de la franja
+    forceAt,
     // Media altura de la franja a la distancia relativa u (0 = mano, 1 = extremo)
     bandHalf: (u) => halfAt(u),
     getState: () => ({ unlocked: isUnlocked(window.gameInstance), active: state.active, power: state.power, caught: state.caught.length, stunned: state.stunned.length })
@@ -668,6 +691,7 @@
   window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
   window.GameHooks.onRestartGame.push(() => {
     state.unlocked = false;
+    state.storageChecked = false;
     clearAll();
     state.active = false;
     state.power = 0;

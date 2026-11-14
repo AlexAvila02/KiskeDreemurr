@@ -10,12 +10,13 @@
  *  - Piedras y enemigos que caen al agua salpican; las piedras se hunden despacio.
  *  - CHARCOS (`room.puddles`): el agua que cae al suelo queda como charco y se evapora
  *    (60 s uno lleno, también estando en otra sala). Son fuente para el Dominio del Agua.
- *  - El viento de Ruben (wind-pull.js) encrespa la superficie (windOnWater).
+ *  - El viento de Ruben (wind-pull.js) encrespa la superficie y los charcos y les arranca
+ *    gotas y rocío (windOnWater).
  *  - Sonido ambiente de agua que lame la orilla (sigue en pausa, como la brisa).
  *
  * API interna para water-quest.js y water-power.js: window.WaterCore
  *   ws (reloj ws.t y estado de nado ws.swim / ws.swimBody), surfaceAt, splashAt, bodyAt,
- *   spawnDrop, burst, addPuddle, EVAP_FRAMES y sonidos (playSplash, playWhoosh,
+ *   spawnDrop, spawnMist, burst, addPuddle, drawOrb, EVAP_FRAMES y sonidos (playSplash, playWhoosh,
  *   playBell, streamSound).
  * Hooks: onBeforeUpdate · onAfterUpdate · onAction (brazada) · onAfterPlayerUpdate (nado)
  *   · onBeforeRoomLoad · onRenderWorld · capa world 'water-puddles' (ver MAPA.md).
@@ -87,15 +88,23 @@
   }
 
   // ---------------- gotas y burbujas (pools fijos) ----------------
+  // Tres clases en el mismo pool: gota (cae con gravedad y se deshace al tocar suelo o agua),
+  // burbuja (sube bajo el agua) y bruma (rocío fino que flota, se abre y se desvanece).
   const DROPS = [];
-  for (let i = 0; i < 120; i++) DROPS.push({ on: false, x: 0, y: 0, vx: 0, vy: 0, r: 2, life: 0, bubble: false });
+  const MIST_LIFE = 34;
+  for (let i = 0; i < 200; i++) DROPS.push({ on: false, x: 0, y: 0, vx: 0, vy: 0, r: 2, life: 0, bubble: false, mist: false });
   function spawnDrop(x, y, vx, vy, r, bubble) {
     for (const d of DROPS) {
       if (d.on) continue;
-      d.on = true; d.x = x; d.y = y; d.vx = vx; d.vy = vy; d.r = r; d.life = bubble ? 50 : 70; d.bubble = !!bubble;
+      d.on = true; d.x = x; d.y = y; d.vx = vx; d.vy = vy; d.r = r; d.life = bubble ? 50 : 70; d.bubble = !!bubble; d.mist = false;
       return d;
     }
     return null;
+  }
+  function spawnMist(x, y, vx, vy, r) {
+    const d = spawnDrop(x, y, vx, vy, r, false);
+    if (d) { d.mist = true; d.life = MIST_LIFE; }
+    return d;
   }
   function burst(x, y, count, power, up = 1) {
     for (let i = 0; i < count; i++) {
@@ -104,10 +113,15 @@
       spawnDrop(x + (Math.random() - 0.5) * 10, y, Math.cos(a) * sp, Math.sin(a) * sp * up, 1.6 + Math.random() * 2.2, false);
     }
   }
-  function stepDrops(room) {
+  function stepDrops(room, plats) {
     for (const d of DROPS) {
       if (!d.on) continue;
       d.life--;
+      if (d.mist) {
+        d.vx *= 0.94; d.vy = d.vy * 0.94 - 0.012; d.x += d.vx; d.y += d.vy; d.r += 0.16;
+        if (d.life <= 0) d.on = false;
+        continue;
+      }
       if (d.bubble) {
         d.vy -= 0.04; d.vx *= 0.96; d.x += d.vx + Math.sin(d.life * 0.3) * 0.2; d.y += d.vy;
         const wb = bodyAt(room, d.x, d.y, 4);
@@ -117,7 +131,16 @@
       d.vy += 0.32; d.x += d.vx; d.y += d.vy;
       const wb = d.vy > 0 ? bodyAt(room, d.x, d.y, 0) : null;
       if (wb && d.y >= surfaceAt(wb, d.x)) { splashAt(wb, d.x, 0.25 + d.r * 0.08, 0); d.on = false; continue; }
-      if (d.life <= 0 || (room && d.y > room.height + 20)) d.on = false;
+      if (d.life <= 0 || (room && d.y > room.height + 20)) { d.on = false; continue; }
+      // Al caer sobre el suelo la gota se deshace (las más gordas dejan un rocío)
+      if (d.vy > 0 && plats) {
+        for (const pl of plats) {
+          if (d.x < pl.x || d.x > pl.x + pl.w || d.y < pl.y || d.y > pl.y + pl.h) continue;
+          if (d.r > 2.2 && d.vy > 2.5) { d.mist = true; d.life = 14; d.y = pl.y - 1; d.vx *= 0.3; d.vy = -0.3; d.r *= 0.9; }
+          else d.on = false;
+          break;
+        }
+      }
     }
   }
 
@@ -423,6 +446,10 @@
         ctx.strokeStyle = 'rgba(236, 252, 255, 0.95)';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(x, y, d.r, 0, Math.PI * 2); ctx.stroke();
+      } else if (d.mist) {
+        ctx.globalAlpha = Math.min(1, d.life / MIST_LIFE) * 0.34;
+        ctx.fillStyle = '#f2fcff';
+        ctx.beginPath(); ctx.arc(x, y, d.r, 0, Math.PI * 2); ctx.fill();
       } else {
         ctx.globalAlpha = Math.min(1, d.life / 15);
         ctx.fillStyle = '#bfe9f2';
@@ -432,45 +459,111 @@
         const a = Math.atan2(d.vy, d.vx);
         ctx.ellipse(x, y, d.r * (1 + sp * 0.4), d.r, a, 0, Math.PI * 2);
         ctx.fill();
+        if (d.r > 2) {      // brillo en las gotas gordas
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.beginPath(); ctx.arc(x - d.r * 0.3, y - d.r * 0.3, d.r * 0.32, 0, Math.PI * 2); ctx.fill();
+        }
       }
     }
     ctx.restore();
   }
 
 
+  // Esfera de agua (la usan el orbe de Ruben, sus disparos y la bola de los maestros)
+  function drawOrb(ctx, x, y, r, t) {
+    ctx.save();
+    const wob = Math.sin(t * 0.3) * 0.08;
+    ctx.translate(x, y);
+    ctx.scale(1 + wob, 1 - wob);
+    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.35, 1, 0, 0, r);
+    g.addColorStop(0, 'rgba(240, 253, 255, 0.95)');
+    g.addColorStop(0.45, 'rgba(126, 204, 220, 0.9)');
+    g.addColorStop(1, 'rgba(48, 120, 150, 0.9)');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = OUT;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.4, r * 0.28, r * 0.16, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   // ---------------- el viento sobre el agua (wind-pull.js) ----------------
-  // Cada columna de la superficie que cae dentro de la franja de viento recibe fuerza:
-  //  - Soplar: la hunde con un picado irregular (olas que se propagan) y levanta espuma
-  //    que vuela en la dirección del viento.
+  // El viento no solo toca el agua que cae dentro de la franja: también riza la que queda
+  // hasta WIND_SKIM px por fuera (soplar a ras de la laguna la encrespa).
+  //  - Soplar: hunde la superficie con un picado irregular (olas que se propagan) y arranca
+  //    gotas y rocío que vuelan en la dirección del viento.
   //  - Jalar: la levanta hacia Ruben y arranca gotitas que vuelan a su mano.
+  //  - Apuntando hacia abajo, donde el chorro pega en el agua se abre un cráter que
+  //    salpica en corona hacia los dos lados.
+  //  - Los charcos también se rizan y sueltan gotas.
+  const WIND_SKIM = 46;
+  let windSplashT = 0;
+  // Una gota arrancada por el viento en (x, y) con fuerza f
+  function windSpray(b, x, y, f, push) {
+    if (push) {
+      const sp = (2.5 + Math.random() * 3.5) * f;
+      spawnDrop(x, y - 1, b.dirX * sp + (Math.random() - 0.5) * 0.8,
+        -(1.4 + Math.random() * 2.8) * f - Math.abs(b.dirY) * 1.6, 1.2 + Math.random() * 1.8, false);
+      if (Math.random() < 0.5) spawnMist(x, y - 3, b.dirX * sp * 0.6, -0.6 - Math.random() * 0.8, 2.5 + Math.random() * 2.5);
+    } else {
+      // Jalar: la gota sale hacia la mano de Ruben
+      const dx = b.hx - x, dy = b.hy - y, d = Math.hypot(dx, dy) || 1;
+      const sp = (3 + Math.random() * 2.5) * (0.5 + f * 0.5);
+      const drop = spawnDrop(x, y - 1, dx / d * sp, dy / d * sp - 1.6, 1.1 + Math.random() * 1.3, false);
+      if (drop) drop.life = Math.min(70, 10 + d / sp);
+    }
+  }
   function windOnWater(room) {
     const WP = window.WindPull;
-    if (!room.water || !WP || !WP.getBand) return;
+    if (!WP || !WP.forceAt || (!room.water && !room.puddles)) return;
     const b = WP.getBand();
     if (!b || b.power <= 0.05 || b.reach < 8) return;
     const push = b.mode === 'push';
-    for (const wb of room.water) {
+    let strongest = 0;
+    for (const wb of room.water || []) {
       const s = sim(wb);
       const step = wb.w / (s.n - 1);
       for (let i = 0; i < s.n; i++) {
         const x = wb.x + i * step, y = wb.y + s.h[i];
-        const rx = x - b.hx, ry = y - b.hy;
-        const along = rx * b.dirX + ry * b.dirY;
-        if (along < -6 || along > b.reach) continue;
-        const u = Math.max(0, along / b.range);
-        const perp = Math.abs(ry * b.dirX - rx * b.dirY);
-        const half = (WP.bandHalf ? WP.bandHalf(u) : 30) + 10;
-        if (perp > half) continue;
-        // Más fuerza cerca de la mano y en el centro de la franja
-        const f = b.power * (1 - u * 0.55) * (1 - perp / half * 0.6);
+        const f = WP.forceAt(x, y, WIND_SKIM);
+        if (f <= 0) continue;
+        if (f > strongest) strongest = f;
         const chop = 0.55 + 0.45 * Math.sin(ws.t * 0.45 + i * 1.3);
         s.v[i] += (push ? 0.32 : -0.26) * f * chop;
-        // Espuma / gotas arrancadas por el viento
-        if (Math.random() < 0.035 * f) {
-          const sx = push ? b.dirX : -b.dirX;
-          spawnDrop(x, y - 1, sx * (2 + Math.random() * 2.5) * f + (Math.random() - 0.5) * 0.6, -1.2 - Math.random() * 2 * f, 1.2 + Math.random() * 1.4, false);
+        if (Math.random() < 0.12 * f) windSpray(b, x, y, f, push);
+      }
+      // Chorro apuntado al agua: cráter + corona de salpicaduras donde pega
+      if (push && b.dirY > 0.2) {
+        const k = (wb.y - b.hy) / b.dirY;
+        const ix = b.hx + b.dirX * k;
+        if (k > 0 && k < b.reach && ix > wb.x + 4 && ix < wb.x + wb.w - 4) {
+          const hit = b.power * b.dirY * (1 - k / b.range * 0.5);
+          splashAt(wb, ix, 0.9 * hit, 2);
+          if (hit > strongest) strongest = hit;
+          if (ws.t % 3 === 0) {
+            const sy = surfaceAt(wb, ix);
+            for (let side = -1; side <= 1; side += 2) {
+              spawnDrop(ix + side * (6 + Math.random() * 10), sy - 1, side * (1.2 + Math.random() * 2.6) * hit + b.dirX,
+                -(2.5 + Math.random() * 3.5) * hit, 1.5 + Math.random() * 2, false);
+            }
+            spawnMist(ix + (Math.random() - 0.5) * 20, sy - 4, (Math.random() - 0.5) * 1.5, -0.8 - Math.random(), 3 + Math.random() * 3);
+          }
         }
       }
+    }
+    for (const q of room.puddles || []) {
+      const f = WP.forceAt(q.x, q.y, WIND_SKIM);
+      if (f <= 0) continue;
+      if (f > strongest) strongest = f;
+      q.pop = Math.max(q.pop || 0, 0.35 * f);          // el charco se estira con el viento
+      if (Math.random() < 0.1 * f) windSpray(b, q.x + (Math.random() - 0.5) * puddleHalf(q), q.y - 1, f, push);
+    }
+    // Chapoteo del agua batida por el viento
+    if (windSplashT > 0) windSplashT--;
+    if (strongest > 0.3 && windSplashT === 0) {
+      windSplashT = 16 + ((Math.random() * 14) | 0);
+      playSplash(0.1 + strongest * 0.22);
     }
   }
 
@@ -487,13 +580,14 @@
       if (!running) return;
       ws.t++;
       const room = game.world.getCurrentRoom();
-      if (room.water) { windOnWater(room); for (const wb of room.water) stepSim(wb); }
+      windOnWater(room);
+      if (room.water) for (const wb of room.water) stepSim(wb);
     });
     H.onAfterUpdate.push((game, running) => {
       if (running) {
         const room = game.world.getCurrentRoom();
         objectsStep(game);
-        stepDrops(room);
+        stepDrops(room, game.world.getPlatforms());
         puddlesStep(game, room);
       }
       // Ambiente de agua: sigue en pausa / Diario; se apaga en el menú principal
@@ -523,7 +617,7 @@
   }
 
   window.WaterCore = {
-    ws, EVAP_FRAMES, sim, surfaceAt, splashAt, bodyAt, spawnDrop, burst, addPuddle,
+    ws, EVAP_FRAMES, sim, surfaceAt, splashAt, bodyAt, spawnDrop, spawnMist, burst, addPuddle, drawOrb,
     playSplash, playWhoosh, playBell, streamSound
   };
   window.GameHooks = window.GameHooks || {};

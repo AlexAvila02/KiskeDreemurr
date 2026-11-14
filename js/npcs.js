@@ -8,6 +8,8 @@
  *
  * Dibujos: Maestro del Agua (look: 'water-master', enseña con teaches: 'water') y el
  * viejo pastor (por defecto). Decorados en props.js, notas en notes.js, brisa en ambience.js.
+ * Los dos reaccionan al agua y al viento de Ruben: el estado lo calcula npc-reactions.js y
+ * lo deja en `npc.fx` (brazos, pelo, ojos); acá solo se dibuja.
  * Hooks: onAction · onKeepDialog · onBeforeUpdate · onBeforeRoomLoad (ver MAPA.md); dibuja en
  * la capa world de AnimationRegistry (orden 50, detrás de Ruben). Sin basura por cuadro.
  *
@@ -20,6 +22,12 @@
   const TALK_DIST_X = 52;
   const TALK_DIST_Y = 56;
   const state = { near: null, talkT: 0, t: 0 };
+  // Reacciones al agua y al viento (npc-reactions.js escribe npc.fx; sin él, en reposo)
+  const NO_FX = {
+    wind: 0, flut: 0, squint: 0, startle: 0, wet: 0, phase: '', eyes: '',
+    arms: 0, h1x: 17, h1y: -27, h2x: -8, h2y: -24, flinch: 0, shake: 0, lean: 0, face: 0
+  };
+  const lerp = (a, b, k) => a + (b - a) * k;
 
   function roomNpcs(g) {
     const room = g.world && g.world.getCurrentRoom();
@@ -77,6 +85,47 @@
     }
   }
 
+  // ---------------- piezas compartidas por los dos dibujos ----------------
+  // Respiración + saltito al hablar + reacciones (encogerse por el chapuzón, sacudirse),
+  // todo escalado desde los pies.
+  function bodyTransform(ctx, x, fy, breathe, bob, fx) {
+    ctx.translate(x + fx.shake, fy);
+    ctx.scale((1 - breathe * 0.5) * (1 + fx.flinch * 0.1), (1 + breathe) * (1 - fx.flinch * 0.13));
+    ctx.translate(-x, -fy - bob);
+  }
+  // Un ojo. modo: '' (abierto), 'blink', 'calm' (cerrado sereno), 'shut' (apretado),
+  // 'happy' (arco sonriente), 'wide' (sorprendido). squint 0..1 lo entrecierra (viento de
+  // cara); look desplaza la pupila. side = -1 / 1 (para que los apretados miren a la nariz).
+  function drawEye(ctx, ex, ey, r, mode, squint, look, side) {
+    ctx.strokeStyle = OUT; ctx.fillStyle = OUT; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    if (mode === 'blink') {
+      ctx.moveTo(ex - 1.6, ey); ctx.lineTo(ex + 1.6, ey); ctx.stroke();
+    } else if (mode === 'calm') {
+      ctx.arc(ex, ey - 0.8, 1.9, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    } else if (mode === 'happy') {
+      ctx.arc(ex, ey + 1, 1.9, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+    } else if (mode === 'shut') {
+      ctx.moveTo(ex + side * 1.9, ey - 1.7); ctx.lineTo(ex - side * 1.3, ey); ctx.lineTo(ex + side * 1.9, ey + 1.7); ctx.stroke();
+    } else if (mode === 'wide') {
+      ctx.fillStyle = '#fffaf0'; ctx.lineWidth = 1;
+      ctx.arc(ex, ey, r + 1.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = OUT;
+      ctx.beginPath(); ctx.arc(ex + look * 0.6, ey, r * 0.85, 0, Math.PI * 2); ctx.fill();
+    } else if (squint > 0.75) {
+      // Casi cerrado: una rendija apenas curvada
+      ctx.moveTo(ex - 1.9, ey - 0.3); ctx.quadraticCurveTo(ex, ey + 0.9, ex + 1.9, ey - 0.3); ctx.stroke();
+    } else {
+      ctx.ellipse(ex + look, ey, r, r * (1 - squint * 0.72), 0, 0, Math.PI * 2); ctx.fill();
+      if (squint > 0.2) {   // párpado que baja
+        ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.moveTo(ex - 2.1, ey - r * (1 - squint)); ctx.lineTo(ex + 2.1, ey - r * (1 - squint)); ctx.stroke();
+      }
+    }
+    ctx.lineWidth = 2;
+  }
+  function eyeMode(fx, blink) { return fx.eyes || (fx.startle > 0 ? 'wide' : (blink ? 'blink' : '')); }
+
   // ---------------- dibujo (Maestro del Agua, estilo años 50) ----------------
   // Anciano de túnica turquesa con olas en el ruedo, cabeza calva, cejas y bigote blancos
   // largos que flotan, y un orbe de agua que gira sobre su palma con gotitas en órbita.
@@ -85,7 +134,10 @@
     const f = lookDir;
     const breathe = Math.sin(t * 0.04) * 0.025;
     const bob = talking ? Math.abs(Math.sin(t * 0.35)) * 1.5 : 0;
-    const blink = (t % 240) < 7;
+    const fx = n.fx || NO_FX;
+    const w = fx.wind, fl = fx.flut, aw = Math.abs(w);
+    // Con viento parpadea más seguido
+    const blink = (t % (aw > 0.15 ? 70 : 240)) < 7;
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -96,19 +148,33 @@
     ctx.lineWidth = 2;
     // bend (0..1): se agacha a dejar una maceta (lo controla water.js en la escena final)
     const bend = n.bend || 0;
-    ctx.translate(x, fy);
-    ctx.scale(1 - breathe * 0.5, 1 + breathe);
-    ctx.translate(-x, -fy - bob);
+    bodyTransform(ctx, x, fy, breathe, bob, fx);
 
     // Sandalias (no se inclinan con el cuerpo)
     ctx.fillStyle = '#8a5a35';
     ctx.beginPath(); ctx.ellipse(x - 6, fy - 2.5, 6, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(x + 6, fy - 2.5, 6, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // El cuerpo se inclina hacia adelante desde los pies
-    if (bend > 0) {
+    // (fx.lean: se echa atrás para tomar impulso y adelante al lanzar el agua)
+    if (bend > 0 || fx.lean) {
       ctx.translate(x, fy - 4);
-      ctx.rotate(f * 0.42 * bend);
+      ctx.rotate(f * (0.42 * bend + fx.lean));
       ctx.translate(-x, -(fy - 4));
+    }
+    // Manos: en reposo, la de adelante sostiene el orbe; al reaccionar al agua
+    // (fx.arms 0..1) los dos brazos siguen la pose que marca npc-reactions.js
+    const A = fx.arms;
+    const hx = x + f * lerp(17, fx.h1x, A), hy = fy + lerp(-27 + bend * 8, fx.h1y, A);
+    if (A > 0.03) {
+      // Brazo de atrás (sale de detrás de la túnica)
+      const bx = x + f * lerp(-8, fx.h2x, A), by = fy + lerp(-24, fx.h2y, A);
+      ctx.strokeStyle = OUT; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(x - f * 6, fy - 31); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.strokeStyle = '#357a80'; ctx.lineWidth = 3.6;
+      ctx.beginPath(); ctx.moveTo(x - f * 6, fy - 31); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2;
+      ctx.fillStyle = '#dcb088';
+      ctx.beginPath(); ctx.arc(bx, by - 1, 3.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
 
     // Túnica larga turquesa (campana)
@@ -134,18 +200,17 @@
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
 
     // Brazo extendido con la palma hacia arriba (al agacharse baja hacia el suelo)
-    const hx = x + f * 17, hy = fy - 27 + bend * 8;
     ctx.strokeStyle = OUT; ctx.lineWidth = 6;
     ctx.beginPath(); ctx.moveTo(x + f * 6, fy - 31); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.strokeStyle = '#3f8a8f'; ctx.lineWidth = 3.6;
     ctx.beginPath(); ctx.moveTo(x + f * 6, fy - 31); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
     ctx.fillStyle = '#e8bf95';
-    ctx.beginPath(); ctx.ellipse(hx + f * 2, hy - 1, 4, 2.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(hx + f * 2 * (1 - A), hy - 1, 4 - A * 0.7, 2.6 + A * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
     // Orbe de agua flotando sobre la palma, con gotitas en órbita (lo guarda mientras
-    // está ocupado con las macetas)
-    if (!n.busy) {
+    // está ocupado con las macetas o devolviendo el agua que le tiraron)
+    if (!n.busy && !fx.phase) {
     const ox = hx + f * 2, oy = hy - 14 + Math.sin(t * 0.06) * 2.5;
     const og = ctx.createRadialGradient(ox - 2, oy - 2, 1, ox, oy, 7.5);
     og.addColorStop(0, 'rgba(240, 253, 255, 0.95)');
@@ -170,26 +235,36 @@
     // Brillo en la calva
     ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
     ctx.beginPath(); ctx.ellipse(cx - f * 3, cy - 6, 3, 1.6, -0.4 * f, 0, Math.PI * 2); ctx.fill();
-    // Rodete de pelo blanco atrás
-    ctx.fillStyle = '#f6efe0';
-    ctx.beginPath(); ctx.arc(cx - f * 9, cy + 1, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // Ojos (parpadean)
-    ctx.fillStyle = OUT;
-    for (const k of [-1, 1]) {
-      const ex = cx + f * 2 + k * 4, ey = cy - 1;
-      if (blink || talking && (t % 90) < 4) { ctx.beginPath(); ctx.moveTo(ex - 1.6, ey); ctx.lineTo(ex + 1.6, ey); ctx.stroke(); }
-      else { ctx.beginPath(); ctx.arc(ex + f * 0.6, ey, 1.3, 0, Math.PI * 2); ctx.fill(); }
+    // Rodete de pelo blanco atrás; con viento se le sueltan mechones que vuelan
+    const bunX = cx - f * 9 + w * 1.5, bunY = cy + 1;
+    if (aw > 0.08) {
+      ctx.strokeStyle = '#f6efe0'; ctx.lineWidth = 1.7;
+      for (let i = 0; i < 3; i++) {
+        const len = (9 + i * 4) * aw, wave = Math.sin(t * 0.8 + i * 1.9) * 3 * aw;
+        ctx.beginPath(); ctx.moveTo(bunX, bunY - 2 + i * 2);
+        ctx.quadraticCurveTo(bunX + w * len * 0.55, bunY - 3 + i * 2 - wave, bunX + Math.sign(w) * len, bunY - 1 + i * 2.5 + wave);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = OUT; ctx.lineWidth = 2;
     }
-    // Cejas blancas largas que caen y se mecen
+    ctx.fillStyle = '#f6efe0';
+    ctx.beginPath(); ctx.ellipse(bunX, bunY, 4 + aw * 0.8, 4 - aw * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Ojos: parpadean, siguen el viento con la mirada, se entrecierran con el viento de
+    // cara y reaccionan al agua (fx.eyes)
+    const mode = eyeMode(fx, blink || (talking && (t % 90) < 4));
+    for (let k = -1; k <= 1; k += 2) drawEye(ctx, cx + f * 2 + k * 4, cy - 1, 1.3, mode, fx.squint, f * 0.6 + w * 0.9, k);
+    // Cejas blancas largas que caen y se mecen; el viento las tiende y las hace aletear
     ctx.strokeStyle = '#f6efe0'; ctx.lineWidth = 2.4;
     const sway = Math.sin(t * 0.05) * 1.5;
-    ctx.beginPath(); ctx.moveTo(cx + f * 2 - 6, cy - 4.5); ctx.quadraticCurveTo(cx + f * 2 - 12, cy - 4, cx + f * 2 - 14, cy + 2 + sway); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + f * 2 + 6, cy - 4.5); ctx.quadraticCurveTo(cx + f * 2 + 12, cy - 4, cx + f * 2 + 14, cy + 2 - sway); ctx.stroke();
-    // Bigote largo que cuelga como dos chorritos de agua
+    const wx = w * 11 + fl * 2.5, lift = aw * 7, wet = fx.wet * 3;
+    ctx.beginPath(); ctx.moveTo(cx + f * 2 - 6, cy - 4.5); ctx.quadraticCurveTo(cx + f * 2 - 12 + wx * 0.4, cy - 4 - lift * 0.3, cx + f * 2 - 14 + wx, cy + 2 + sway - lift + fl * 2 + wet); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + f * 2 + 6, cy - 4.5); ctx.quadraticCurveTo(cx + f * 2 + 12 + wx * 0.4, cy - 4 - lift * 0.3, cx + f * 2 + 14 + wx, cy + 2 - sway - lift - fl * 2 + wet); ctx.stroke();
+    // Bigote largo que cuelga como dos chorritos de agua (mojado cuelga más)
     const mouth = talking && state.talkT > 0 ? (0.5 + 0.5 * Math.sin(t * 0.6)) : 0;
+    const mx = w * 15 + fl * 3.5, mlift = aw * 10;
     ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(cx + f * 3, cy + 4); ctx.quadraticCurveTo(cx + f * 3 - 7, cy + 6, cx + f * 3 - 9, cy + 17 + sway); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx + f * 3, cy + 4); ctx.quadraticCurveTo(cx + f * 3 + 7, cy + 6, cx + f * 3 + 9, cy + 17 - sway); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + f * 3, cy + 4); ctx.quadraticCurveTo(cx + f * 3 - 7 + mx * 0.35, cy + 6, cx + f * 3 - 9 + mx, cy + 17 + sway - mlift + fl * 2.5 + wet); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + f * 3, cy + 4); ctx.quadraticCurveTo(cx + f * 3 + 7 + mx * 0.35, cy + 6, cx + f * 3 + 9 + mx, cy + 17 - sway - mlift - fl * 2.5 + wet); ctx.stroke();
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
     if (mouth > 0.15) {
       ctx.fillStyle = '#5a2418';
@@ -207,7 +282,9 @@
     const f = lookDir;
     const breathe = Math.sin(t * 0.045) * 0.025;
     const bob = talking ? Math.abs(Math.sin(t * 0.35)) * 1.5 : 0;
-    const blink = (t % 210) < 7;
+    const fx = n.fx || NO_FX;
+    const w = fx.wind, fl = fx.flut, aw = Math.abs(w);
+    const blink = (t % (aw > 0.15 ? 64 : 210)) < 7;
 
     ctx.save();
     ctx.lineJoin = 'round';
@@ -232,10 +309,8 @@
     ctx.beginPath(); ctx.arc(sx - f * 6, fy - 50, 6, 0, Math.PI, f > 0); ctx.stroke();
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
 
-    // Respiración: escala desde los pies
-    ctx.translate(x, fy);
-    ctx.scale(1 - breathe * 0.5, 1 + breathe);
-    ctx.translate(-x, -fy - bob);
+    // Respiración: escala desde los pies (más encogerse / sacudirse si lo mojan)
+    bodyTransform(ctx, x, fy, breathe, bob, fx);
 
     // Botas
     ctx.fillStyle = '#5a3a22';
@@ -274,9 +349,11 @@
     const mouth = talking && state.talkT > 0 ? (0.5 + 0.5 * Math.sin(t * 0.6)) : 0;
     ctx.fillStyle = '#f6efe0';
     ctx.beginPath();
+    // El viento se lleva la punta de la barba y la hace aletear; mojada cuelga más
+    const bw = w * 11 + fl * 3, bl = aw * 5 - fx.wet * 3;
     ctx.moveTo(hx - 9, hy + 1);
-    ctx.quadraticCurveTo(hx - 10, hy + 14 + Math.sin(t * 0.04) * 1, hx + f * 2, hy + 18);
-    ctx.quadraticCurveTo(hx + 10, hy + 14, hx + 9, hy + 1);
+    ctx.quadraticCurveTo(hx - 10 + bw * 0.45, hy + 14 + Math.sin(t * 0.04) * 1 - bl * 0.4, hx + f * 2 + bw, hy + 18 - bl + fl * 1.5);
+    ctx.quadraticCurveTo(hx + 10 + bw * 0.45, hy + 14 - bl * 0.4, hx + 9, hy + 1);
     ctx.quadraticCurveTo(hx, hy + 5, hx - 9, hy + 1);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
@@ -286,21 +363,19 @@
     }
     // Bigote
     ctx.fillStyle = '#f6efe0';
-    ctx.beginPath(); ctx.ellipse(hx + f * 2 - 3.5, hy + 3.5, 4, 2.2, 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(hx + f * 2 + 3.5, hy + 3.5, 4, 2.2, -0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(hx + f * 2 - 3.5 + w * 1.2, hy + 3.5, 4, 2.2, 0.3 + w * 0.45 + fl * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(hx + f * 2 + 3.5 + w * 1.2, hy + 3.5, 4, 2.2, -0.3 + w * 0.45 + fl * 0.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // Nariz redonda
     ctx.fillStyle = '#e0957a';
     ctx.beginPath(); ctx.arc(hx + f * 4, hy + 0.5, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // Ojos (parpadean) y cejas pobladas
-    ctx.fillStyle = OUT;
-    for (const k of [-1, 1]) {
-      const ex = hx + f * 2 + k * 3.8, ey = hy - 3;
-      if (blink) { ctx.beginPath(); ctx.moveTo(ex - 1.6, ey); ctx.lineTo(ex + 1.6, ey); ctx.stroke(); }
-      else { ctx.beginPath(); ctx.arc(ex + f * 0.6, ey, 1.4, 0, Math.PI * 2); ctx.fill(); }
-    }
+    const mode = eyeMode(fx, blink);
+    for (let k = -1; k <= 1; k += 2) drawEye(ctx, hx + f * 2 + k * 3.8, hy - 3, 1.4, mode, fx.squint, f * 0.6 + w * 0.9, k);
+    // Cejas: se fruncen con el viento de cara, se levantan con la sorpresa y aletean
+    const frown = fx.squint * 1.6, up = mode === 'wide' ? 1.6 : 0;
     ctx.strokeStyle = '#f6efe0'; ctx.lineWidth = 2.6;
-    ctx.beginPath(); ctx.moveTo(hx + f * 2 - 6, hy - 6.5); ctx.lineTo(hx + f * 2 - 1.5, hy - 5.5); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(hx + f * 2 + 1.5, hy - 5.5); ctx.lineTo(hx + f * 2 + 6, hy - 6.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx + f * 2 - 6 + w * 2, hy - 6.5 - up - aw * 1.5 + fl); ctx.lineTo(hx + f * 2 - 1.5, hy - 5.5 - up + frown); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx + f * 2 + 1.5, hy - 5.5 - up + frown); ctx.lineTo(hx + f * 2 + 6 + w * 2, hy - 6.5 - up - aw * 1.5 - fl); ctx.stroke();
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
 
     // Sombrero de paja de ala ancha
@@ -356,10 +431,14 @@
     const px = g.player.x + g.player.width / 2;
     for (const n of list) {
       const talking = g.activeNote === n;
-      const look = n.forceFace ? n.forceFace : (Math.abs(px - n.x) < 260 ? (px >= n.x ? 1 : -1) : (n.facing || 1));
+      const fx = n.fx;
+      // Mira a Ruben si está cerca (o a donde le marque la escena / la reacción al agua)
+      const look = n.forceFace || (fx && fx.face) || (Math.abs(px - n.x) < 260 ? (px >= n.x ? 1 : -1) : (n.facing || 1));
+      if (fx) fx.look = look;
       if (n.look === 'water-master') drawWaterMaster(ctx, n, cam, state.t, talking, look);
       else drawShepherd(ctx, n, cam, state.t, talking, look);
-      if (state.near === n && !talking && !n.busy) drawPrompt(ctx, g, n, cam, state.t);
+      const reacting = !!(fx && (fx.phase || fx.sayT > 0));
+      if (state.near === n && !talking && !n.busy && !reacting) drawPrompt(ctx, g, n, cam, state.t);
     }
   }
 
