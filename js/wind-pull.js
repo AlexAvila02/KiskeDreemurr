@@ -19,6 +19,7 @@
  * dos, apunta hacia adelante y Izquierda/Derecha giran a Ruben. Vale para jalar y soplar.
  *
  * API: window.WindPull.isActive() · .getState() · .getBand() · .forceAt(x, y, roce) · .stun(enemigo, cuadros)
+ *   · multijugador: .netState() · .setRemotes(fuentes) · .forceFrom(fuente, x, y) · .reachFor(potencia)
  */
 (function () {
   'use strict';
@@ -147,6 +148,29 @@
     const core = perp <= edge ? 1 - perp / edge * 0.6 : 0.4 * (1 - (perp - edge) / skim);
     return state.power * (1 - u * 0.55) * core;
   }
+  // Viento de otros jugadores (multijugador): coop-elements.js deja acá una fuente por
+  // jugador { hx, hy, dirX, dirY, facing, rel, power, mode, reach, flow }.
+  let remotes = [];
+  // Fuerza (0..1) del viento de una fuente cualquiera en (x, y) y u (0 = mano, 1 = extremo)
+  const srcHit = { f: 0, u: 0, along: 0 };
+  function forceFrom(src, x, y, skim = 0) {
+    srcHit.f = 0;
+    if (!src || src.power <= 0.05 || src.reach < 8) return srcHit;
+    const rx = x - src.hx, ry = y - src.hy;
+    const along = rx * src.dirX + ry * src.dirY;
+    if (along < -6 || along > src.reach) return srcHit;
+    const u = Math.max(0, along / RANGE);
+    const perp = Math.abs(ry * src.dirX - rx * src.dirY);
+    const edge = halfAt(u) + 10;
+    if (perp > edge + skim) return srcHit;
+    const core = perp <= edge ? 1 - perp / edge * 0.6 : 0.4 * (1 - (perp - edge) / skim);
+    srcHit.f = src.power * (1 - u * 0.55) * core;
+    srcHit.u = u;
+    srcHit.along = along;
+    return srcHit;
+  }
+  function reachFor(power) { return RANGE * (1 - Math.pow(1 - power, 3)); }
+
   // ¿El punto (x, y) está dentro de la franja? Devuelve u (0 = mano, 1 = extremo) o -1
   function bandU(p, x, y) {
     const h = handPoint(p);
@@ -531,24 +555,23 @@
   }
 
   // ---------------- dibujo ----------------
-  function render(g, ctx, cam) {
-    if (!g.isPlaying || g.isPaused) { if (windLoop && g.isPaused) stopSound(); return; }
-    const pw = state.power;
-    if (pw <= 0.01) return;
-    const p = g.player;
-    const biome = (g.world.getCurrentRoom().biome) || 'pradera';
+  // Franja de viento de un jugador. src = { hx, hy, facing, rel, power, reach, flow }.
+  // flow = null: el viento propio (corrientes y hojas animadas en postUpdate); un número:
+  // el de otro jugador (multijugador, coop-elements.js), que corre con su propio reloj.
+  function frac(v) { return v - Math.floor(v); }
+  function drawBand(ctx, cam, src, biome, t) {
+    const pw = src.power;
     const tint = TINT[biome] || TINT.pradera;
-    const h = handPoint(p);
-    const reach = currentReach();
-    const t = state.t;
+    const reach = src.reach;
+    const remote = src.flow !== null && src.flow !== undefined;
 
     ctx.save();
     // Marco local de la franja: origen en la mano, eje x = hacia donde apunta.
     // Se espeja según hacia dónde mira Ruben y se gira por el ángulo relativo, así
     // el dibujo de siempre (hacia adelante) sirve para cualquier dirección.
-    ctx.translate(h.x - cam.x, h.y - cam.y);
-    ctx.scale(state.facing, 1);
-    ctx.rotate(state.rel);
+    ctx.translate(src.hx - cam.x, src.hy - cam.y);
+    ctx.scale(src.facing, 1);
+    ctx.rotate(src.rel);
     const f = 1, hx = 0, hy = 0;
     // Bruma de aire sin bordes: manchas suaves a lo largo de la franja (no se ve el límite,
     // solo el aire que corre hacia Ruben)
@@ -572,15 +595,16 @@
     // Corrientes que viajan hacia la mano y se cierran en espiral
     ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
     for (const s of streaks) {
-      const along = s.u * RANGE;
+      const su = remote ? 0.02 + frac(s.ph * 0.159 - src.flow * s.sp) * 0.98 : s.u;
+      const along = su * RANGE;
       if (along > reach) continue;
-      const half = halfAt(s.u);
+      const half = halfAt(su);
       const x = hx + f * along;
       const y = hy + s.v * half * 0.85 + Math.sin(t * 0.07 + s.ph) * 3;
-      const a = Math.sin(Math.min(1, s.u * 1.15) * Math.PI) * 0.75 * pw;
+      const a = Math.sin(Math.min(1, su * 1.15) * Math.PI) * 0.75 * pw;
       if (a < 0.03) continue;
       ctx.globalAlpha = a;
-      ctx.lineWidth = 1.2 + (1 - s.u) * 1.3;
+      ctx.lineWidth = 1.2 + (1 - su) * 1.3;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.quadraticCurveTo(x + f * s.len * 0.5, y - s.v * 4, x + f * s.len, y - s.v * 6);
@@ -591,17 +615,18 @@
     // Hojitas / copos arrastrados
     const cols = BITS[biome] || BITS.pradera;
     for (const b of bits) {
-      const along = b.u * RANGE;
+      const bu = remote ? 0.03 + frac(b.rot * 0.159 - src.flow * b.sp) * 0.97 : b.u;
+      const along = bu * RANGE;
       if (along > reach) continue;
       const x = hx + f * along;
-      const y = hy + b.v * halfAt(b.u) * 0.75 + Math.sin(t * 0.1 + b.rot) * 4;
-      ctx.globalAlpha = Math.min(1, b.u * 4) * pw;
+      const y = hy + b.v * halfAt(bu) * 0.75 + Math.sin(t * 0.1 + b.rot) * 4;
+      ctx.globalAlpha = Math.min(1, bu * 4) * pw;
       ctx.fillStyle = cols[b.c];
       ctx.strokeStyle = '#3a2416';
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       if (biome === 'montana') ctx.arc(x, y, b.s * 0.7, 0, Math.PI * 2);
-      else ctx.ellipse(x, y, b.s * 1.4, b.s * 0.7, b.rot, 0, Math.PI * 2);
+      else ctx.ellipse(x, y, b.s * 1.4, b.s * 0.7, b.rot + (remote ? src.flow * 0.2 : 0), 0, Math.PI * 2);
       ctx.fill();
       if (biome !== 'montana') ctx.stroke();
     }
@@ -618,6 +643,22 @@
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  const localSrc = { hx: 0, hy: 0, facing: 1, rel: 0, power: 0, reach: 0, flow: null };
+  function render(g, ctx, cam) {
+    if (!g.isPlaying || g.isPaused) { if (windLoop && g.isPaused) stopSound(); return; }
+    const biome = (g.world.getCurrentRoom().biome) || 'pradera';
+    // Viento de los demás jugadores (multijugador)
+    for (const r of remotes) {
+      if (r.power > 0.01) drawBand(ctx, cam, r, biome, state.t);
+    }
+    if (state.power <= 0.01) return;
+    const h = handPoint(g.player);
+    localSrc.hx = h.x; localSrc.hy = h.y;
+    localSrc.facing = state.facing; localSrc.rel = state.rel;
+    localSrc.power = state.power; localSrc.reach = currentReach();
+    drawBand(ctx, cam, localSrc, biome, state.t);
   }
 
   // ---------------- instalación ----------------
@@ -681,6 +722,12 @@
     },
     // Fuerza del viento (0..1) en un punto del mundo; skim = px de roce fuera de la franja
     forceAt,
+    // Multijugador (coop-elements.js): estado propio para mandar por la red, viento de los
+    // demás para dibujar, y la fuerza de una fuente cualquiera ({ f, u, along }, mismo objeto)
+    netState: () => (state.power > 0.01 ? [state.mode === 'push' ? 2 : 1, Math.round(state.power * 100) / 100, Math.round(state.angle * 100) / 100] : null),
+    setRemotes: (list) => { remotes = list || []; },
+    forceFrom,
+    reachFor,
     // Media altura de la franja a la distancia relativa u (0 = mano, 1 = extremo)
     bandHalf: (u) => halfAt(u),
     getState: () => ({ unlocked: isUnlocked(window.gameInstance), active: state.active, power: state.power, caught: state.caught.length, stunned: state.stunned.length })

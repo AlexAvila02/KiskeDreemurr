@@ -77,7 +77,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `aim.js` | Claude | Apuntado compartido: ratón sobre el canvas y stick derecho (un solo lector) | `Aim` |
 | `sound-kit.js` | Claude | Sonidos sintetizados compartidos: ruidos blanco/rosado/marrón, bucles con filtro, golpes y tonos | `SoundKit` |
 | `stamina.js` | Claude | Barra de energía elemental y cansancio de Ruben (`player.fatigue`: cansado / de rodillas / agotado 5 s) | `Stamina` |
-| `wind-pull.js` | Claude | Jalar / soplar el aire, aturdir enemigos, molino → usa `Aim`, `SoundKit`. `WindPull.forceAt(x, y, roce)` = fuerza del viento en un punto (la usan el agua y los maestros) | `WindPull` |
+| `wind-pull.js` | Claude | Jalar / soplar el aire, aturdir enemigos, molino → usa `Aim`, `SoundKit`. `WindPull.forceAt(x, y, roce)` = fuerza del viento propio en un punto (la usan el agua y los maestros); `forceFrom(fuente, x, y)` = la de cualquier jugador | `WindPull` |
 | `ambience.js` | Claude | Brisa de sala (`ambience: 'breeze'`) con sonido → usa `SoundKit` | `Ambience` |
 | `props.js` | Claude | Decorados de sala (`props`: cabaña, ovejas) → usa `Ambience` | — |
 | `npcs.js` | Claude | NPC, diálogos, burbuja de texto; dibujos del pastor y el maestro (leen `npc.fx`) | `NPCs` |
@@ -86,7 +86,8 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `water-core.js` | Claude | Superficie con olas, nado, gotas / bruma / burbujas, charcos, esfera de agua (`drawOrb`), viento sobre el agua, sonidos → usa `SoundKit`, `WindPull.forceAt` | `WaterCore` (interna) |
 | `water-quest.js` | Claude | Campanas y escena de las macetas (sala 12) → usa `WaterCore` | `WaterQuest` (interna) |
 | `water-power.js` | Claude | Dominio del Agua: orbe, disparo, esfera guiada, maestría → usa `WaterCore`, `WaterQuest`, `Aim` | `WaterControl` |
-| `multiplayer.js` | Claude | Cooperativo hasta 4 (PeerJS/WebRTC, CDN): anfitrión = servidor de enemigos, mundo y sala; los demás se dibujan como Ruben con su color | `Multiplayer` |
+| `multiplayer.js` | Claude | Cooperativo hasta 4 (PeerJS/WebRTC, CDN): anfitrión = servidor de enemigos, mundo y sala; los demás se dibujan como Ruben con su color · `Multiplayer.others()` = los demás de esta sala | `Multiplayer` |
+| `coop-elements.js` | Claude | Viento y agua entre jugadores: el viento de un compañero te arrastra (jalar) o te empuja (soplar), sus bolas de agua te empapan; dibuja el agua ajena y pasa el viento ajeno a `wind-pull.js`. Escribe `player.windHit` (pose en `player.js`) → usa `WindPull.netState/setRemotes/forceFrom`, `WaterControl.netState/shots`, `WaterCore` | `CoopElements` |
 | `main.js` | ambos | Bucle, cámara, entradas, GameHooks | `Game`, `gameInstance` |
 
 ## Ruben (player.js): APIs para habilidades y estadísticas

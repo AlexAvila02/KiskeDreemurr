@@ -71,6 +71,10 @@ class Player {
     // Cansancio (lo escribe js/stamina.js): { tired, kneel, collapse (0..1), breath (fase) }
     this.fatigue = null;
 
+    // Viento de OTRO jugador (multijugador, lo escribe js/coop-elements.js):
+    // { pull, push (0..1), dir (±1, hacia dónde lo lleva el viento) } o null
+    this.windHit = null;
+
     // Modificadores que ajustan las estadísticas del Diario (journal.js → applyPassives)
     this.mods = {
       attackDamage: 1,      // multiplica el daño del tajo
@@ -535,8 +539,14 @@ class Player {
     anchor.y = this.y + 17 + (fg ? 7 * fg.kneel + 2 * fg.collapse : 0);   // de rodillas baja
 
     // El viento que jala Ruben empuja la bufanda hacia atrás
-    const speed = Math.max(Math.min(1, Math.abs(this.vx) / this.speed), this.armPose().pose * 0.95);
-    const back = -this.facing;
+    let speed = Math.max(Math.min(1, Math.abs(this.vx) / this.speed), this.armPose().pose * 0.95);
+    let back = -this.facing;
+    // El viento de otro jugador la hace flamear hacia donde sopla
+    const wh = this.windHit;
+    if (wh) {
+      const k = Math.max(wh.pull, wh.push);
+      if (k > 0.05) { speed = Math.max(speed, Math.min(1, k * 1.3)); if (k > 0.25) back = wh.dir; }
+    }
     const t = Date.now() * 0.008;
     for (let i = 1; i < this.capePoints.length; i++) {
       const prev = this.capePoints[i - 1];
@@ -574,7 +584,13 @@ class Player {
     // piernas abiertas y la mano libre extendida con la palma abierta tirando del viento
     const arm = this.armPose();
     const wp = arm.pose;
-    const windTremble = wp ? Math.sin(t * 47) * 0.5 * wp : 0;
+    // Viento de otro jugador (js/coop-elements.js): arrastrado (pull) o empujado (push).
+    // whd = hacia dónde lo lleva el viento. Arrastrado: se echa atrás resistiendo, clava los
+    // talones y manotea hacia atrás. Empujado: se inclina contra el viento y se tapa la cara.
+    const wh = this.dead ? null : this.windHit;
+    const whp = wh ? wh.pull : 0, whs = wh ? wh.push : 0, whd = wh ? wh.dir : 0;
+    const blown = Math.max(whp, whs);
+    const windTremble = (wp ? Math.sin(t * 47) * 0.5 * wp : 0) + (blown > 0.02 ? Math.sin(t * 39) * 0.7 * blown : 0);
     // Cansancio (js/stamina.js): cansado (respira rápido y suda), de rodillas sosteniendo el
     // poder con una mano y apoyado en la espada, o tirado con las dos manos en el suelo
     const fg = this.dead ? null : this.fatigue;
@@ -591,6 +607,7 @@ class Player {
     const breathAmp = (idle ? 0.018 : 0) + 0.022 * tired + 0.012 * kn + 0.02 * col;
     if (breathAmp) stretchY *= 1 + brW * breathAmp;
     if (wp) stretchY *= 1 - 0.1 * wp;                   // se agacha para afirmarse
+    if (whs) stretchY *= 1 - 0.08 * whs;                // empujado: se encoge contra el viento
     const scaleY = stretchY * (1 + (1 - a.sx) * 0.5);
     const scaleX = a.sx / stretchY;
 
@@ -642,7 +659,7 @@ class Player {
 
     // Escalado desde los pies (squash & stretch) + inclinación + avance del tajo
     ctx.translate(cx + lungeX + windTremble, feetY);
-    const bodyRot = a.lean - f * 0.17 * wp + f * (0.07 * kn + 0.24 * col);
+    const bodyRot = a.lean - f * 0.17 * wp + f * (0.07 * kn + 0.24 * col) - whd * (0.26 * whp + 0.2 * whs);
     ctx.rotate(bodyRot);
     ctx.scale(scaleX, scaleY);
     ctx.translate(-cx, -feetY);
@@ -696,8 +713,10 @@ class Player {
           airAng = k * 0.3 * fallK;
         }
       }
-      const footAng = -Math.sin(ph) * 0.25 * f * wk + airAng; // la punta acompaña el paso
-      let fx = cx + k * (4 + 3.2 * wp + landSpread * 0.5) + stepX + airX + f * 0.8 + (front ? f * 3.5 * lungeK : -f * 1.5 * lungeK);
+      // Arrastrado: los pies se adelantan hacia donde lo jalan con la punta levantada (talones
+      // clavados); empujado: se abren para afirmarse
+      const footAng = -Math.sin(ph) * 0.25 * f * wk + airAng - whd * 0.35 * whp;
+      let fx = cx + k * (4 + 3.2 * wp + landSpread * 0.5 + 2.2 * whs) + stepX + airX + f * 0.8 + (front ? f * 3.5 * lungeK : -f * 1.5 * lungeK) + whd * 3 * whp;
       let fy = feetY - 3 - lift - airTuck, rx = 5, ry = 3.5;
       if (kn > 0.01) {
         // De rodillas: el pie de adelante plantado, la otra pierna con la canilla en el suelo
@@ -759,6 +778,12 @@ class Player {
       }
       if (this.isAttacking) { tx = -11.5; ty = 23; }          // contrapeso del tajo
       if (this.carriedItem) { tx = -10; ty = -3; }            // sostiene la piedra sobre la cabeza
+      if (blown > 0.05 && !this.carriedItem) {
+        // Arrastrado: manotea hacia atrás (lejos de quien lo jala). Empujado: se tapa la cara.
+        const bx = whp >= whs ? -whd * f * 12 : -whd * f * 8.5;
+        const by = whp >= whs ? 11 + Math.sin(t * 17) * 5 : 8 + Math.sin(t * 31) * 0.8;
+        tx += (bx - tx) * blown; ty += (by - ty) * blown;
+      }
       if (kn > 0.01) { tx += (-9 - tx) * kn; ty += (25 - ty) * kn; }
       if (this.dead) { tx = -10; ty = 12; }
       a.armX += (tx - a.armX) * 0.3; a.armY += (ty - a.armY) * 0.3;
@@ -916,7 +941,7 @@ class Player {
     // Todas las coordenadas X se espejan con f para que el peinado se vea igual a ambos lados
     ctx.moveTo(hcx - 10 * f, headY - 1);
     ctx.quadraticCurveTo(hcx - 9 * f, headY - 13, hcx + 1 * f, headY - 11);
-    ctx.quadraticCurveTo(hcx + 12 * f, headY - 16 - tuft, hcx + 5 * f, headY - 7);
+    ctx.quadraticCurveTo(hcx + 12 * f + whd * 6 * blown, headY - 16 - tuft - 2.5 * blown + Math.sin(t * 23) * 1.5 * blown, hcx + 5 * f, headY - 7);
     ctx.quadraticCurveTo(hcx + 10 * f, headY - 6, hcx + 10 * f, headY - 1);
     ctx.quadraticCurveTo(hcx, headY - 6, hcx - 10 * f, headY - 1);
     ctx.closePath();
@@ -944,6 +969,14 @@ class Player {
         ctx.moveTo(exx - 2 * k, headY - 1); ctx.lineTo(exx + 2 * k, headY + 1); ctx.lineTo(exx - 2 * k, headY + 3);
         ctx.stroke();
         ctx.lineWidth = 2;
+      } else if (whs > 0.4) {
+        // Empujado por el viento: ojos entrecerrados con fuerza
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(exx - 2.4, headY + 0.4); ctx.quadraticCurveTo(exx, headY + 2, exx + 2.4, headY + 0.4);
+        ctx.moveTo(exx - 2.2, headY - 2.2 - k * 0.6); ctx.lineTo(exx + 2.2, headY - 2.2 + k * 0.6);
+        ctx.stroke();
+        ctx.lineWidth = 2;
       } else if (blink || col > 0.5) {
         // Parpadeo, o en el suelo: ojos cerrados con fuerza, mirando abajo
         ctx.beginPath();
@@ -951,14 +984,16 @@ class Player {
         else { ctx.moveTo(exx - 2, headY + 1); ctx.lineTo(exx + 2, headY + 1); }
         ctx.stroke();
       } else {
+        // Arrastrado: ojos muy abiertos de susto, con la pupila chiquita
+        const wide = 1 + 0.25 * whp;
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.ellipse(exx, headY + 1, 2.6, 3.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(exx, headY + 1, 2.6 * wide, 3.4 * wide, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.lineWidth = 1; ctx.stroke(); ctx.lineWidth = 2;
         ctx.fillStyle = '#2b1a10';
         ctx.beginPath();
-        ctx.arc(exx + f * 0.8, headY + 1.5 + lookY, 1.6, 0, Math.PI * 2);
+        ctx.arc(exx + f * 0.8 * (1 - whp) + whd * whp, headY + 1.5 + lookY, 1.6 - 0.55 * whp, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -1008,7 +1043,22 @@ class Player {
     ctx.fill();
     ctx.lineWidth = 1.3;
     const pant = tired > 0.3 && !hurt && !this.dead ? (0.5 + 0.5 * brW) * (0.6 + 0.25 * kn + 0.25 * col) : 0;
-    if (wp > 0.35 && !hurt && !this.dead) {
+    if (whp > 0.4 && !hurt) {
+      // Arrastrado: grito con la boca bien abierta (tiembla)
+      ctx.fillStyle = '#5a2418';
+      ctx.beginPath();
+      ctx.ellipse(ex + f * 1.2, headY + 6.4, 2 + Math.sin(t * 29) * 0.3, 2.6 * whp + 0.6, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    } else if (whs > 0.4 && !hurt) {
+      // Empujado: dientes apretados contra el viento
+      ctx.fillStyle = '#fff8ec';
+      ctx.beginPath();
+      ctx.roundRect(ex + f * 1.2 - 2.8, headY + 4.8, 5.6, 2.6, 1.2);
+      ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(ex + f * 1.2 - 2.4, headY + 6.1); ctx.lineTo(ex + f * 1.2 + 2.4, headY + 6.1); ctx.stroke();
+      ctx.lineWidth = 1.3;
+    } else if (wp > 0.35 && !hurt && !this.dead) {
       // Boca en "O": está aspirando el aire con fuerza (y jadea si está cansado)
       ctx.fillStyle = '#5a2418';
       ctx.beginPath();

@@ -63,6 +63,7 @@
   };
   // Esfera guiada (tras la mejora): se mueve por el aire con el stick izquierdo / flechas
   const guide = { on: false, x: 0, y: 0, vx: 0, vy: 0, t: 0, r: BASE_R, vol: 1 };
+  let netSeq = 0;               // número de cada bola lanzada (multijugador)
   const SHOTS = [];
   for (let i = 0; i < 6; i++) SHOTS.push({ on: false, x: 0, y: 0, vx: 0, vy: 0, r: 6, size: 0, t: 0 });
 
@@ -627,6 +628,24 @@
     isUpgraded: () => st.upgraded,
     isHolding: () => st.holding,
     isGuiding: () => guide.on,
+    // Multijugador (coop-elements.js): lo que se ve del agua propia para mandarlo por la red.
+    // Cada bola lanzada recibe un número (netId) mientras vuela. SHOT_LIFE: cuadros de vida.
+    SHOT_LIFE,
+    netState: (g) => {
+      g = g || window.gameInstance;
+      const out = { o: null, s: null, gd: null };
+      if (st.holding && st.size > 0.02 && g && g.player) out.o = [Math.round(orbRadius(st.size) * 10) / 10, Math.round(st.angle * 100) / 100];
+      for (const s of SHOTS) {
+        if (!s.on) { s.netId = 0; continue; }
+        if (!s.netId) s.netId = ++netSeq;
+        (out.s || (out.s = [])).push([s.netId, Math.round(s.x), Math.round(s.y), Math.round(s.vx * 10) / 10, Math.round(s.vy * 10) / 10, Math.round(s.r * 10) / 10, s.t, Math.round(s.size * 100) / 100]);
+      }
+      if (guide.on) out.gd = [Math.round(guide.x), Math.round(guide.y), Math.round(guide.vx * 10) / 10, Math.round(guide.vy * 10) / 10, Math.round((guide.r || BASE_R) * 10) / 10];
+      return out;
+    },
+    // Bolas en vuelo (para reventarlas al chocar con otro jugador) y la esfera guiada
+    shots: SHOTS,
+    guide,
     getState: () => ({ learned: st.learned, upgraded: st.upgraded, mastery: st.mastery, swimming: ws.swim, holding: st.holding, size: st.size, guiding: guide.on })
   };
   window.GameHooks = window.GameHooks || {};
