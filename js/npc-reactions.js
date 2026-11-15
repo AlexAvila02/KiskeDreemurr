@@ -15,7 +15,7 @@
  * está en npcs.js (lee `npc.fx`). Acá se dibuja lo que va por delante: las gotas que se
  * juntan, la bola y el globo de texto.
  *
- * API: window.NpcReactions.hitTest(room, x, y, r) → NPC o null · .splash(game, npc, vol, vx)
+ * API: window.NpcReactions.hitTest(room, x, y, r) → NPC o null · .splash(game, npc, vol, vx, quién)
  *   · .REST (pose en reposo, para npcs.js)
  * Hooks: onBeforeUpdate · onBeforeRoomLoad · onRenderWorld (ver MAPA.md). Pools fijos.
  */
@@ -84,9 +84,17 @@
   // ---------------- bolas devueltas (pool fijo) ----------------
   const BALLS = [];
   for (let i = 0; i < 3; i++) BALLS.push({ on: false, x: 0, y: 0, vx: 0, vy: 0, r: 8, vol: 0.5, t: 0 });
+  // A quién le devuelve el agua el maestro: al que lo mojó (otro jugador en multijugador) o a Ruben
+  function targetOf(g, fx) {
+    const by = fx.by;
+    if (by && by !== g.player && !by.dead && window.Multiplayer && window.Multiplayer.isActive && window.Multiplayer.isActive()) {
+      for (const pl of window.Multiplayer.others()) if (pl.ghost === by) return by;
+    }
+    return g.player;
+  }
   function launchBall(g, n, fx) {
     const WC = window.WaterCore;
-    const p = g.player;
+    const p = targetOf(g, fx);
     const x = n.x + fx.face * fx.ballX, y = n.y + fx.ballY;
     const tx = p.x + p.width / 2, ty = p.y + p.height / 2;
     const dx = tx - x, dy = ty - y;
@@ -94,7 +102,7 @@
     const T = Math.max(16, Math.min(46, Math.hypot(dx, dy) / 8));
     for (const b of BALLS) {
       if (b.on) continue;
-      b.on = true; b.x = x; b.y = y; b.t = 0; b.r = fx.ballR; b.vol = fx.vol;
+      b.on = true; b.x = x; b.y = y; b.t = 0; b.r = fx.ballR; b.vol = fx.vol; b.by = p;
       b.vx = dx / T; b.vy = dy / T - 0.5 * GRAV * T;
       break;
     }
@@ -137,6 +145,12 @@
         const nx = Math.max(p.x, Math.min(b.x, p.x + p.width)), ny = Math.max(p.y, Math.min(b.y, p.y + p.height));
         if ((b.x - nx) * (b.x - nx) + (b.y - ny) * (b.y - ny) <= b.r * b.r) { soakPlayer(g, b); continue; }
       }
+      // Otro jugador (multijugador): revienta en él; su computadora lo empapa
+      const o = b.by;
+      if (o && o !== p && !o.dead) {
+        const nx = Math.max(o.x, Math.min(b.x, o.x + o.width)), ny = Math.max(o.y, Math.min(b.y, o.y + o.height));
+        if ((b.x - nx) * (b.x - nx) + (b.y - ny) * (b.y - ny) <= b.r * b.r) { ballSplash(g, b, false); continue; }
+      }
       // Laguna: se funde con ella
       const wb = WC ? WC.bodyAt(room, b.x, b.y, 0) : null;
       if (wb && b.y >= WC.surfaceAt(wb, b.x)) {
@@ -160,10 +174,12 @@
   function windStep(n, fx) {
     const WP = window.WindPull;
     let target = 0;
-    if (WP && WP.forceAt) {
-      const f = WP.forceAt(n.x, n.y - 40, 22);
+    if (WP && WP.strongestAt) {
+      // El viento de cualquier jugador (el más fuerte que le llega)
+      const hit = WP.strongestAt(n.x, n.y - 40, 22);
+      const f = hit.f;
       if (f > 0) {
-        const b = WP.getBand();
+        const b = hit.band;
         // Soplar empuja el pelo hacia donde apunta el viento; jalar lo trae hacia Ruben
         let wx = b.dirX * (b.mode === 'push' ? 1 : -1);
         if (Math.abs(wx) < 0.35) wx = wx < 0 ? -0.35 : 0.35;
@@ -206,7 +222,7 @@
   // Maestro del Agua: se quita el agua de encima, la junta en una bola y la devuelve
   function masterStep(g, n, fx) {
     const t = ++fx.t;
-    const p = g.player;
+    const p = targetOf(g, fx);
     const targetR = 6 + 9 * Math.min(1, fx.vol);
     if (t < T_WINDUP) fx.face = p.x + p.width / 2 >= n.x ? 1 : -1;
     if (t <= T_HIT) {
@@ -285,7 +301,8 @@
     }
   }
 
-  function splash(g, n, vol, vx) {
+  // by = quién lo mojó (Ruben o el de otro jugador); el maestro se la devuelve a él
+  function splash(g, n, vol, vx, by) {
     const WC = window.WaterCore;
     const fx = fxOf(n);
     if (WC) {
@@ -307,6 +324,7 @@
     fx.ballX = 0; fx.ballY = -80;
     fx.sayT = 0;
     fx.wetDir = vx >= 0 ? 1 : -1;
+    fx.by = by || null;
   }
 
   // ¿La esfera (x, y, r) toca a algún NPC? (caja del cuerpo: 28 x 60 sobre los pies)

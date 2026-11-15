@@ -171,6 +171,58 @@
   }
   function reachFor(power) { return RANGE * (1 - Math.pow(1 - power, 3)); }
 
+  // Franja propia con la forma pública { power, mode, hx, hy, dirX, dirY, reach, range }
+  const band = { power: 0, mode: 'pull', hx: 0, hy: 0, dirX: 1, dirY: 0, reach: 0, range: RANGE };
+  function ownBand() {
+    const g = window.gameInstance;
+    if (!g || !g.player || state.power <= 0.01) { band.power = 0; return band; }
+    const h = handPoint(g.player);
+    band.power = state.power;
+    band.mode = state.mode;
+    band.hx = h.x; band.hy = h.y;
+    band.dirX = state.dirX; band.dirY = state.dirY;
+    band.reach = currentReach();
+    return band;
+  }
+  // Todas las franjas activas: la propia y las de los demás jugadores (multijugador)
+  const bandList = [];
+  function allBands() {
+    bandList.length = 0;
+    const own = ownBand();
+    if (own.power > 0.05 && own.reach > 8) bandList.push(own);
+    for (const r of remotes) if (r.power > 0.05 && r.reach > 8) bandList.push(r);
+    return bandList;
+  }
+  const strongest = { f: 0, band: null };
+  function strongestAt(x, y, skim = 0) {
+    strongest.f = 0; strongest.band = null;
+    for (const b of allBands()) {
+      const f = forceFrom(b, x, y, skim).f;
+      if (f > strongest.f) { strongest.f = f; strongest.band = b; }
+    }
+    return strongest;
+  }
+
+  // Invitado: la copia de un enemigo del anfitrión muestra que está atrapado o mareado.
+  // fx = [1 atrapado | 2 mareado, giro] o 0 / null para soltarlo.
+  function applyNetFx(e, fx) {
+    let w = e.__wind;
+    if (!fx) {
+      if (w && w.net) { delete e.render; delete e.update; delete e.__wind; }
+      return;
+    }
+    if (!w) w = e.__wind = { t: Math.random() * 10, spin: 0, stun: 0, vy: 0, seed: Math.random() * 6.28, net: true };
+    e.render = captureRender;
+    e.update = caughtUpdate;
+    w.t++;
+    w.spin += (fx[1] - w.spin) * 0.4;
+    w.stun = fx[0] === 2 ? 1 : 0;
+    if (fx[0] === 1) {
+      if ('flapT' in e) e.flapT += 0.6;
+      if ('animT' in e) e.animT += 0.5;
+    }
+  }
+
   // ¿El punto (x, y) está dentro de la franja? Devuelve u (0 = mano, 1 = extremo) o -1
   function bandU(p, x, y) {
     const h = handPoint(p);
@@ -254,20 +306,37 @@
     }
   }
 
-  function capture(e) {
+  // Fuente de viento: { hx, hy, dirX, dirY, facing, power, mode, reach, caught }. La propia es
+  // `self` (se actualiza cada cuadro desde state); las de los demás jugadores llegan por
+  // setRemotes (coop-elements.js) y en el anfitrión también atrapan y empujan a los enemigos.
+  const self = { hx: 0, hy: 0, dirX: 1, dirY: 0, facing: 1, power: 0, mode: 'pull', reach: 0, range: RANGE, caught: state.caught };
+  function syncSelf(p) {
+    const h = handPoint(p);
+    self.hx = h.x; self.hy = h.y;
+    self.dirX = state.dirX; self.dirY = state.dirY;
+    self.facing = state.facing; self.power = state.power;
+    self.mode = state.mode; self.reach = currentReach();
+  }
+  // Invitado del multijugador: sus enemigos son copias del anfitrión (multiplayer.js);
+  // el anfitrión los mueve con el viento de todos y acá solo se ve el resultado.
+  const isGuest = () => !!(window.Multiplayer && window.Multiplayer.isGuest && window.Multiplayer.isGuest());
+
+  function capture(e, src) {
     if (e.__wind) { e.__wind.stun = 0; if (state.stunned.includes(e)) state.stunned.splice(state.stunned.indexOf(e), 1); }
     else e.__wind = { t: Math.random() * 10, spin: 0, stun: 0, vy: 0, seed: Math.random() * 6.28 };
+    e.__wind.by = src;
     e.update = caughtUpdate;
     e.render = captureRender;
     if ('knockbackVx' in e) e.knockbackVx = 0;
     if ('knockbackVy' in e) e.knockbackVy = 0;
-    state.caught.push(e);
+    src.caught.push(e);
     const g = window.gameInstance;
-    if (g && g.rumble) g.rumble(0.25, 90);
+    if (g && g.rumble && src === self) g.rumble(0.25, 90);
     if (window.particleSystem) window.particleSystem.createDust(e.x + e.width / 2, e.y + e.height / 2, 6, '#f5ecd8');
   }
   function release(e, stun) {
     if (!e.__wind) return;
+    e.__wind.by = null;
     if (stun && e.alive) {
       e.__wind.stun = STUN_FRAMES;
       e.__wind.vy = 0;
@@ -279,42 +348,47 @@
       delete e.__wind;
     }
   }
-  function releaseAll(stun) {
-    for (const e of state.caught) release(e, stun);
-    state.caught.length = 0;
+  function releaseList(list, stun) {
+    for (const e of list) release(e, stun);
+    list.length = 0;
   }
+  function releaseAll(stun) { releaseList(state.caught, stun); }
+  // Fuentes ajenas que tienen insectos atrapados (para soltarlos si el jugador deja de jalar o se va)
+  const remoteHolders = [];
   function clearAll() {
     releaseAll(false);
+    for (const src of remoteHolders) releaseList(src.caught, false);
+    remoteHolders.length = 0;
     for (const e of state.stunned) { delete e.update; delete e.render; delete e.__wind; }
     state.stunned.length = 0;
   }
+  const isCaught = (e) => !!(e.__wind && e.__wind.by);
 
-  function pullStep(e, p, idx) {
+  function pullStep(e, src, idx) {
     const w = e.__wind;
     w.t++;
     if (!e.alive) return false;
-    const h = handPoint(p);
     const cx = e.x + e.width / 2, cy = e.y + e.height / 2;
     const gap = HOLD_GAP + Math.max(e.width, e.height) / 2 + idx * 8;
-    const holdX = h.x + state.dirX * gap;
-    const holdY = h.y + state.dirY * gap - 2 + Math.sin(w.t * 0.12 + w.seed) * 4 - idx * 5;
+    const holdX = src.hx + src.dirX * gap;
+    const holdY = src.hy + src.dirY * gap - 2 + Math.sin(w.t * 0.12 + w.seed) * 4 - idx * 5;
     const dx = holdX - cx, dy = holdY - cy;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const step = PULL_SPEED * (0.45 + state.power * 0.55) * (1 + Math.min(1, dist / 200) * 0.3);
+    const step = PULL_SPEED * (0.45 + src.power * 0.55) * (1 + Math.min(1, dist / 200) * 0.3);
     // Se acerca en línea recta hacia la mano, con un leve vaivén perpendicular a la franja
     const k = dist <= step || dist === 0 ? 1 : step / dist;
     const wob = Math.sin(w.t * 0.21 + w.seed) * 0.7;
-    const mx = dx * k - state.dirY * wob;
-    const my = dy * k + state.dirX * wob;
+    const mx = dx * k - src.dirY * wob;
+    const my = dy * k + src.dirX * wob;
     const world = window.gameInstance.world;
     unstick(e, world);
     moveCollide(e, mx, my, world);
     // Aletea / patalea indefenso girando en el aire
-    w.spin = Math.sin(w.t * 0.18 + w.seed) * 0.5 + (Math.abs(dx) > 4 ? -state.facing * 0.25 : 0);
+    w.spin = Math.sin(w.t * 0.18 + w.seed) * 0.5 + (Math.abs(dx) > 4 ? -src.facing * 0.25 : 0);
     if ('flapT' in e) e.flapT += 0.6;     // la polilla aletea desesperada
     if ('animT' in e) e.animT += 0.5;     // el escarabajo mueve las patas
-    if ('facing' in e) e.facing = -state.facing;
-    if ('lookX' in e) e.lookX = -state.facing;
+    if ('facing' in e) e.facing = -src.facing;
+    if ('lookX' in e) e.lookX = -src.facing;
     if ('vy' in e) e.vy = 0;
     if ('vx' in e) e.vx = 0;
     if ('isGrounded' in e) e.isGrounded = false;
@@ -415,11 +489,11 @@
 
   const PUSH_SPEED = 2.6;     // px por cuadro con potencia completa al soplar
   // Soplar: aleja a los enemigos dentro de la franja (más fuerte cerca de la mano)
-  function pushStep(e, p, u) {
+  function pushStep(e, src, u) {
     const world = window.gameInstance.world;
-    const sp = PUSH_SPEED * (0.35 + state.power * 0.65) * (1 - u * 0.5);
+    const sp = PUSH_SPEED * (0.35 + src.power * 0.65) * (1 - u * 0.5);
     unstick(e, world);
-    moveCollide(e, state.dirX * sp, state.dirY * sp, world);
+    moveCollide(e, src.dirX * sp, src.dirY * sp, world);
     if ('knockbackVx' in e) e.knockbackVx = 0;
     if (state.t % 11 === 0 && window.particleSystem) window.particleSystem.createDust(e.x + e.width / 2, e.y + e.height / 2, 1, '#ffffff');
   }
@@ -435,19 +509,19 @@
     const room = g.world.getCurrentRoom();
     if (!room || !room.hasWindmill) return;
     let push = 0;
-    if (state.active && state.mode === 'push' && state.power > 0.05) {
-      const h = handPoint(g.player);
-      const rx = MILL_X - h.x, ry = MILL_Y - h.y;
-      const along = rx * state.dirX + ry * state.dirY;
-      const perp = ry * state.dirX - rx * state.dirY;
-      const reach = currentReach();
+    // El soplido de cualquier jugador (el propio y los de los demás) mueve las aspas
+    for (const b of allBands()) {
+      if (b.mode !== 'push' || b.power <= 0.05) continue;
+      const rx = MILL_X - b.hx, ry = MILL_Y - b.hy;
+      const along = rx * b.dirX + ry * b.dirY;
+      const perp = ry * b.dirX - rx * b.dirY;
       const u = Math.max(0, Math.min(1, along / RANGE));
-      if (along > -MILL_R && along < reach + MILL_R * 0.6 && Math.abs(perp) < halfAt(u) + MILL_R) {
+      if (along > -MILL_R && along < b.reach + MILL_R * 0.6 && Math.abs(perp) < halfAt(u) + MILL_R) {
         // perp > 0 → torque horario (el mismo sentido del giro de siempre)
         const sign = Math.abs(perp) < 10 ? 1 : Math.sign(perp);
         const lever = Math.abs(perp) < 10 ? 0.6 : Math.min(1, 0.5 + Math.abs(perp) / MILL_R);
         const falloff = 1 - Math.max(0, along) / (RANGE + MILL_R) * 0.6;
-        push = sign * state.power * lever * falloff;
+        push += sign * b.power * lever * falloff;
       }
     }
     if (push) {
@@ -495,17 +569,20 @@
       startSound();
     }
 
+    const guest = isGuest();
     if (state.active) {
       startSound();   // (si una pausa lo cortó, vuelve a sonar)
       updateAim(g, p);
       state.power = Math.min(1, state.power + 0.045);
       p.facing = state.facing;
-      for (const e of g.enemies) {
-        if (!e || !e.alive || state.caught.includes(e)) continue;
+      syncSelf(p);
+      // (invitado: el anfitrión aplica este viento a sus enemigos y manda dónde quedaron)
+      for (const e of guest ? [] : g.enemies) {
+        if (!e || !e.alive || isCaught(e)) continue;
         const u = bandU(p, e.x + e.width / 2, e.y + e.height / 2);
         if (u < 0) continue;
         // Jalar: atrapa a los insectos · Soplar: los empuja lejos
-        if (state.mode === 'push') pushStep(e, p, u); else capture(e);
+        if (state.mode === 'push') pushStep(e, self, u); else capture(e, self);
       }
       if (window.AnimSystem && window.AnimSystem.spawnFX && state.t % 26 === 0) {
         const h = handPoint(p);
@@ -515,19 +592,54 @@
       state.power = Math.max(0, state.power - 0.12);
       if (state.power === 0) stopSound();
     }
+    if (!state.active) syncSelf(p);
+    remotesOnEnemies(g, guest);
     updateSound();
+  }
+
+  // Viento de los demás jugadores sobre los enemigos (solo donde se simulan: el anfitrión)
+  function liveSrc(src) { return src.power > 0.05 && src.reach > 8 && remotes.includes(src); }
+  function remotesOnEnemies(g, guest) {
+    // Soltar (mareados) los que tenía una fuente que dejó de jalar, cambió a soplar o se fue
+    for (let i = remoteHolders.length - 1; i >= 0; i--) {
+      const src = remoteHolders[i];
+      if (liveSrc(src) && src.mode === 'pull' && !guest) continue;
+      releaseList(src.caught, true);
+      remoteHolders.splice(i, 1);
+    }
+    if (guest) return;
+    for (const src of remotes) {
+      if (!liveSrc(src)) continue;
+      if (!src.caught) src.caught = [];
+      for (const e of g.enemies) {
+        if (!e || !e.alive || isCaught(e)) continue;
+        const hit = forceFrom(src, e.x + e.width / 2, e.y + e.height / 2, 0);
+        if (hit.f <= 0) continue;
+        if (src.mode === 'push') pushStep(e, src, hit.u);
+        else {
+          capture(e, src);
+          if (!remoteHolders.includes(src)) remoteHolders.push(src);
+        }
+      }
+    }
+  }
+
+  function pullList(g, src) {
+    let idx = 0;
+    const list = src.caught;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const e = list[i];
+      if (!g.enemies.includes(e) || !pullStep(e, src, idx)) { release(e, false); list.splice(i, 1); continue; }
+      idx++;
+    }
   }
 
   function postUpdate(g) {
     const p = g.player;
     const room = g.world.getCurrentRoom();
     // Arrastrar a los atrapados
-    let idx = 0;
-    for (let i = state.caught.length - 1; i >= 0; i--) {
-      const e = state.caught[i];
-      if (!g.enemies.includes(e) || !pullStep(e, p, idx)) { release(e, false); state.caught.splice(i, 1); continue; }
-      idx++;
-    }
+    pullList(g, self);
+    for (const src of remoteHolders) pullList(g, src);
     for (let i = state.stunned.length - 1; i >= 0; i--) {
       const e = state.stunned[i];
       if (!g.enemies.includes(e) || !stunStep(e, g.world, room)) state.stunned.splice(i, 1);
@@ -681,7 +793,6 @@
     });
   }
 
-  const band = { power: 0, mode: 'pull', hx: 0, hy: 0, dirX: 1, dirY: 0, reach: 0, range: RANGE };
   window.WindPull = {
     isUnlocked: () => isUnlocked(window.gameInstance),
     isActive: () => state.active,
@@ -689,23 +800,17 @@
     getMillAngle: () => mill.angle,
     // Franja de viento actual (la usan el agua y el pasto). Devuelve siempre el mismo
     // objeto (sin basura por cuadro); power = 0 cuando no sopla ni jala.
-    getBand: () => {
-      const g = window.gameInstance;
-      if (!g || !g.player || state.power <= 0.01) { band.power = 0; return band; }
-      const h = handPoint(g.player);
-      band.power = state.power;
-      band.mode = state.mode;
-      band.hx = h.x; band.hy = h.y;
-      band.dirX = state.dirX; band.dirY = state.dirY;
-      band.reach = currentReach();
-      return band;
-    },
+    getBand: ownBand,
     // Aturde a un enemigo N cuadros (sin IA ni daño por contacto, estrellitas) con un
     // empujón opcional (vx, vy) que respeta las plataformas. Lo usa el agua (water.js).
     stun: (e, frames, vx = 0, vy = 0) => {
       if (!e || !e.alive) return;
-      const ci = state.caught.indexOf(e);
-      if (ci >= 0) state.caught.splice(ci, 1);
+      if (e.__wind && e.__wind.by) {
+        const list = e.__wind.by.caught;
+        const ci = list.indexOf(e);
+        if (ci >= 0) list.splice(ci, 1);
+        e.__wind.by = null;
+      }
       if (!e.__wind) e.__wind = { t: Math.random() * 10, spin: 0, stun: 0, vy: 0, seed: Math.random() * 6.28 };
       const w = e.__wind;
       e.update = caughtUpdate;
@@ -725,9 +830,22 @@
     // Multijugador (coop-elements.js): estado propio para mandar por la red, viento de los
     // demás para dibujar, y la fuerza de una fuente cualquiera ({ f, u, along }, mismo objeto)
     netState: () => (state.power > 0.01 ? [state.mode === 'push' ? 2 : 1, Math.round(state.power * 100) / 100, Math.round(state.angle * 100) / 100] : null),
-    setRemotes: (list) => { remotes = list || []; },
+    setRemotes: (list) => { remotes = list || []; for (const r of remotes) r.range = RANGE; },
     forceFrom,
     reachFor,
+    // Todas las franjas de viento activas (la propia y las de los demás jugadores), con la
+    // forma de getBand(). Mismo arreglo cada vez. La usan el pasto, el agua y los maestros.
+    bands: allBands,
+    // Fuerza más fuerte (0..1) de cualquier viento en (x, y); deja en strongest.band cuál fue
+    strongestAt,
+    // Multijugador: cómo está un enemigo del anfitrión ([1 atrapado | 2 mareado, giro] o 0)
+    // y, en el invitado, reproducirlo sobre su copia (giro, aleteo y estrellitas)
+    netFxOf: (e) => {
+      const w = e && e.__wind;
+      if (!w || w.net) return 0;
+      return [w.by ? 1 : 2, Math.round(w.spin * 100) / 100];
+    },
+    applyNetFx,
     // Media altura de la franja a la distancia relativa u (0 = mano, 1 = extremo)
     bandHalf: (u) => halfAt(u),
     getState: () => ({ unlocked: isUnlocked(window.gameInstance), active: state.active, power: state.power, caught: state.caught.length, stunned: state.stunned.length })

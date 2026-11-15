@@ -514,11 +514,59 @@
       if (drop) drop.life = Math.min(70, 10 + d / sp);
     }
   }
+  // Los demás jugadores (multijugador) también salpican al entrar y salir del agua, levantan
+  // olas al nadar y chapotean en los charcos
+  function othersInWater(room) {
+    const MP = window.Multiplayer;
+    if (!MP || !MP.isActive || !MP.isActive() || (!room.water && !room.puddles)) return;
+    for (const pl of MP.others()) {
+      const gh = pl.ghost;
+      if (!gh || gh.dead) continue;
+      const cx = gh.x + gh.width / 2, cy = gh.y + gh.height / 2;
+      const wb = room.water ? bodyAt(room, cx, cy, 0) : null;
+      const surf = wb ? surfaceAt(wb, cx) : 0;
+      const inside = !!wb && cy > surf;
+      const was = gh._inWater;
+      if (inside && !was) {
+        const sp = Math.min(11, Math.abs(gh.vy) + Math.abs(gh.vx) * 0.4);
+        splashAt(wb, cx, Math.min(9, sp * 0.9), 2);
+        burst(cx, surf, 6 + Math.round(sp * 1.6), 2 + sp * 0.35);
+        playSplash(sp / 14);
+      } else if (!inside && was && gh._lastBody) {
+        const wb2 = gh._lastBody;
+        if (cx >= wb2.x && cx <= wb2.x + wb2.w) { splashAt(wb2, cx, -2.5, 1); burst(cx, surfaceAt(wb2, cx), 7, 3); playSplash(0.25); }
+      }
+      gh._inWater = inside;
+      if (inside) {
+        gh._lastBody = wb;
+        if (Math.abs(gh.vx) > 0.8 && ws.t % 7 === 0 && cy - surf < 26) splashAt(wb, cx - gh.vx * 3, 1.1, 1);
+        if (ws.t % 18 === 0 && cy - surf > 20) spawnDrop(cx + (gh.facing || 1) * 6, gh.y + 8, 0, -0.4, 1.5 + Math.random(), true);
+        continue;
+      }
+      if (!gh.isGrounded || Math.abs(gh.vx) <= 1 || ws.t % 9) continue;
+      for (const q of room.puddles || []) {
+        if (Math.abs(gh.y + gh.height - q.y) < 4 && Math.abs(cx - q.x) < puddleHalf(q)) {
+          burst(cx, q.y - 1, 2, 1.6);
+          break;
+        }
+      }
+    }
+  }
+
+  // El viento de cualquier jugador (el propio y el de los demás) riza el agua y los charcos
   function windOnWater(room) {
     const WP = window.WindPull;
-    if (!WP || !WP.forceAt || (!room.water && !room.puddles)) return;
-    const b = WP.getBand();
-    if (!b || b.power <= 0.05 || b.reach < 8) return;
+    if (!WP || !WP.forceFrom || !WP.bands || (!room.water && !room.puddles)) return;
+    let strongest = 0;
+    for (const b of WP.bands()) strongest = Math.max(strongest, windBandOnWater(room, WP, b));
+    // Chapoteo del agua batida por el viento
+    if (windSplashT > 0) windSplashT--;
+    if (strongest > 0.3 && windSplashT === 0) {
+      windSplashT = 16 + ((Math.random() * 14) | 0);
+      playSplash(0.1 + strongest * 0.22);
+    }
+  }
+  function windBandOnWater(room, WP, b) {
     const push = b.mode === 'push';
     let strongest = 0;
     for (const wb of room.water || []) {
@@ -526,7 +574,7 @@
       const step = wb.w / (s.n - 1);
       for (let i = 0; i < s.n; i++) {
         const x = wb.x + i * step, y = wb.y + s.h[i];
-        const f = WP.forceAt(x, y, WIND_SKIM);
+        const f = WP.forceFrom(b, x, y, WIND_SKIM).f;
         if (f <= 0) continue;
         if (f > strongest) strongest = f;
         const chop = 0.55 + 0.45 * Math.sin(ws.t * 0.45 + i * 1.3);
@@ -553,18 +601,13 @@
       }
     }
     for (const q of room.puddles || []) {
-      const f = WP.forceAt(q.x, q.y, WIND_SKIM);
+      const f = WP.forceFrom(b, q.x, q.y, WIND_SKIM).f;
       if (f <= 0) continue;
       if (f > strongest) strongest = f;
       q.pop = Math.max(q.pop || 0, 0.35 * f);          // el charco se estira con el viento
       if (Math.random() < 0.1 * f) windSpray(b, q.x + (Math.random() - 0.5) * puddleHalf(q), q.y - 1, f, push);
     }
-    // Chapoteo del agua batida por el viento
-    if (windSplashT > 0) windSplashT--;
-    if (strongest > 0.3 && windSplashT === 0) {
-      windSplashT = 16 + ((Math.random() * 14) | 0);
-      playSplash(0.1 + strongest * 0.22);
-    }
+    return strongest;
   }
 
   // ---------------- instalación ----------------
@@ -589,6 +632,7 @@
         objectsStep(game);
         stepDrops(room, game.world.getPlatforms());
         puddlesStep(game, room);
+        othersInWater(room);
       }
       // Ambiente de agua: sigue en pausa / Diario; se apaga en el menú principal
       const room = game.world && game.world.getCurrentRoom();
@@ -600,6 +644,8 @@
     H.onBeforeRoomLoad.push(() => {
       ws.swim = false; ws.prevSwim = false; ws.lastBody = null;
       for (const d of DROPS) d.on = false;
+      const MP = window.Multiplayer;
+      if (MP && MP._state) for (const pl of MP._state.players.values()) if (pl.ghost) { pl.ghost._inWater = false; pl.ghost._lastBody = null; }
     });
 
     // Charcos detrás de Ruben (capa world); agua y gotas por delante (translúcidas)

@@ -108,7 +108,9 @@
   // Moja a un enemigo: no le hace daño, lo empuja (con sus colisiones) y lo aturde 3 s
   function wetEnemy(g, e, vx, vy) {
     const WP = window.WindPull;
-    if (WP && WP.stun) WP.stun(e, STUN_WATER, vx, vy);
+    // Invitado del multijugador: el enemigo es del anfitrión; él lo aturde y lo empuja
+    if (e.netWet) e.netWet(vx, vy);
+    else if (WP && WP.stun) WP.stun(e, STUN_WATER, vx, vy);
     else if ('knockbackVx' in e) e.knockbackVx = vx;
     e.__wetT = ws.t;
     burst(e.x + e.width / 2, e.y + e.height / 2, 8, 2.6);
@@ -631,6 +633,8 @@
     // Multijugador (coop-elements.js): lo que se ve del agua propia para mandarlo por la red.
     // Cada bola lanzada recibe un número (netId) mientras vuela. SHOT_LIFE: cuadros de vida.
     SHOT_LIFE,
+    // Aturde y empuja a un enemigo con agua (el anfitrión, por el agua de un invitado)
+    wetEnemy: (g, e, vx, vy) => wetEnemy(g || window.gameInstance, e, vx, vy),
     netState: (g) => {
       g = g || window.gameInstance;
       const out = { o: null, s: null, gd: null };

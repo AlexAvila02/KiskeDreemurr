@@ -268,6 +268,7 @@
     const life = (window.WaterControl && window.WaterControl.SHOT_LIFE) || 22;
     const p = g.player;
     const room = g.world.getCurrentRoom();
+    const NR = window.NpcReactions;
     for (const [key, s] of shots) {
       s.t++;
       s.vy += 0.2;
@@ -282,6 +283,17 @@
         for (const pl of others) {
           if (pl.id !== s.owner && pl.ghost && !pl.ghost.dead && rectHit(s.x, s.y, s.r, pl.ghost)) { pop = true; break; }
         }
+      }
+      // Enemigos: revienta en ellos (el que la tiró decide el aturdido; el anfitrión lo aplica)
+      if (!pop) {
+        for (const e of g.enemies) {
+          if (e && e.alive && rectHit(s.x, s.y, s.r, e)) { pop = true; break; }
+        }
+      }
+      // Maestros y vecinos: los moja y el maestro le devuelve el agua al que la tiró
+      if (!pop && NR) {
+        const npc = NR.hitTest(room, s.x, s.y, s.r);
+        if (npc) { NR.splash(g, npc, 0.35 + s.size * 0.65, s.vx, ghostOf(s.owner)); pop = true; }
       }
       if (!pop && inPlatform(g.world, s.x, s.y, s.r)) pop = true;
       if (pop || s.t >= life) {
@@ -303,6 +315,11 @@
       if (me.guideCd <= 0 && !p.dead && g.deathTimer <= 0 && rectHit(gs.x, gs.y, gs.r, p)) {
         soakMe(g, gs.vx || (p.x + p.width / 2 - gs.x), 0.6);
         me.guideCd = 45;
+      }
+      // Moja una sola vez al maestro (en la computadora del dueño la esfera se gasta ahí)
+      if (!gs.npcDone && NR) {
+        const npc = NR.hitTest(room, gs.x, gs.y, gs.r || 13);
+        if (npc) { gs.npcDone = true; NR.splash(g, npc, 0.7, gs.vx, ghostOf(gs.owner)); }
       }
     }
     // Mis bolas lanzadas revientan al chocar con un compañero (él se moja en su computadora)
@@ -330,6 +347,11 @@
     const WC = window.WaterCore;
     if (!WC || frame % 4) return;
     WC.spawnDrop(p.x + 3 + Math.random() * (p.width - 6), p.y + 8 + Math.random() * 22, (Math.random() - 0.5) * 0.6, 0.4, 1 + Math.random() * 0.8, false);
+  }
+
+  function ghostOf(id) {
+    for (const pl of others) if (pl.id === id) return pl.ghost || null;
+    return null;
   }
 
   // ---------------- dibujo del agua ajena ----------------

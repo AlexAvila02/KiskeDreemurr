@@ -645,6 +645,7 @@
     return cv;
   }
 
+  const NO_BANDS = [];
   // Pasto que se mece (en vivo, pocas líneas por plataforma visible)
   function drawLive(ctx, p, sx, sy, biomeKey, biome, t) {
     if (p.type === 'ceiling' || p.type === 'wall') return;
@@ -655,17 +656,18 @@
       ctx.beginPath();
       const x0 = Math.max(sx + 6, -10), x1 = Math.min(sx + p.w - 6, 970);
       const start = sx + 6 + Math.ceil((x0 - sx - 6) / 11) * 11;
-      // Viento de Ruben (wind-pull.js): las briznas dentro de la franja se doblan en la
-      // dirección del viento (soplar = se alejan, jalar = se inclinan hacia Ruben) y tiemblan
+      // Viento de Ruben y de los demás jugadores (wind-pull.js): las briznas dentro de una
+      // franja se doblan en la dirección del viento (soplar = se alejan, jalar = se inclinan
+      // hacia quien jala) y tiemblan
       const WP = window.WindPull;
-      const band = WP && WP.getBand ? WP.getBand() : null;
-      const windOn = band && band.power > 0.05 && band.reach > 8;
+      const bands = WP && WP.bands ? WP.bands() : NO_BANDS;
       const camX = p.x - sx, camY = p.y - sy;   // de pantalla a mundo
       for (let gx = start; gx < x1; gx += 11) {
         const k = (gx - sx) * 0.37;
         let sway = Math.sin(t * 2.2 + k * 0.6) * 2.2;
         let hh = 4 + ((k * 7.3) % 5);
-        if (windOn) {
+        for (let bi = 0; bi < bands.length; bi++) {
+          const band = bands[bi];
           const rx = gx + camX - band.hx, ry = sy + camY - 3 - band.hy;
           const along = rx * band.dirX + ry * band.dirY;
           if (along > -6 && along < band.reach) {

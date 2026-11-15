@@ -272,6 +272,8 @@
     get alive() { return this.real.alive; } set alive(v) { this.real.alive = v; }
     get hp() { return this.real.hp; }
     get facing() { return this.real.facing; } set facing(v) { this.real.facing = v; }
+    // Una bola o esfera de agua de este invitado lo mojó: el anfitrión lo aturde y lo empuja
+    netWet(vx, vy) { send(MP.hostConn, { t: 'fx', id: this.id, k: 'wet', vx: r1(vx), vy: r1(vy) }); }
     takeDamage(amount, knockback = 0) {
       const e = this.real;
       if (!e.alive || e.hitCooldown > 0) return;
@@ -281,8 +283,9 @@
       try { e.takeDamage(amount, knockback); } catch (err) { /* */ }
     }
     apply(s) {
-      // s = [id, clase, x, y, mira, vivo, vida]
+      // s = [id, clase, x, y, mira, vivo, vida, viento] (viento: [1 atrapado | 2 mareado, giro] o 0)
       this.tx = s[2]; this.ty = s[3];
+      this.netFx = s[7] || 0;
       const e = this.real;
       if (e.lookX !== undefined) e.lookX = s[4]; else e.facing = s[4];
       e.hp = s[6];
@@ -296,6 +299,9 @@
     update(world) {
       const e = this.real;
       const dying = !e.alive;
+      // Atrapado por el viento o mareado (lo decide el anfitrión): gira, aletea y ve estrellitas
+      const WP = window.WindPull;
+      if (WP && WP.applyNetFx) WP.applyNetFx(e, dying ? 0 : this.netFx);
       try { e.update(world, FAR); } catch (err) { /* */ }
       if (!dying || e.dyingTimer > 0) {
         if (Math.hypot(this.tx - e.x, this.ty - e.y) > 160) { e.x = this.tx; e.y = this.ty; }
@@ -338,7 +344,8 @@
       if (!e._mpId) e._mpId = MP.nextEnemyId++;
       if (!e.alive && !(e.dyingTimer > 0)) continue;
       enemies.push([e._mpId, e.constructor && e.constructor.name, r1(e.x), r1(e.y),
-        e.lookX !== undefined ? e.lookX : (e.facing || 1), e.alive ? 1 : 0, Math.round(e.hp || 0)]);
+        e.lookX !== undefined ? e.lookX : (e.facing || 1), e.alive ? 1 : 0, Math.round(e.hp || 0),
+        window.WindPull && window.WindPull.netFxOf ? window.WindPull.netFxOf(e) : 0]);
     }
     const players = [];
     for (const pl of MP.players.values()) {
@@ -401,6 +408,11 @@
     } else if (msg.t === 'hit') {
       const e = g.enemies.find((x) => x && x._mpId === msg.id);
       if (e && e.alive && e.takeDamage) e.takeDamage(+msg.amt || 0, +msg.kb || 0);
+    } else if (msg.t === 'fx') {
+      // El agua de un invitado mojó a un enemigo: aturdido y empujado acá (y todos lo ven)
+      const e = g.enemies.find((x) => x && x._mpId === msg.id);
+      const WC = window.WaterControl;
+      if (e && e.alive && msg.k === 'wet' && WC && WC.wetEnemy) WC.wetEnemy(g, e, +msg.vx || 0, +msg.vy || 0);
     } else if (msg.t === 'w') {
       mergeWorld(g, msg.w, pl.name, false);
     } else if (msg.t === 'exit') {
@@ -916,6 +928,8 @@
       if (running && !p.dead && game.deathTimer <= 0) {
         for (const e of game.enemies) {
           if (!e || !e.alive) continue;
+          // Atrapado por el viento o mareado: no lastima a nadie
+          if (e.__wind || e.netFx) continue;
           if (MP.mode === 'host' && !e._mpTgt) continue; // ya lo resolvió enemy.update
           if (overlap(e, p)) {
             const kd = Math.sign((p.x + p.width / 2) - (e.x + e.width / 2)) || 1;
