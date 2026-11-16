@@ -5,10 +5,11 @@
  * - Menú "Diario" con tres pestañas: OBJETOS · ESTADÍSTICAS · NOTAS DE ANGELO.
  * - ESTADÍSTICAS de Ruben: daño básico, velocidad de ataque, defensa (probabilidad de
  *   bloquear un golpe) y velocidad de movimiento.
- *     · Se suben ENTRENANDO con los maestros: hablá con ellos después de sus líneas y cada
- *       charla sube su estadística más baja un nivel, sin costo. Máximo STAT_MAX por stat.
- *     · Se potencian EQUIPANDO objetos del diario (hasta EQUIP_SLOTS a la vez).
- * - Sin sistema de puntos: el entrenamiento y los objetos equipados son la única progresión.
+ *     · SOLO suben EQUIPANDO objetos del diario (los maestros ya no entrenan estadísticas).
+ *     · Ranuras por tipo (EQUIP[id].slot): 'weapon' (1 arma), 'outfit' (1 vestimenta),
+ *       'charm' (hasta SLOT_MAX.charm recuerdos).
+ *     · Armas y vestimentas se VEN en Ruben: applyPassives escribe player.gear y player.js
+ *       las dibuja (WEAPON_LOOKS / OUTFIT_LOOKS).
  * - Progreso guardado en localStorage ('ruben_diario_v1').
  *
  * Abrir / cerrar: I o Tab (si no están asignadas a otra acción) · botón del HUD ·
@@ -17,8 +18,7 @@
  *
  * Se integra con GameHooks (onInit, onAfterUpdate, onBeforeTogglePause, onRenderWorld;
  *   ver MAPA.md), ajusta player.mods (estadísticas) y amplía MenuNavigator (js/menu-nav.js)
- *   para que el mando navegue el Diario. Los maestros llaman a `game.journal.trainNpc(npc)`
- *   desde npcs.js.
+ *   para que el mando navegue el Diario.
  */
 (function () {
   'use strict';
@@ -71,31 +71,41 @@
       name: 'Sello del Reino',
       desc: 'El sello real de la familia. Prueba de quiénes son... y de lo que pueden volver a ser.',
       kind: 'Objeto clave'
+    },
+    cuchillo: {
+      name: 'Cuchillo de Caza',
+      desc: 'El cuchillo con mango de nogal que papá usaba para tallar. Corto y liviano: con él los tajos salen mucho más rápido.',
+      kind: 'Arma · se ve en la mano de Ruben'
     }
   };
-  const ITEM_ORDER = ['llave', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla', 'retrato', 'sello'];
+  const ITEM_ORDER = ['llave', 'cuchillo', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla', 'retrato', 'sello'];
 
 
   // ------------------------------------------------------------------
   // Estadísticas de Ruben (pestaña ESTADÍSTICAS del Diario)
   // ------------------------------------------------------------------
-  const STAT_MAX = 100;              // tope interno de entrenamiento por estadística (el jugador no lo ve)
+  const RADAR_FULL = 0.5;            // bonus (+50%) que llena un eje del radar
   const BASE_DAMAGE = 15;            // daño del tajo básico (player.js: 15 * mods.attackDamage)
   const BASE_ATTACK_FRAMES = 18;     // cuadros entre tajos sin mejoras (player.js)
   const STATS = {
-    dmg:  { name: 'Daño básico', short: 'Daño', step: 0.10, trainText: 'El maestro te hace repetir el tajo hasta que los brazos pesan, y el golpe pesa más.' },
-    atk:  { name: 'Velocidad de ataque', short: 'Ritmo', step: 0.08, trainText: 'Te enseña a volver a la guardia sin pensarlo: las manos ganan ritmo.' },
-    def:  { name: 'Defensa', short: 'Defensa', step: 0.06, trainText: 'Te hace cubrirte con el brazo una y otra vez: ahora los golpes te encuentran menos.' },
-    move: { name: 'Velocidad de movimiento', short: 'Veloc.', step: 0.05, trainText: 'Corren cuesta arriba y cuesta abajo: el cuerpo aprende a ir liviano.' }
+    dmg:  { name: 'Daño básico', short: 'Daño' },
+    atk:  { name: 'Velocidad de ataque', short: 'Ritmo' },
+    def:  { name: 'Defensa', short: 'Defensa' },
+    move: { name: 'Velocidad de movimiento', short: 'Veloc.' }
   };
   const STAT_ORDER = ['dmg', 'atk', 'def', 'move'];
-  const EQUIP_SLOTS = 2;             // objetos equipados a la vez
-  // Objetos del diario que se equipan: suman un % a una estadística
+  // Ranuras de equipo: cuántos objetos de cada tipo a la vez
+  const SLOT_MAX = { weapon: 1, outfit: 1, charm: 2 };
+  const SLOT_NAMES = { weapon: 'ARMA', outfit: 'VESTIMENTA', charm: 'RECUERDOS' };
+  const SLOT_ORDER = ['weapon', 'outfit', 'charm'];
+  // Objetos del diario que se equipan: suman un % a una estadística (única forma de subirlas).
+  // look = cómo se ve en Ruben (armas y vestimentas; ver WEAPON_LOOKS / OUTFIT_LOOKS en player.js)
   const EQUIP = {
-    brujula:    { stat: 'move', bonus: 0.12 },
-    campanilla: { stat: 'atk',  bonus: 0.15 },
-    retrato:    { stat: 'dmg',  bonus: 0.15 },
-    sello:      { stat: 'def',  bonus: 0.12 }
+    cuchillo:   { slot: 'weapon', stat: 'atk',  bonus: 0.25, look: 'cuchillo' },
+    brujula:    { slot: 'charm',  stat: 'move', bonus: 0.12 },
+    campanilla: { slot: 'charm',  stat: 'atk',  bonus: 0.15 },
+    retrato:    { slot: 'charm',  stat: 'dmg',  bonus: 0.15 },
+    sello:      { slot: 'charm',  stat: 'def',  bonus: 0.12 }
   };
 
   // ------------------------------------------------------------------
@@ -236,6 +246,23 @@
       c.lineWidth = 1.1;
       c.beginPath(); c.moveTo(-5, 2.5); c.lineTo(-5, -4); c.lineTo(-2.5, -1); c.lineTo(0, -5.5); c.lineTo(2.5, -1); c.lineTo(5, -4); c.lineTo(5, 2.5); c.closePath();
       fs(c, '#e9b04a');
+    },
+    cuchillo(c) {
+      sparkle(c, 10, -11, 2.8); sparkle(c, -11, 9, 2.2);
+      c.rotate(-Math.PI / 4);
+      // Hoja: lomo recto, panza curva hacia la punta
+      c.beginPath();
+      c.moveTo(-2, -3.2); c.lineTo(15, -2.2);
+      c.quadraticCurveTo(10, 5.5, -2, 3.6); c.closePath();
+      fs(c, '#e4ebef');
+      c.save(); c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(1, -1.4); c.lineTo(11, -1.1); c.stroke(); c.restore();
+      // Virola de bronce
+      c.beginPath(); c.roundRect(-4.6, -4.6, 3.4, 9.6, 1.2); fs(c, '#c98a3a');
+      // Mango de nogal con remaches
+      c.beginPath(); c.roundRect(-15, -3, 10.6, 6.2, 2.6); fs(c, '#7a4a2b');
+      c.fillStyle = '#e9c46a';
+      c.beginPath(); c.arc(-12, 0.1, 1.1, 0, Math.PI * 2); c.arc(-7.8, 0.1, 1.1, 0, Math.PI * 2); c.fill();
     },
     corazon(c) {
       heartPath(c); fs(c, '#d4483b');
@@ -410,7 +437,7 @@
   // Diario
   // ------------------------------------------------------------------
   function emptySave() {
-    return { collected: {}, notes: {}, valor: 0, stats: { dmg: 0, atk: 0, def: 0, move: 0 }, equipped: [] };
+    return { collected: {}, notes: {}, valor: 0, equipped: [] };
   }
 
   class Journal {
@@ -448,10 +475,15 @@
         s.collected = data.collected || {};
         s.notes = data.notes || {};
         s.valor = Number(data.valor) || 0;
-        for (const id of STAT_ORDER) {
-          s.stats[id] = Math.max(0, Math.min(STAT_MAX, Number(data.stats && data.stats[id]) || 0));
+        // (los niveles entrenados con maestros de guardados viejos se descartan:
+        //  las estadísticas ahora salen solo de los objetos)
+        const count = {};
+        for (const id of Array.isArray(data.equipped) ? data.equipped : []) {
+          const e = EQUIP[id];
+          if (!e || s.equipped.includes(id)) continue;
+          count[e.slot] = (count[e.slot] || 0) + 1;
+          if (count[e.slot] <= SLOT_MAX[e.slot]) s.equipped.push(id);
         }
-        s.equipped = Array.isArray(data.equipped) ? data.equipped.filter(id => EQUIP[id]).slice(0, EQUIP_SLOTS) : [];
         return s;
       } catch (e) {
         return emptySave();
@@ -472,7 +504,6 @@
     emblemCount() {
       return Object.values(this.save.collected).filter(v => v === 'emblema').length;
     }
-    statLevel(id) { return Math.max(0, Math.min(STAT_MAX, this.save.stats[id] || 0)); }
     ownsItem(id) {
       if (id === 'llave') return this.game.player.keys > 0 || !!(this.game.world.rooms[2] && this.game.world.rooms[2].keyItem && this.game.world.rooms[2].keyItem.collected);
       return Object.values(this.save.collected).includes(id);
@@ -507,8 +538,16 @@
       return sum;
     }
     // Multiplicador de daño, velocidad de ataque o de movimiento (1 = sin mejoras)
-    statMult(id) { return 1 + STATS[id].step * this.statLevel(id) + this.equipBonus(id); }
-    blockChance() { return Math.min(0.5, STATS.def.step * this.statLevel('def') + this.equipBonus('def')); }
+    statMult(id) { return 1 + this.equipBonus(id); }
+    blockChance() { return Math.min(0.5, this.equipBonus('def')); }
+    // Objeto equipado en una ranura que tiene look (arma / vestimenta), o null
+    equippedLook(slot) {
+      for (const id of this.save.equipped) {
+        const e = EQUIP[id];
+        if (e && e.slot === slot && e.look) return e.look;
+      }
+      return null;
+    }
     attackCooldown() { return Math.max(6, Math.round(this.base.attackCooldown / this.statMult('atk'))); }
 
     applyPassives() {
@@ -523,6 +562,11 @@
         p.mods.attackCooldown = this.attackCooldown();
         p.mods.blockChance = this.blockChance();
       }
+      // Lo equipado que se ve en el sprite (player.js dibuja arma y vestimenta)
+      if (p.gear) {
+        p.gear.weapon = this.equippedLook('weapon');
+        p.gear.outfit = this.equippedLook('outfit');
+      }
       if (this.game.updateHUD) this.game.updateHUD();
     }
 
@@ -536,46 +580,27 @@
       if (id === 'atk') return `tajo cada ${this.attackCooldown()} cuadros · ${sign}${pct}%`;
       return `${(this.base.speed * m).toFixed(1)} · ${sign}${pct}%`;
     }
-    trainersOf(id) {
-      const names = [];
-      for (const room of this.game.world.rooms) {
-        if (!room || !room.npcs) continue;
-        room.npcs.forEach(n => { if ((n.trains || []).includes(id)) names.push(n.name.split(',')[0]); });
-      }
-      return names.length ? names.join(' · ') : 'nadie todavía';
-    }
-
-    // Lo llama npcs.js cuando el maestro ya dijo sus líneas y Ruben vuelve a hablarle.
-    // Devuelve el texto del entrenamiento, o null si no hay nada que entrenar (sigue la despedida).
-    trainNpc(npc) {
-      const ids = (npc.trains || []).filter(id => STATS[id]);
-      const open = ids.filter(id => this.statLevel(id) < STAT_MAX);
-      if (!open.length) return null;
-      // Entrena la estadística más baja de ese maestro (sin costo)
-      open.sort((a, b) => this.statLevel(a) - this.statLevel(b));
-      const id = open[0];
-      this.save.stats[id] = this.statLevel(id) + 1;
-      this.persist();
-      this.applyPassives();
-      this.refreshHeader();
-      const sm = window.soundManager;
-      if (sm && sm.playUnlockAbility) try { sm.playUnlockAbility(); } catch (e) { /* */ }
-      this.game.showNotification(`${STATS[id].name} · nivel ${this.statLevel(id)}`);
-      return `${STATS[id].trainText} (${STATS[id].name}: nivel ${this.statLevel(id)}).`;
-    }
-
-    // Equipa / quita un objeto del diario (hasta EQUIP_SLOTS)
+    // Equipa / quita un objeto del diario. Arma y vestimenta: una sola (la nueva reemplaza
+    // a la anterior). Recuerdos: hasta SLOT_MAX.charm.
     toggleEquip(id) {
-      if (!EQUIP[id] || !this.ownsItem(id)) return false;
+      const e = EQUIP[id];
+      if (!e || !this.ownsItem(id)) return false;
       const i = this.save.equipped.indexOf(id);
       if (i >= 0) {
         this.save.equipped.splice(i, 1);
       } else {
-        if (this.save.equipped.length >= EQUIP_SLOTS) {
-          this.game.showNotification(`Ya tenés ${EQUIP_SLOTS} objetos equipados: quitá uno primero`);
-          return false;
+        const same = this.save.equipped.filter(o => EQUIP[o] && EQUIP[o].slot === e.slot);
+        if (same.length >= SLOT_MAX[e.slot]) {
+          if (SLOT_MAX[e.slot] === 1) {
+            this.save.equipped.splice(this.save.equipped.indexOf(same[0]), 1);
+          } else {
+            this.game.showNotification(`Ya tenés ${SLOT_MAX[e.slot]} recuerdos equipados: quitá uno primero`);
+            return false;
+          }
         }
         this.save.equipped.push(id);
+        const sm = window.soundManager;
+        if (e.look && sm && sm.playPickup) try { sm.playPickup(); } catch (err) { /* */ }
       }
       this.persist();
       this.applyPassives();
@@ -657,7 +682,8 @@
         this.game.showNotification(`Emblema del Reino · ${this.emblemCount()}/${this.worldCount('emblema')}`);
       } else {
         if (sm && sm.playUnlockAbility) sm.playUnlockAbility();
-        this.game.showNotification(`Encontraste: ${info.name} · miralo en el Diario (${this.openKeyLabel()})`);
+        const verb = EQUIP[c.item] ? 'equipalo' : 'miralo';
+        this.game.showNotification(`Encontraste: ${info.name} · ${verb} en el Diario (${this.openKeyLabel()})`);
       }
       this.selectedItem = c.item;
     }
@@ -910,10 +936,17 @@
       let meta = where ? `Encontrado en: ${where}` : '';
       if (info.stack) meta = `Tenés ${this.itemCount(id)}` + (where ? ` · el primero, en ${where}` : '');
       if (meta) box.appendChild(el('div', 'journal-detail-meta', meta));
+      const eq = EQUIP[id];
+      if (eq) {
+        const on = this.save.equipped.includes(id);
+        box.appendChild(el('div', 'journal-detail-meta',
+          `${STATS[eq.stat].name} +${Math.round(eq.bonus * 100)}% · ` +
+          (on ? 'EQUIPADO' : 'equipalo en ESTADÍSTICAS')));
+      }
     }
 
-    // Gráfico de radar de las 4 estadísticas: cada eje es una estadística y el nivel
-    // (0 a STAT_MAX) indica qué tan lejos del centro llega la forma. Al inicio todas están en 0.
+    // Gráfico de radar de las 4 estadísticas: cada eje es una estadística y el bonus de los
+    // objetos equipados (0 a RADAR_FULL) indica qué tan lejos del centro llega la forma.
     statRadar() {
       const cx = 130, cy = 112, R = 70, labelR = R + 22;
       const f = n => n.toFixed(1);
@@ -939,18 +972,19 @@
         svg += `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${f(x)}" y2="${f(y)}"/>`;
       });
       // Zona entrenada: sólida en naranja fuerte, encima de la zona pendiente
-      const shape = STAT_ORDER.map((id, i) => pt(i, this.statLevel(id) / STAT_MAX).map(f).join(',')).join(' ');
+      const frac = id => Math.min(1, this.equipBonus(id) / RADAR_FULL);
+      const shape = STAT_ORDER.map((id, i) => pt(i, frac(id)).map(f).join(',')).join(' ');
       svg += `<polygon class="radar-shape" points="${shape}"/>`;
       STAT_ORDER.forEach((id, i) => {
-        const lvl = this.statLevel(id);
-        if (lvl > 0) {
-          const [x, y] = pt(i, lvl / STAT_MAX);
+        const b = this.equipBonus(id);
+        if (b > 0) {
+          const [x, y] = pt(i, frac(id));
           svg += `<circle class="radar-dot stat-${id}" cx="${f(x)}" cy="${f(y)}" r="3.5"/>`;
         }
         const [lx, ly] = pt(i, labelR / R);
         const anchor = i === 1 ? 'start' : (i === 3 ? 'end' : 'middle');
         svg += `<text class="radar-label" x="${f(lx)}" y="${f(ly)}" text-anchor="${anchor}">${STATS[id].short}</text>`;
-        svg += `<text class="radar-level" x="${f(lx)}" y="${f(ly + 12)}" text-anchor="${anchor}">${lvl}</text>`;
+        svg += `<text class="radar-level" x="${f(lx)}" y="${f(ly + 12)}" text-anchor="${anchor}">+${Math.round(b * 100)}%</text>`;
       });
       const wrap = el('div', 'stat-radar-wrap');
       wrap.innerHTML = `<svg class="stat-radar" viewBox="0 0 260 232" role="img" ` +
@@ -967,31 +1001,40 @@
       sec.appendChild(this.statRadar());
       box.appendChild(sec);
 
-      const eq = el('div', 'stats-section');
-      eq.appendChild(el('div', 'stats-title', `OBJETOS EQUIPADOS · ${this.save.equipped.length}/${EQUIP_SLOTS}`));
-      const list = el('div', 'stats-equip-list');
-      for (const id of Object.keys(EQUIP)) {
-        const info = ITEMS[id];
-        if (!this.ownsItem(id)) continue; // los no conseguidos no se muestran
-        const on = this.save.equipped.includes(id);
-        const b = el('button', 'stat-equip' + (on ? ' equipped' : ''));
-        b.type = 'button';
-        b.dataset.item = id;
-        b.appendChild(iconCanvas(id, 32));
-        const txt = el('span', 'stat-equip-text');
-        txt.appendChild(el('span', 'stat-equip-name', info.name));
-        txt.appendChild(el('span', 'stat-equip-desc',
-          `${STATS[EQUIP[id].stat].name} +${Math.round(EQUIP[id].bonus * 100)}%`));
-        b.appendChild(txt);
-        b.appendChild(el('span', 'stat-equip-state', on ? 'EQUIPADO' : 'Equipar'));
-        b.addEventListener('click', () => this.toggleEquip(id));
-        list.appendChild(b);
+      // Una sección por ranura (arma, vestimenta, recuerdos); solo las que tienen objetos conseguidos
+      let any = false;
+      for (const slot of SLOT_ORDER) {
+        const ids = Object.keys(EQUIP).filter(id => EQUIP[id].slot === slot && this.ownsItem(id));
+        if (!ids.length) continue;
+        any = true;
+        const used = this.save.equipped.filter(o => EQUIP[o] && EQUIP[o].slot === slot).length;
+        const eq = el('div', 'stats-section');
+        eq.appendChild(el('div', 'stats-title', `${SLOT_NAMES[slot]} · ${used}/${SLOT_MAX[slot]}`));
+        const list = el('div', 'stats-equip-list');
+        for (const id of ids) {
+          const info = ITEMS[id];
+          const on = this.save.equipped.includes(id);
+          const b = el('button', 'stat-equip' + (on ? ' equipped' : ''));
+          b.type = 'button';
+          b.dataset.item = id;
+          b.appendChild(iconCanvas(id, 32));
+          const txt = el('span', 'stat-equip-text');
+          txt.appendChild(el('span', 'stat-equip-name', info.name));
+          txt.appendChild(el('span', 'stat-equip-desc',
+            `${STATS[EQUIP[id].stat].name} +${Math.round(EQUIP[id].bonus * 100)}%` +
+            (EQUIP[id].look ? ' · se ve en Ruben' : '')));
+          b.appendChild(txt);
+          b.appendChild(el('span', 'stat-equip-state', on ? 'EQUIPADO' : 'Equipar'));
+          b.addEventListener('click', () => this.toggleEquip(id));
+          list.appendChild(b);
+        }
+        eq.appendChild(list);
+        box.appendChild(eq);
       }
-      eq.appendChild(list);
-      box.appendChild(eq);
 
-      box.appendChild(el('p', 'stats-foot',
-        'Los maestros entrenan en persona: hablá con ellos cuando terminen sus líneas. Cada charla sube una estadística.'));
+      box.appendChild(el('p', 'stats-foot', any
+        ? 'Las estadísticas solo suben con los objetos que equipás. Las armas y la ropa se ven en Ruben.'
+        : 'Las estadísticas solo suben con objetos: buscalos por el reino y equipalos acá.'));
     }
 
     renderNotes() {

@@ -8,6 +8,16 @@ const SLASH_OUT = new Float32Array((SLASH_N + 1) * 2);
 const SLASH_IN = new Float32Array((SLASH_N + 1) * 2);
 // Puntos de la bufanda en pantalla (búfer fijo: sin basura por cuadro)
 const CAPE_SCREEN = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
+// Equipo que se VE en el sprite (lo elige el Diario, journal.js → player.gear).
+// Armas: cómo se dibuja lo que Ruben lleva en la mano. len = largo de la hoja,
+// arc = radio de la estela del tajo. Sin arma equipada usa 'espada'.
+const WEAPON_LOOKS = {
+  espada:   { len: 16.5, arc: 33 },
+  cuchillo: { len: 10.5, arc: 26 }
+};
+// Vestimentas: colores que reemplazan los de la túnica / bufanda (y botas) de Ruben.
+// Para sumar una prenda: agregar su look acá y el objeto en journal.js (EQUIP, slot 'outfit').
+const OUTFIT_LOOKS = {};
 // Traza la media luna completa (borde exterior y vuelta por el interior)
 function slashShape(ctx) {
   ctx.beginPath();
@@ -85,6 +95,10 @@ class Player {
       hurtInvuln: 1,        // multiplica la invulnerabilidad tras un golpe
       blockChance: 0        // probabilidad (0..1) de bloquear un golpe (Defensa)
     };
+
+    // Equipo visible (lo escribe journal.js → applyPassives; el multijugador lo copia a
+    // los fantasmas): weapon / outfit = id de WEAPON_LOOKS / OUTFIT_LOOKS, o null
+    this.gear = { weapon: null, outfit: null };
 
     // Estado de animación (solo visual: no afecta física ni hitboxes)
     this.anim = {
@@ -625,9 +639,11 @@ class Player {
     const SKIN = flash ? W : '#f2c79b';
     const HAIR = flash ? W : '#b5562b';     // pelo cobrizo
     const pal = this.palette;               // colores propios (multijugador: cada jugador el suyo)
-    const TUNIC = flash ? W : (pal && pal.tunic) || '#3f7d5a';    // túnica verde bosque
-    const SCARF = flash ? W : (pal && pal.scarf) || '#d9a634';    // bufanda mostaza (el color de la familia)
-    const BOOT = flash ? W : '#6b3f22';
+    const gear = this.gear || {};
+    const fit = OUTFIT_LOOKS[gear.outfit] || null;   // vestimenta equipada (Diario)
+    const TUNIC = flash ? W : (fit && fit.tunic) || (pal && pal.tunic) || '#3f7d5a';    // túnica verde bosque
+    const SCARF = flash ? W : (fit && fit.scarf) || (pal && pal.scarf) || '#d9a634';    // bufanda mostaza (el color de la familia)
+    const BOOT = flash ? W : (fit && fit.boot) || '#6b3f22';
 
     // Sombra de contacto en el suelo (se encoge al aplastarse/estirarse)
     if (this.isGrounded && !this.dead) {
@@ -833,24 +849,28 @@ class Player {
       hy += (ty - hy) * kn;
       swordAng += (tAng - swordAng) * kn;
     }
-    // Hoja
-    ctx.strokeStyle = flash ? W : '#e4e9ee';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(hx, hy);
-    ctx.lineTo(hx + f * Math.cos(swordAng) * 16.5, hy + Math.sin(swordAng) * 16.5);
-    ctx.stroke();
-    ctx.strokeStyle = OUT;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // Guarda
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = flash ? W : '#8a5a2b';
-    const gx = -Math.sin(swordAng) * 3, gy = Math.cos(swordAng) * 3;
-    ctx.beginPath();
-    ctx.moveTo(hx - f * gx, hy - gy);
-    ctx.lineTo(hx + f * gx, hy + gy);
-    ctx.stroke();
+    // Arma en la mano: la del equipo del Diario (gear.weapon) o la espada de siempre
+    if (gear.weapon === 'cuchillo') this.renderKnife(ctx, hx, hy, swordAng, f, flash, OUT, W);
+    else {
+      // Hoja
+      ctx.strokeStyle = flash ? W : '#e4e9ee';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + f * Math.cos(swordAng) * 16.5, hy + Math.sin(swordAng) * 16.5);
+      ctx.stroke();
+      ctx.strokeStyle = OUT;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Guarda
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = flash ? W : '#8a5a2b';
+      const gx = -Math.sin(swordAng) * 3, gy = Math.cos(swordAng) * 3;
+      ctx.beginPath();
+      ctx.moveTo(hx - f * gx, hy - gy);
+      ctx.lineTo(hx + f * gx, hy + gy);
+      ctx.stroke();
+    }
     ctx.strokeStyle = OUT;
     ctx.lineWidth = 2;
     // Mano
@@ -1087,6 +1107,46 @@ class Player {
     if (this.isAttacking && !this.dead) this.renderSlashTrail(ctx, cx + lungeX, sy + 21 + bob);
   }
 
+  // Cuchillo de caza (equipo del Diario): mango de madera con remaches, virola de bronce y
+  // hoja corta de lomo recto y panza curva. (u, v) = a lo largo de la hoja / hacia el filo,
+  // espejado con f igual que la espada.
+  renderKnife(ctx, hx, hy, ang, f, flash, OUT, W) {
+    const c = Math.cos(ang), s = Math.sin(ang);
+    const X = (u, v) => hx + f * (c * u - s * v);
+    const Y = (u, v) => hy + s * u + c * v;
+    const L = WEAPON_LOOKS.cuchillo.len;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // Mango (asoma por detrás del puño)
+    ctx.strokeStyle = OUT; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(X(-5, 0), Y(-5, 0)); ctx.lineTo(X(1, 0), Y(1, 0)); ctx.stroke();
+    ctx.strokeStyle = flash ? W : '#7a4a2b'; ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = flash ? W : '#e9c46a';
+    ctx.beginPath(); ctx.arc(X(-3.6, 0), Y(-3.6, 0), 0.8, 0, Math.PI * 2); ctx.fill();
+    // Hoja: lomo recto hasta la punta y panza curva de vuelta a la base
+    ctx.fillStyle = flash ? W : '#dfe5ea';
+    ctx.strokeStyle = OUT; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(X(1.6, -1.5), Y(1.6, -1.5));
+    ctx.lineTo(X(L, -0.9), Y(L, -0.9));
+    ctx.quadraticCurveTo(X(L * 0.72, 2.9), Y(L * 0.72, 2.9), X(1.6, 1.9), Y(1.6, 1.9));
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // Brillo del filo
+    if (!flash) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)'; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(X(3, -0.6), Y(3, -0.6)); ctx.lineTo(X(L - 2, -0.5), Y(L - 2, -0.5)); ctx.stroke();
+    }
+    // Virola de bronce entre mango y hoja
+    ctx.strokeStyle = OUT; ctx.lineWidth = 3.6;
+    ctx.beginPath(); ctx.moveTo(X(1.3, -2.4), Y(1.3, -2.4)); ctx.lineTo(X(1.3, 2.6), Y(1.3, 2.6)); ctx.stroke();
+    ctx.strokeStyle = flash ? W : '#c98a3a'; ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Estela del tajo ("smear" de animación clásica). Se dibuja cada cuadro con la posición
   // ACTUAL de Ruben, así viaja pegada a él aunque ataque corriendo o saltando.
   // La cabeza sigue a la hoja (arranque explosivo) y la cola la persigue con retraso:
@@ -1113,8 +1173,9 @@ class Player {
     const ox = bodyX + f * 8.8 * ca;
     const oy = oyBase + 8.8 * sa;
     // El arco se expande apenas al abrirse (sensación de impulso) y se adelgaza al final
-    const R = 33 + 3 * Math.sin(Math.min(1, p * 1.4) * Math.PI * 0.5);
-    const maxT = 12 * (1 - 0.45 * p);
+    const look = WEAPON_LOOKS[this.gear && this.gear.weapon] || WEAPON_LOOKS.espada;
+    const R = look.arc + 3 * Math.sin(Math.min(1, p * 1.4) * Math.PI * 0.5);
+    const maxT = 12 * (look.arc / 33) * (1 - 0.45 * p);
     const N = SLASH_N;
     for (let i = 0; i <= N; i++) {
       const k = i / N;                                  // 0 = cola, 1 = cabeza

@@ -72,7 +72,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `menu-nav.js` | Claude | Navegación de menús con teclado/mando | `MenuNavigator` |
 | `bg-continuity.js` | Claude | Fondo continuo entre salas; molino con aspas del viento | `BgContinuity` |
 | `levels-expansion.js` | Claude | Salas 4-12 (`PendingRooms`), parches a 0-3, animación de llegada por un hueco | `LevelsExpansion` |
-| `journal.js` | Claude | Diario: objetos, notas leídas, estadísticas de Ruben (entrenamiento y objetos equipados) | `game.journal` |
+| `journal.js` | Claude | Diario: objetos, notas leídas, estadísticas de Ruben (solo objetos equipados: arma, vestimenta, recuerdos) | `game.journal` |
 | `animation-registry.js` | Gemini | Capas, skins y FX de animación | `AnimationRegistry` |
 | `aim.js` | Claude | Apuntado compartido: ratón sobre el canvas y stick derecho (un solo lector) | `Aim` |
 | `sound-kit.js` | Claude | Sonidos sintetizados compartidos: ruidos blanco/rosado/marrón, bucles con filtro, golpes y tonos | `SoundKit` |
@@ -94,7 +94,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 
 - **Pose del brazo extendido**: `player.setArmPose(fuente, pose 0..1, ángulo)` (fuentes: `'wind'`, `'water'`). Cada habilidad escribe la suya cada cuadro y `player.armPose()` devuelve la más fuerte; el orden de los hooks no importa.
 - **Modificadores** `player.mods`: `attackDamage`, `attackCooldown`, `throwDamage`, `throwSpeed`, `throwLift`, `hurtInvuln`, `blockChance`. Los ajusta el Diario (`journal.js → applyPassives`) según las estadísticas (daño, velocidad de ataque, defensa = `blockChance`); `player.js` los usa al atacar, lanzar y recibir daño (`takeDamage` puede bloquear el golpe). La velocidad de movimiento se aplica directo a `player.speed`. Nadie envuelve los métodos del jugador.
-- **Maestros que entrenan**: un NPC de la sala con `trains: ['move', 'def' …]` (ids `dmg`, `atk`, `def`, `move`). `npcs.js` llama `game.journal.trainNpc(npc)` cuando ya dijo sus líneas: cada charla sube una estadística un nivel, sin costo (máximo 5).
+- **Equipo visible** `player.gear = { weapon, outfit }` (ids de `WEAPON_LOOKS` / `OUTFIT_LOOKS` en `player.js`): lo escribe el Diario (`applyPassives`) según lo equipado y el multijugador lo copia a los fantasmas. Para un arma o prenda nueva: su look en `player.js` y el objeto en `journal.js` (`ITEMS`, `ICONS`, `EQUIP` con `slot: 'weapon'|'outfit'` y `look`). Las estadísticas solo suben con objetos (los maestros ya no entrenan).
 
 ## Multijugador (multiplayer.js)
 

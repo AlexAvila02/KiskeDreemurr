@@ -390,7 +390,6 @@
       {
         id: 'tobias',
         name: 'Tobías, el viejo pastor',
-        trains: ['move', 'def'],   // entrena Velocidad de movimiento y Defensa (Diario → ESTADÍSTICAS)
         x: 1215, y: 460, facing: 1,
         lines: [
           '¡Vaya, un muchacho que cae del cielo! Tranquilo, el pasto de esta hondonada es blando. Me llamo Tobías; cuidaba ovejas cuando el reino todavía tenía rey.',
@@ -472,7 +471,6 @@
         id: 'arroyo',
         look: 'water-master',
         teaches: 'water',
-        trains: ['atk', 'dmg'],    // entrena Velocidad de ataque y Daño básico (Diario → ESTADÍSTICAS)
         name: 'Maestro Arroyo',
         x: 1500, y: 400, facing: 1,
         lines: [
@@ -515,6 +513,8 @@
 
     // Emblemas escondidos en la primera zona
     addCollectible(0, { item: 'emblema', x: 1050, y: 234 });  // ruina alta del extremo derecho
+    // Cuchillo de Caza (arma equipable: se ve en la mano de Ruben) sobre la ruina del medio
+    addCollectible(0, { item: 'cuchillo', x: 810, y: 324 });
     addCollectible(2, { item: 'emblema', x: 680, y: 184 });   // a mitad de la subida al molino
     addCollectible(3, { item: 'emblema', x: 340, y: 324 });   // rama baja del bosque
   }
