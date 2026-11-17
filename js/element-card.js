@@ -143,56 +143,56 @@
       id: 'wind',
       memory: 'wind',
       element: 'Elemento del Aire',
-      title: '¡Ruben aprendió a mover el Viento!',
-      desc: 'El aire obedece a Ruben. Puede JALARLO para atrapar insectos en el aire y arrastrarlos hacia su mano, o SOPLARLO para empujarlos lejos. Al soltarlos quedan mareados: ¡es el momento del tajo!',
+      title: '¡Dominas el Viento!',
+      desc: 'Jala insectos hacia ti o sóplalos lejos. Al soltarlos quedan mareados.',
       accent: '#5aa7d6',
       learned: () => !!(window.WindPull && window.WindPull.isUnlocked && window.WindPull.isUnlocked()),
       controls: () => {
         const f = keyOf('windPull', 'F'), dn = keyOf('aimDown', 'S'), up = keyOf('aimUp', 'W');
         return [
-          ['Jalar el aire', `${dn} + ${f}`, 'Abajo + L2'],
-          ['Soplar el aire', `${up} + ${f}`, 'Arriba + L2'],
-          ['Apuntar la ráfaga', 'Ratón', 'Stick derecho']
+          ['Jalar', `${dn} + ${f}`, 'Abajo + L2'],
+          ['Soplar', `${up} + ${f}`, 'Arriba + L2'],
+          ['Apuntar', 'Ratón', 'Stick derecho']
         ];
       },
-      note: 'Gasta energía elemental (la barra azul bajo los corazones).',
+      note: 'Gasta la barra azul.',
       draw: (ctx, t) => drawWind(ctx, t)
     },
     {
       id: 'water',
       memory: 'water',
       element: 'Elemento del Agua',
-      title: '¡Ruben aprendió el Dominio del Agua!',
-      desc: 'Cerca de una laguna o un charco, Ruben levanta el agua y forma una esfera en su mano que crece mientras la sostiene. Al soltarla sale disparada: empuja y aturde enemigos, rompe muros quebradizos y hace sonar campanas.',
+      title: '¡Dominas el Agua!',
+      desc: 'Junto al agua, carga una esfera y lánzala: aturde enemigos, rompe muros y toca campanas.',
       accent: '#3f9fc6',
       learned: () => !!(window.WaterControl && window.WaterControl.isLearned && window.WaterControl.isLearned()),
       controls: () => {
         const f = keyOf('windPull', 'F');
         return [
-          ['Levantar y cargar el agua', `Mantener ${f}`, 'Mantener L2'],
+          ['Cargar', `Mantener ${f}`, 'Mantener L2'],
           ['Apuntar', 'Ratón', 'Stick derecho'],
-          ['Lanzar la esfera', `Soltar ${f}`, 'Soltar L2']
+          ['Lanzar', `Soltar ${f}`, 'Soltar L2']
         ];
       },
-      note: 'Manteniendo la tecla, Ruben camina y salta con el agua en la mano.',
+      note: '',
       draw: (ctx, t) => drawWater(ctx, t, false)
     },
     {
       id: 'water-guide',
       element: 'Agua · Mejora',
-      title: '¡Esfera guiada desbloqueada!',
-      desc: 'Ruben domina el agua: ahora puede soltar una esfera que vuela por el aire sin caer y guiarla a donde quiera. Atraviesa enemigos dañándolos, rompe muros y alcanza campanas lejanas, ¡incluso la del techo!',
+      title: '¡Esfera guiada!',
+      desc: 'Una esfera que vuela donde la guíes: daña enemigos, rompe muros y llega a campanas lejanas.',
       accent: '#2f86b8',
       learned: () => !!(window.WaterControl && window.WaterControl.isUpgraded && window.WaterControl.isUpgraded()),
       controls: () => {
         const g = keyOf('waterGuide', 'G');
         return [
-          ['Soltar la esfera (cerca del agua)', g, 'L3'],
-          ['Guiarla por el aire', 'Flechas', 'Stick izquierdo'],
-          ['Reventarla', `${g} otra vez`, 'L3 otra vez']
+          ['Soltar', g, 'L3'],
+          ['Guiar', 'Flechas', 'Stick izquierdo'],
+          ['Reventar', `${g} otra vez`, 'L3 otra vez']
         ];
       },
-      note: 'Mientras la guías, Ruben se queda quieto concentrado.',
+      note: '',
       draw: (ctx, t) => drawWater(ctx, t, true)
     }
   ];
@@ -267,7 +267,7 @@
     el.innerHTML = '<div class="ec-paper"><canvas width="260" height="260" aria-hidden="true"></canvas><div class="ec-body">' +
       '<span class="ec-tag"></span><h2></h2><p class="ec-desc"></p>' +
       '<table><thead><tr><th>Acción</th><th>Teclado</th><th>Mando</th></tr></thead><tbody></tbody></table>' +
-      '<p class="ec-note"></p></div><div class="ec-hint">Intro · A — continuar</div></div>';
+      '<p class="ec-note"></p></div><div class="ec-hint">Intro · A</div></div>';
     el.addEventListener('mousedown', (e) => { e.stopPropagation(); close(); });
     host.appendChild(el);
     st.el = el;
