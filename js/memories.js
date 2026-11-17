@@ -96,6 +96,8 @@
       st.checkT = CHECK_EVERY;
       // Espera a que no haya otro texto abierto (la carta o el maestro que lo enseñó)
       if (g.activeNote || !g.player || g.player.dead || !g.isPlaying) return;
+      // Primero la tarjeta grande del elemento (element-card.js), después el recuerdo
+      if (window.ElementCard && window.ElementCard.busy()) return;
       for (const m of MEMORIES) {
         if (!seen[m.id] && m.learned()) { start(g, m); return; }
       }
