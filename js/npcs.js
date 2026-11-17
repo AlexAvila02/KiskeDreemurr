@@ -162,7 +162,10 @@
     // Manos: en reposo, la de adelante sostiene el orbe; al reaccionar al agua
     // (fx.arms 0..1) los dos brazos siguen la pose que marca npc-reactions.js
     const A = fx.arms;
-    const hx = x + f * lerp(17, fx.h1x, A), hy = fy + lerp(-27 + bend * 8, fx.h1y, A);
+    // pray (0..1): antes de conocer a Ruben reza con las palmas juntas frente al pecho,
+    // la cabeza gacha y los ojos cerrados (lo calcula render())
+    const pray = (n.pray || 0) * (1 - A) * (1 - bend);
+    const hx = x + f * lerp(lerp(17, 9, pray), fx.h1x, A), hy = fy + lerp(lerp(-27 + bend * 8, -31, pray), fx.h1y, A);
     if (A > 0.03) {
       // Brazo de atrás (sale de detrás de la túnica)
       const bx = x + f * lerp(-8, fx.h2x, A), by = fy + lerp(-24, fx.h2y, A);
@@ -204,7 +207,11 @@
     ctx.beginPath(); ctx.moveTo(x + f * 6, fy - 31); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
     ctx.fillStyle = '#e8bf95';
-    ctx.beginPath(); ctx.ellipse(hx + f * 2 * (1 - A), hy - 1, 4 - A * 0.7, 2.6 + A * 0.7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (pray > 0.03) {
+      // La otra palma, apoyada contra la de adelante
+      ctx.beginPath(); ctx.ellipse(hx - f * 1.5, hy - 1.5, 2.6, 2.6 + 2.2 * pray, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.ellipse(hx + f * 2 * (1 - A) * (1 - pray), hy - 1 - pray * 0.5, 4 - A * 0.7 - pray * 1.4, 2.6 + A * 0.7 + pray * 2.2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
     // Orbe de agua flotando sobre la palma, con gotitas en órbita (lo guarda mientras
     // está ocupado con las macetas o devolviendo el agua que le tiraron)
@@ -227,7 +234,7 @@
     ctx.strokeStyle = OUT; ctx.lineWidth = 2;
 
     // Cabeza calva
-    const cx = x + f * 1.5, cy = fy - 47;
+    const cx = x + f * (1.5 + pray * 1.5), cy = fy - 47 + pray * 2.5;
     ctx.fillStyle = '#e8bf95';
     ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // Brillo en la calva
@@ -249,7 +256,8 @@
     ctx.beginPath(); ctx.ellipse(bunX, bunY, 4 + aw * 0.8, 4 - aw * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     // Ojos: parpadean, siguen el viento con la mirada, se entrecierran con el viento de
     // cara y reaccionan al agua (fx.eyes)
-    const mode = eyeMode(fx, blink || (talking && (t % 90) < 4));
+    let mode = eyeMode(fx, blink || (talking && (t % 90) < 4));
+    if (pray > 0.5 && (mode === '' || mode === 'blink')) mode = 'calm';
     for (let k = -1; k <= 1; k += 2) drawEye(ctx, cx + f * 2 + k * 4, cy - 1, 1.3, mode, fx.squint, f * 0.6 + w * 0.9, k);
     // Cejas blancas largas que caen y se mecen; el viento las tiende y las hace aletear
     ctx.strokeStyle = '#f6efe0'; ctx.lineWidth = 2.4;
@@ -433,6 +441,13 @@
       // Mira a Ruben si está cerca (o a donde le marque la escena / la reacción al agua)
       const look = n.forceFace || (fx && fx.face) || (Math.abs(px - n.x) < 260 ? (px >= n.x ? 1 : -1) : (n.facing || 1));
       if (fx) fx.look = look;
+      if (n.teaches === 'water') {
+        // Reza hasta que Ruben le habla por primera vez (si ya enseñó en otra partida, no)
+        const WC = window.WaterControl;
+        const want = !n.lineIdx && !(WC && WC.isLearned && WC.isLearned()) ? 1 : 0;
+        n.pray = (n.pray || 0) + (want - (n.pray || 0)) * 0.08;
+        if (n.pray < 0.005) n.pray = 0;
+      }
       if (n.look === 'water-master') drawWaterMaster(ctx, n, cam, state.t, talking, look);
       else drawShepherd(ctx, n, cam, state.t, talking, look);
       const reacting = !!(fx && (fx.phase || fx.sayT > 0));

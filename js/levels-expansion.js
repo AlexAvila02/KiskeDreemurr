@@ -476,6 +476,8 @@
         lines: [
           'Ah, un muchacho que cae del cielo y todavía no se moja. Soy el Maestro Arroyo. El agua de esta laguna escucha a quien sabe pedirle.',
           'Tu hermano Angelo se sentó en esta misma orilla. Quería aprender, pero tenía prisa; siempre la tuvo. Me dijo que vendría alguien más paciente.',
+          'Somos cuatro los maestros que sostenemos este reino. La Tierra le da forma a cada sala. El Viento hace circular el aire para que todo lo vivo respire. El Fuego mantiene tibio el suelo para que nada se congele. Y yo le doy la humedad, para que la vida pueda florecer.',
+          'Veo que el aire ya te obedece. Bien: es el primero que se aprende, porque nos rodea a todos; hasta quien agita una mano lo está empujando. Ahora te toca el agua.',
           'Escucha: el agua no se empuja, se invita. Cerca de la laguna, mantén F (L2 en el mando) y subirá a tu mano. Apunta con el ratón o el stick derecho, y suéltala.'
         ],
         farewell: 'Haz sonar las tres campanas que cuelgan sobre la laguna. Cuanto más tiempo la sostengas, más fuerte sale el agua.',

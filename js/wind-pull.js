@@ -796,6 +796,8 @@
   window.WindPull = {
     isUnlocked: () => isUnlocked(window.gameInstance),
     isActive: () => state.active,
+    // Potencia actual 0..1 (crece al mantenerlo). stamina.js gasta energía según esto.
+    getPower: () => state.power,
     // Ángulo de las aspas del molino (bg-continuity.js lo usa para dibujarlo)
     getMillAngle: () => mill.angle,
     // Franja de viento actual (la usan el agua y el pasto). Devuelve siempre el mismo
