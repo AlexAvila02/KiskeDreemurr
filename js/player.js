@@ -13,7 +13,8 @@ const CAPE_SCREEN = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
 // arc = radio de la estela del tajo. Sin arma equipada usa 'espada'.
 const WEAPON_LOOKS = {
   espada:   { len: 16.5, arc: 33 },
-  cuchillo: { len: 10.5, arc: 26 }
+  cuchillo: { len: 10.5, arc: 26 },
+  baston:   { len: 27,   arc: 48 }
 };
 // Vestimentas: colores que reemplazan los de la túnica / bufanda (y botas) de Ruben.
 // Para sumar una prenda: agregar su look acá y el objeto en journal.js (EQUIP, slot 'outfit').
@@ -93,7 +94,8 @@ class Player {
       throwSpeed: 1,        // multiplica la velocidad horizontal del lanzamiento
       throwLift: 1,         // multiplica la velocidad vertical del lanzamiento
       hurtInvuln: 1,        // multiplica la invulnerabilidad tras un golpe
-      blockChance: 0        // probabilidad (0..1) de bloquear un golpe (Defensa)
+      blockChance: 0,       // probabilidad (0..1) de bloquear un golpe (Defensa)
+      attackRange: 1        // multiplica el alcance del tajo (caja de golpe y distancia)
     };
 
     // Equipo visible (lo escribe journal.js → applyPassives; el multijugador lo copia a
@@ -205,11 +207,13 @@ class Player {
 
     // Actualizar hitbox de ataque según la dirección (+10% de rango)
     // Caja de golpe centrada a ~37.4 px del cuerpo en la dirección del tajo
+    // mods.attackRange (Bastón del Ermitaño: 1.5) agranda la caja y la aleja del cuerpo
     const vertical = Math.abs(dirY) > 0.9;
-    this.attackBox.w = vertical ? 55 : 51;
-    this.attackBox.h = vertical ? 51 : 46;
-    const bcx = this.x + this.width / 2 + dirX * 37.4;
-    const bcy = this.y + this.height / 2 + dirY * 39.6;
+    const rng = this.mods.attackRange || 1;
+    this.attackBox.w = (vertical ? 55 : 51) * rng;
+    this.attackBox.h = (vertical ? 51 : 46) * rng;
+    const bcx = this.x + this.width / 2 + dirX * 37.4 * rng;
+    const bcy = this.y + this.height / 2 + dirY * 39.6 * rng;
     this.attackBox.x = bcx - this.attackBox.w / 2;
     this.attackBox.y = bcy - this.attackBox.h / 2;
 
@@ -851,6 +855,7 @@ class Player {
     }
     // Arma en la mano: la del equipo del Diario (gear.weapon) o la espada de siempre
     if (gear.weapon === 'cuchillo') this.renderKnife(ctx, hx, hy, swordAng, f, flash, OUT, W);
+    else if (gear.weapon === 'baston') this.renderStaff(ctx, hx, hy, swordAng, f, flash, OUT, W);
     else {
       // Hoja
       ctx.strokeStyle = flash ? W : '#e4e9ee';
@@ -1144,6 +1149,38 @@ class Player {
     ctx.beginPath(); ctx.moveTo(X(1.3, -2.4), Y(1.3, -2.4)); ctx.lineTo(X(1.3, 2.6), Y(1.3, 2.6)); ctx.stroke();
     ctx.strokeStyle = flash ? W : '#c98a3a'; ctx.lineWidth = 1.8;
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // Bastón del Ermitaño (equipo del Diario): vara larga de madera nudosa con la punta
+  // envuelta en cuerda y una piedra verde de la gruta. Sobresale también por detrás del puño.
+  renderStaff(ctx, hx, hy, ang, f, flash, OUT, W) {
+    const c = Math.cos(ang), s = Math.sin(ang);
+    const X = (u) => hx + f * c * u;
+    const Y = (u) => hy + s * u;
+    const L = WEAPON_LOOKS.baston.len;
+    ctx.save();
+    ctx.lineCap = 'round';
+    // Vara: contorno de tinta y madera encima
+    ctx.strokeStyle = OUT; ctx.lineWidth = 4.6;
+    ctx.beginPath(); ctx.moveTo(X(-9), Y(-9)); ctx.lineTo(X(L), Y(L)); ctx.stroke();
+    ctx.strokeStyle = flash ? W : '#9a6a3c'; ctx.lineWidth = 2.6;
+    ctx.stroke();
+    // Nudos de la madera
+    ctx.fillStyle = flash ? W : '#6b4426';
+    ctx.beginPath(); ctx.arc(X(L * 0.38), Y(L * 0.38), 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(L * 0.66), Y(L * 0.66), 1.1, 0, Math.PI * 2); ctx.fill();
+    // Cuerda cerca de la punta
+    ctx.strokeStyle = flash ? W : '#e2c98f'; ctx.lineWidth = 3.4;
+    ctx.beginPath(); ctx.moveTo(X(L - 6.5), Y(L - 6.5)); ctx.lineTo(X(L - 3.5), Y(L - 3.5)); ctx.stroke();
+    // Piedra de la gruta en la punta
+    ctx.fillStyle = flash ? W : '#6fc49a';
+    ctx.strokeStyle = OUT; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(X(L + 1.5), Y(L + 1.5), 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (!flash) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.beginPath(); ctx.arc(X(L + 0.6) - 0.8, Y(L + 0.6) - 0.8, 0.9, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
   }
 

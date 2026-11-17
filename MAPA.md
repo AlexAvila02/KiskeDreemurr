@@ -40,6 +40,7 @@ window.GameHooks = window.GameHooks || {};
 | `onPlayerHurt` | `(game, amount)` | Ruben recibió daño (lo llama `player.takeDamage`; el Diario reinicia la regeneración). |
 | `onRestartGame` | `(game)` | "Reiniciar juego": borrar **solo el progreso propio** (guardados, habilidades). Las salas ya vuelven solas a su estado inicial. |
 | `onEnemyTarget` | `(game, enemy) → objeto` | A quién persigue y ataca cada enemigo este cuadro (`{x, y, width, height, takeDamage}`). Sin respuesta → `game.player`. Lo usa el multijugador (jugador más cercano). |
+| `onPlayerFall` | `(game) → true` | Ruben cayó al vacío. Devolver `true` consume la muerte (los abismos de `abyss.js` lo llevan a una gruta). |
 | `onRenderWorld` | `(game, ctx, cam)` | Dibujo en coordenadas del mundo, por delante de Ruben. Para dibujar **detrás** de Ruben usá la capa `world` de `AnimationRegistry.registerLayer`. |
 
 Orden de un cuadro (`main.update`): `onBeforeUpdate` → [si corre: `onFreezeInput` →
@@ -72,6 +73,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `menu-nav.js` | Claude | Navegación de menús con teclado/mando | `MenuNavigator` |
 | `bg-continuity.js` | Claude | Fondo continuo entre salas; molino con aspas del viento | `BgContinuity` |
 | `levels-expansion.js` | Claude | Salas 4-12 (`PendingRooms`), parches a 0-3, animación de llegada por un hueco | `LevelsExpansion` |
+| `abyss.js` | Claude | Abismos: caer por un barranco lleva a una gruta con enemigos y un objeto (salas 13-15, `room.abyss`, `hideOnMap`); túnel de vuelta a la sala de origen (hook `onPlayerFall`) | `Abyss` |
 | `journal.js` | Claude | Diario: objetos, notas leídas, estadísticas de Ruben (solo objetos equipados: arma, vestimenta, recuerdos) | `game.journal` |
 | `animation-registry.js` | Gemini | Capas, skins y FX de animación | `AnimationRegistry` |
 | `aim.js` | Claude | Apuntado compartido: ratón sobre el canvas y stick derecho (un solo lector) | `Aim` |
@@ -94,7 +96,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 ## Ruben (player.js): APIs para habilidades y estadísticas
 
 - **Pose del brazo extendido**: `player.setArmPose(fuente, pose 0..1, ángulo)` (fuentes: `'wind'`, `'water'`). Cada habilidad escribe la suya cada cuadro y `player.armPose()` devuelve la más fuerte; el orden de los hooks no importa.
-- **Modificadores** `player.mods`: `attackDamage`, `attackCooldown`, `throwDamage`, `throwSpeed`, `throwLift`, `hurtInvuln`, `blockChance`. Los ajusta el Diario (`journal.js → applyPassives`) según las estadísticas (daño, velocidad de ataque, defensa = `blockChance`); `player.js` los usa al atacar, lanzar y recibir daño (`takeDamage` puede bloquear el golpe). La velocidad de movimiento se aplica directo a `player.speed`. Nadie envuelve los métodos del jugador.
+- **Modificadores** `player.mods`: `attackDamage`, `attackCooldown`, `attackRange` (alcance del tajo), `throwDamage`, `throwSpeed`, `throwLift`, `hurtInvuln`, `blockChance`. Los ajusta el Diario (`journal.js → applyPassives`) según las estadísticas (daño, velocidad de ataque, defensa = `blockChance`); `player.js` los usa al atacar, lanzar y recibir daño (`takeDamage` puede bloquear el golpe). La velocidad de movimiento se aplica directo a `player.speed`. Nadie envuelve los métodos del jugador.
 - **Equipo visible** `player.gear = { weapon, outfit }` (ids de `WEAPON_LOOKS` / `OUTFIT_LOOKS` en `player.js`): lo escribe el Diario (`applyPassives`) según lo equipado y el multijugador lo copia a los fantasmas. Para un arma o prenda nueva: su look en `player.js` y el objeto en `journal.js` (`ITEMS`, `ICONS`, `EQUIP` con `slot: 'weapon'|'outfit'` y `look`). Las estadísticas solo suben con objetos (los maestros ya no entrenan).
 
 ## Multijugador (multiplayer.js)

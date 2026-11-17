@@ -30,55 +30,39 @@
   // ------------------------------------------------------------------
   // Catálogo de objetos
   // ------------------------------------------------------------------
+  // desc = UNA línea corta: en la pestaña OBJETOS manda el dibujo grande (splash art)
   const ITEMS = {
-    llave: {
-      name: 'Llave del Portón Norte',
-      desc: 'Angelo la dejó en lo alto del molino. Abrió el camino hacia el Bosque de los Susurros.',
-      kind: 'Objeto clave'
-    },
-    emblema: {
-      name: 'Emblema del Reino',
-      desc: 'Escudos del viejo ejército de la familia. Cada uno le recuerda a Ruben un entrenamiento con Angelo.',
-      kind: 'Reliquia · se acumula',
-      stack: true
-    },
-    panuelo: {
-      name: 'Pañuelo de Angelo',
-      desc: 'Bordado por mamá con una A y una R entrelazadas. Todavía huele a fogata: Angelo pasó por el claro hace poco.',
-      kind: 'Recuerdo'
-    },
-    mapa: {
-      name: 'Mapa Rasgado',
-      desc: 'Un trozo del mapa del reino. Alguien marcó con carbón el camino que sube por el roble hasta la Montaña Gris.',
-      kind: 'Recuerdo'
-    },
-    brujula: {
-      name: 'Brújula de Papá',
-      desc: 'Su aguja no apunta al norte: apunta siempre hacia el castillo, el viejo hogar de la familia.',
-      kind: 'Recuerdo'
-    },
-    campanilla: {
-      name: 'Campanilla de Plata',
-      desc: 'Angelo la llevaba atada al cinturón para no perderse en la niebla. Se le cayó cruzando la cornisa.',
-      kind: 'Recuerdo'
-    },
-    retrato: {
-      name: 'Retrato Familiar',
-      desc: 'Una pintura chamuscada: papá, mamá, Angelo y un Ruben muy chiquito. Estaba colgada en las murallas.',
-      kind: 'Recuerdo'
-    },
-    sello: {
-      name: 'Sello del Reino',
-      desc: 'El sello real de la familia. Prueba de quiénes son... y de lo que pueden volver a ser.',
-      kind: 'Objeto clave'
-    },
-    cuchillo: {
-      name: 'Cuchillo de Caza',
-      desc: 'El cuchillo con mango de nogal que papá usaba para tallar. Corto y liviano: con él los tajos salen mucho más rápido.',
-      kind: 'Arma · se ve en la mano de Ruben'
-    }
+    llave:      { name: 'Llave del Portón Norte', desc: 'Abrió el camino al Bosque de los Susurros.', kind: 'Objeto clave' },
+    emblema:    { name: 'Emblema del Reino', desc: 'Escudos del viejo ejército de la familia.', kind: 'Reliquia', stack: true },
+    panuelo:    { name: 'Pañuelo de Angelo', desc: 'Bordado por mamá. Todavía huele a fogata.', kind: 'Recuerdo' },
+    mapa:       { name: 'Mapa Rasgado', desc: 'Marca con carbón el camino a la Montaña Gris.', kind: 'Recuerdo' },
+    brujula:    { name: 'Brújula de Papá', desc: 'Siempre apunta hacia el castillo.', kind: 'Recuerdo' },
+    campanilla: { name: 'Campanilla de Plata', desc: 'Angelo la usaba para no perderse en la niebla.', kind: 'Recuerdo' },
+    retrato:    { name: 'Retrato Familiar', desc: 'Papá, mamá, Angelo y un Ruben chiquito.', kind: 'Recuerdo' },
+    sello:      { name: 'Sello del Reino', desc: 'Prueba de quiénes son.', kind: 'Objeto clave' },
+    cuchillo:   { name: 'Cuchillo de Caza', desc: 'Corto y liviano: tajos mucho más rápidos.', kind: 'Arma' },
+    // Objetos de los abismos (js/abyss.js): se consiguen cayendo por los barrancos
+    baston:     { name: 'Bastón del Ermitaño', desc: 'Una vara larga: llega mucho más lejos.', kind: 'Arma' },
+    colmillo:   { name: 'Colmillo de Topo', desc: 'Afilado por años de cavar en la oscuridad.', kind: 'Amuleto' },
+    caparazon:  { name: 'Caparazón Hueco', desc: 'La coraza vacía de un escarabajo gigante.', kind: 'Amuleto' }
   };
-  const ITEM_ORDER = ['llave', 'cuchillo', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla', 'retrato', 'sello'];
+  const ITEM_ORDER = ['llave', 'cuchillo', 'baston', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla',
+    'retrato', 'colmillo', 'caparazon', 'sello'];
+  // Fondo del splash art de cada objeto: [centro claro, borde, rayos]
+  const SPLASH = {
+    llave:      ['#fff1c4', '#c98a3a', '#e9b04a'],
+    emblema:    ['#fff0bf', '#b8542f', '#f0c75a'],
+    panuelo:    ['#ffe1d6', '#9c3a33', '#e07a6e'],
+    mapa:       ['#fbf0d4', '#8c6a3a', '#d8b57a'],
+    brujula:    ['#fff0cf', '#6e4a2a', '#d9a634'],
+    campanilla: ['#e8f1fb', '#3b5a88', '#9fbde0'],
+    retrato:    ['#f7e0e4', '#6e3746', '#d9a634'],
+    sello:      ['#ffe6c4', '#7d1f1d', '#e07a6e'],
+    cuchillo:   ['#eef5f7', '#4a5b6e', '#b9c9d4'],
+    baston:     ['#e6f7ea', '#2f5a45', '#8fd3a8'],
+    colmillo:   ['#f6f0e4', '#5a4636', '#d8c7a8'],
+    caparazon:  ['#eaf2e0', '#3d5a2f', '#a7c47a']
+  };
 
 
   // ------------------------------------------------------------------
@@ -91,9 +75,10 @@
     dmg:  { name: 'Daño básico', short: 'Daño' },
     atk:  { name: 'Velocidad de ataque', short: 'Ritmo' },
     def:  { name: 'Defensa', short: 'Defensa' },
-    move: { name: 'Velocidad de movimiento', short: 'Veloc.' }
+    move: { name: 'Velocidad de movimiento', short: 'Veloc.' },
+    rng:  { name: 'Alcance', short: 'Alcance' }
   };
-  const STAT_ORDER = ['dmg', 'atk', 'def', 'move'];
+  const STAT_ORDER = ['dmg', 'atk', 'def', 'move', 'rng'];
   // Ranuras de equipo: cuántos objetos de cada tipo a la vez
   const SLOT_MAX = { weapon: 1, outfit: 1, charm: 2 };
   const SLOT_NAMES = { weapon: 'ARMA', outfit: 'VESTIMENTA', charm: 'RECUERDOS' };
@@ -102,6 +87,9 @@
   // look = cómo se ve en Ruben (armas y vestimentas; ver WEAPON_LOOKS / OUTFIT_LOOKS en player.js)
   const EQUIP = {
     cuchillo:   { slot: 'weapon', stat: 'atk',  bonus: 0.25, look: 'cuchillo' },
+    baston:     { slot: 'weapon', stat: 'rng',  bonus: 0.5,  look: 'baston' },
+    colmillo:   { slot: 'charm',  stat: 'dmg',  bonus: 0.2 },
+    caparazon:  { slot: 'charm',  stat: 'def',  bonus: 0.15 },
     brujula:    { slot: 'charm',  stat: 'move', bonus: 0.12 },
     campanilla: { slot: 'charm',  stat: 'atk',  bonus: 0.15 },
     retrato:    { slot: 'charm',  stat: 'dmg',  bonus: 0.15 },
@@ -264,6 +252,39 @@
       c.fillStyle = '#e9c46a';
       c.beginPath(); c.arc(-12, 0.1, 1.1, 0, Math.PI * 2); c.arc(-7.8, 0.1, 1.1, 0, Math.PI * 2); c.fill();
     },
+    baston(c) {
+      sparkle(c, -11, -10, 2.8); sparkle(c, 11, 10, 2.2);
+      c.rotate(Math.PI / 4);
+      c.beginPath(); c.roundRect(-2.2, -11, 4.4, 27, 2); fs(c, '#9a6a3c');
+      c.fillStyle = '#6b4426';
+      c.beginPath(); c.arc(0, -1, 1.2, 0, Math.PI * 2); c.arc(0.4, 7, 1, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.roundRect(-3, -10.5, 6, 4, 1.2); fs(c, '#e2c98f');
+      c.beginPath(); c.arc(0, -14, 4.4, 0, Math.PI * 2); fs(c, '#6fc49a');
+      c.save(); c.fillStyle = 'rgba(255,255,255,0.85)';
+      c.beginPath(); c.arc(-1.4, -15.4, 1.4, 0, Math.PI * 2); c.fill(); c.restore();
+    },
+    colmillo(c) {
+      sparkle(c, 10, -10, 2.6);
+      c.beginPath(); c.arc(0, -10, 2.4, 0, Math.PI * 2); c.stroke();
+      c.save(); c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(-9, -12); c.quadraticCurveTo(0, -4, 9, -12); c.stroke(); c.restore();
+      c.beginPath();
+      c.moveTo(-5.5, -7); c.quadraticCurveTo(-7, 6, 1, 15); c.quadraticCurveTo(3, 5, 5.5, -7);
+      c.quadraticCurveTo(0, -9.5, -5.5, -7); c.closePath(); fs(c, '#f4ead2');
+      c.save(); c.strokeStyle = 'rgba(58,36,22,0.35)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(-2.5, -4); c.quadraticCurveTo(-3, 4, 0.5, 10); c.stroke(); c.restore();
+    },
+    caparazon(c) {
+      c.beginPath(); c.ellipse(0, -12, 5, 2.6, 0, 0, Math.PI * 2); fs(c, '#3d5a2f');
+      c.beginPath(); c.ellipse(0, 1, 12, 13, 0, 0, Math.PI * 2); fs(c, '#5f8a4a');
+      c.save(); c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(0, -12); c.lineTo(0, 14); c.stroke();
+      c.fillStyle = 'rgba(255,255,230,0.35)';
+      c.beginPath(); c.ellipse(-5, -4, 3, 5, -0.3, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#3d5a2f';
+      c.beginPath(); c.arc(5, 2, 2, 0, Math.PI * 2); c.arc(-5, 7, 1.6, 0, Math.PI * 2); c.arc(6, -6, 1.4, 0, Math.PI * 2); c.fill();
+      c.restore();
+    },
     corazon(c) {
       heartPath(c); fs(c, '#d4483b');
       c.save(); c.fillStyle = 'rgba(255,255,255,0.6)';
@@ -425,6 +446,52 @@
     }
   }
 
+  // Splash art del objeto: fondo pintado con rayos que giran, aura, sombra y el objeto
+  // grande que flota. t = segundos (se anima mientras el Diario está abierto).
+  function paintSplash(cv, key, t) {
+    const c = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const pal = SPLASH[key] || ['#fff6dc', '#8a623e', '#e6cc9b'];
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    const cx = W / 2, cy = H * 0.47;
+    const bg = c.createRadialGradient(cx, cy, 4, cx, cy, Math.max(W, H) * 0.7);
+    bg.addColorStop(0, pal[0]); bg.addColorStop(1, pal[1]);
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+    // Rayos de sol (animación clásica)
+    c.save();
+    c.translate(cx, cy); c.rotate(t * 0.15);
+    c.fillStyle = pal[2]; c.globalAlpha = 0.35;
+    const N = 14, R = Math.max(W, H);
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      c.beginPath(); c.moveTo(0, 0);
+      c.lineTo(Math.cos(a - 0.11) * R, Math.sin(a - 0.11) * R);
+      c.lineTo(Math.cos(a + 0.11) * R, Math.sin(a + 0.11) * R);
+      c.closePath(); c.fill();
+    }
+    c.restore();
+    // Aura y sombra en el piso
+    const S = Math.min(W, H);
+    const bob = Math.sin(t * 2.2) * S * 0.025;
+    const aura = c.createRadialGradient(cx, cy + bob, 2, cx, cy + bob, S * 0.42);
+    aura.addColorStop(0, 'rgba(255, 252, 235, 0.95)'); aura.addColorStop(1, 'rgba(255, 252, 235, 0)');
+    c.fillStyle = aura; c.beginPath(); c.arc(cx, cy + bob, S * 0.42, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(40, 22, 12, 0.28)';
+    c.beginPath(); c.ellipse(cx, H * 0.88, S * 0.2 - bob, S * 0.04, 0, 0, Math.PI * 2); c.fill();
+    // El objeto, grande
+    drawIcon(c, key, cx, cy + bob, S * 0.66);
+    // Destellos que titilan
+    const tw = [[0.2, 0.25, 0], [0.82, 0.3, 1.7], [0.74, 0.78, 3.1], [0.16, 0.72, 4.4]];
+    for (const [fx, fy, ph] of tw) {
+      const k = Math.max(0, Math.sin(t * 2.4 + ph));
+      if (k > 0.05) sparkle(c, W * fx, H * fy, S * 0.05 * k);
+    }
+    // Marco de tinta
+    const lw = Math.max(3, W / 90);
+    c.strokeStyle = INK; c.lineWidth = lw;
+    c.strokeRect(lw / 2, lw / 2, W - lw, H - lw);
+  }
+
   function el(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -561,6 +628,7 @@
         p.mods.attackDamage = this.statMult('dmg');
         p.mods.attackCooldown = this.attackCooldown();
         p.mods.blockChance = this.blockChance();
+        p.mods.attackRange = this.statMult('rng');
       }
       // Lo equipado que se ve en el sprite (player.js dibuja arma y vestimenta)
       if (p.gear) {
@@ -577,6 +645,7 @@
       const pct = Math.round((m - 1) * 100);
       const sign = pct >= 0 ? '+' : '';
       if (id === 'dmg') return `${Math.round(BASE_DAMAGE * m)} · ${sign}${pct}%`;
+      if (id === 'rng') return `${sign}${pct}% de alcance`;
       if (id === 'atk') return `tajo cada ${this.attackCooldown()} cuadros · ${sign}${pct}%`;
       return `${(this.base.speed * m).toFixed(1)} · ${sign}${pct}%`;
     }
@@ -606,6 +675,11 @@
       this.applyPassives();
       this.renderStats();
       this.refreshHeader();
+      if (this.tab === 'items' && this.isOpen()) {
+        this.modal.querySelectorAll('.journal-slot[data-item]').forEach(sl =>
+          sl.classList.toggle('equipped', this.save.equipped.includes(sl.dataset.item)));
+        this.renderItemDetail();
+      }
       return true;
     }
 
@@ -801,7 +875,7 @@
             <div class="journal-notes" id="journal-notes"></div>
           </div>
           <div class="journal-footer">
-            <span><b id="journal-footer-key">I</b> o <b>Esc</b> cerrar · <b>Q</b>/<b>E</b> pestañas · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> equipar · <b>LB</b>/<b>RB</b> pestañas · <b>B</b> cerrar</span>
+            <span><b>Clic</b> en EQUIPAR o <b>doble clic</b> · <b>Enter</b> equipa · <b>Q</b>/<b>E</b> pestañas · <b id="journal-footer-key">I</b>/<b>Esc</b> cerrar · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> equipar · <b>LB</b>/<b>RB</b> pestañas</span>
           </div>
         </div>`;
       const notif = document.getElementById('notification');
@@ -891,28 +965,28 @@
       if (!ownedIds.includes(this.selectedItem)) this.selectedItem = ownedIds[0] || null;
       for (const id of ownedIds) {
         const info = ITEMS[id];
-        const b = el('button', 'journal-slot owned' + (id === this.selectedItem ? ' selected' : ''));
+        const on = this.save.equipped.includes(id);
+        const b = el('button', 'journal-slot owned' + (id === this.selectedItem ? ' selected' : '') + (on ? ' equipped' : ''));
         b.type = 'button';
+        b.dataset.item = id;
         b.appendChild(iconCanvas(id, 40));
-        if (info.stack) {
-          b.appendChild(el('span', 'journal-slot-count', `${this.itemCount(id)}`));
-        }
+        if (info.stack) b.appendChild(el('span', 'journal-slot-count', `${this.itemCount(id)}`));
         b.title = info.name;
         const select = () => {
+          if (this.selectedItem === id) return;
           this.selectedItem = id;
-          grid.querySelectorAll('.journal-slot').forEach(s => s.classList.remove('selected'));
+          grid.querySelectorAll('.journal-slot').forEach(sl => sl.classList.remove('selected'));
           b.classList.add('selected');
           this.renderItemDetail();
         };
         b.addEventListener('click', select);
         b.addEventListener('focus', select);
         b.addEventListener('mouseenter', select);
+        // Doble clic (ratón) equipa / quita
+        b.addEventListener('dblclick', () => { if (EQUIP[id]) this.toggleEquip(id); });
         grid.appendChild(b);
       }
-      const foot = el('div', 'journal-grid-foot', ownedIds.length
-        ? `Objetos encontrados: ${ownedIds.length}`
-        : 'Todavía no encontraste ningún objeto.');
-      grid.appendChild(foot);
+      if (!ownedIds.length) grid.appendChild(el('div', 'journal-grid-foot', 'Todavía no encontraste ningún objeto.'));
       this.renderItemDetail();
       this.itemsDirty = false;
     }
@@ -921,28 +995,55 @@
       const box = this.modal.querySelector('#journal-item-detail');
       const id = this.selectedItem;
       box.innerHTML = '';
+      this.splashCanvas = null;
       if (!id || !this.ownsItem(id)) {
         box.appendChild(el('p', 'journal-detail-desc', 'Las notas de Angelo dan pistas de dónde buscar.'));
         return;
       }
       const info = ITEMS[id];
-      const frame = el('div', 'journal-detail-frame');
-      frame.appendChild(iconCanvas(id, 88));
-      box.appendChild(frame);
-      box.appendChild(el('div', 'journal-detail-kind', info.kind));
-      box.appendChild(el('h3', 'journal-detail-name', info.name));
-      box.appendChild(el('p', 'journal-detail-desc', info.desc));
-      const where = this.whereFound(id);
-      let meta = where ? `Encontrado en: ${where}` : '';
-      if (info.stack) meta = `Tenés ${this.itemCount(id)}` + (where ? ` · el primero, en ${where}` : '');
-      if (meta) box.appendChild(el('div', 'journal-detail-meta', meta));
+      // Splash art: lo que más se ve
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(430 * dpr); cv.height = Math.round(272 * dpr);
+      cv.className = 'journal-splash';
+      cv.dataset.item = id;
+      paintSplash(cv, id, performance.now() / 1000);
+      box.appendChild(cv);
+      this.splashCanvas = cv;
+      this.startSplashLoop();
+
+      const row = el('div', 'journal-detail-row');
+      const txt = el('div', 'journal-detail-text');
+      const name = el('h3', 'journal-detail-name', info.name);
+      if (info.stack) name.appendChild(el('span', 'journal-detail-count', ` ×${this.itemCount(id)}`));
+      txt.appendChild(name);
+      txt.appendChild(el('p', 'journal-detail-desc', info.desc));
+      row.appendChild(txt);
       const eq = EQUIP[id];
       if (eq) {
         const on = this.save.equipped.includes(id);
-        box.appendChild(el('div', 'journal-detail-meta',
-          `${STATS[eq.stat].name} +${Math.round(eq.bonus * 100)}% · ` +
-          (on ? 'EQUIPADO' : 'equipalo en ESTADÍSTICAS')));
+        const side = el('div', 'journal-equip-side');
+        side.appendChild(el('span', 'journal-stat-chip', `${STATS[eq.stat].short} +${Math.round(eq.bonus * 100)}%`));
+        const btn = el('button', 'journal-equip-btn' + (on ? ' on' : ''), on ? '✓ EQUIPADO' : 'EQUIPAR');
+        btn.type = 'button';
+        btn.title = on ? 'Clic para quitar' : 'Clic para equipar';
+        btn.addEventListener('click', () => this.toggleEquip(id));
+        side.appendChild(btn);
+        row.appendChild(side);
       }
+      box.appendChild(row);
+    }
+
+    // Anima el splash art mientras el Diario está abierto en OBJETOS (un solo bucle)
+    startSplashLoop() {
+      if (this.splashRaf) return;
+      const step = () => {
+        const cv = this.splashCanvas;
+        if (!cv || !cv.isConnected || !this.isOpen() || this.tab !== 'items') { this.splashRaf = 0; return; }
+        paintSplash(cv, cv.dataset.item, performance.now() / 1000);
+        this.splashRaf = requestAnimationFrame(step);
+      };
+      this.splashRaf = requestAnimationFrame(step);
     }
 
     // Gráfico de radar de las 4 estadísticas: cada eje es una estadística y el bonus de los
@@ -951,7 +1052,7 @@
       const cx = 130, cy = 112, R = 70, labelR = R + 22;
       const f = n => n.toFixed(1);
       const pt = (i, frac) => {
-        const a = -Math.PI / 2 + i * (Math.PI / 2); // eje 0 arriba, luego sentido horario
+        const a = -Math.PI / 2 + i * (Math.PI * 2 / STAT_ORDER.length); // eje 0 arriba, sentido horario
         return [cx + Math.cos(a) * R * frac, cy + Math.sin(a) * R * frac];
       };
       // Patrón rayado para la zona pendiente (lo que aún no se entrena)
@@ -982,7 +1083,8 @@
           svg += `<circle class="radar-dot stat-${id}" cx="${f(x)}" cy="${f(y)}" r="3.5"/>`;
         }
         const [lx, ly] = pt(i, labelR / R);
-        const anchor = i === 1 ? 'start' : (i === 3 ? 'end' : 'middle');
+        const ax = Math.cos(-Math.PI / 2 + i * (Math.PI * 2 / STAT_ORDER.length));
+        const anchor = ax > 0.3 ? 'start' : (ax < -0.3 ? 'end' : 'middle');
         svg += `<text class="radar-label" x="${f(lx)}" y="${f(ly)}" text-anchor="${anchor}">${STATS[id].short}</text>`;
         svg += `<text class="radar-level" x="${f(lx)}" y="${f(ly + 12)}" text-anchor="${anchor}">+${Math.round(b * 100)}%</text>`;
       });
@@ -1091,6 +1193,12 @@
           if (just(9)) { this.close(false); return true; }
           if (just(4)) { this.cycleTab(-1); return true; }
           if (just(5)) { this.cycleTab(1); return true; }
+          // A sobre un objeto equipable de la grilla = equipar / quitar
+          const fo = nav.focused;
+          if (just(0) && fo && fo.classList && fo.classList.contains('journal-slot') && EQUIP[fo.dataset.item]) {
+            this.toggleEquip(fo.dataset.item);
+            return true;
+          }
           return origHandle(pressed, prev);
         }
         const g = this.game;
@@ -1128,7 +1236,16 @@
           }
           if ((e.code === 'Enter' || e.code === 'Space') && document.activeElement && this.modal.contains(document.activeElement)) {
             e.preventDefault();
-            document.activeElement.click();
+            const ae = document.activeElement;
+            // Enter sobre un objeto equipable de la grilla = equipar / quitar
+            if (ae.classList.contains('journal-slot') && EQUIP[ae.dataset.item]) this.toggleEquip(ae.dataset.item);
+            else ae.click();
+            return;
+          }
+          // Sin nada enfocado, Enter equipa / quita el objeto seleccionado
+          if (e.code === 'Enter' && this.tab === 'items' && EQUIP[this.selectedItem]) {
+            e.preventDefault();
+            this.toggleEquip(this.selectedItem);
             return;
           }
           if (e.code === 'Space' || e.code === 'Enter') e.preventDefault();

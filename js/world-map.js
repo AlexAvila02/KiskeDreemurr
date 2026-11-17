@@ -169,10 +169,12 @@
       const cur = g.world.currentRoomIndex;
       // Salas a mostrar: visitadas + vecinas de visitadas
       const known = new Set();
-      visited.forEach(i => { if (rooms[i]) known.add(i); });
-      known.add(cur);
+      // Las grutas de los abismos (room.hideOnMap, js/abyss.js) no figuran en el mapa
+      const onMap = i => rooms[i] && !rooms[i].hideOnMap;
+      visited.forEach(i => { if (onMap(i)) known.add(i); });
+      if (onMap(cur)) known.add(cur);
       const hinted = new Set();
-      known.forEach(i => (rooms[i].exits || []).forEach(ex => { if (rooms[ex.targetRoom] && !known.has(ex.targetRoom)) hinted.add(ex.targetRoom); }));
+      known.forEach(i => (rooms[i].exits || []).forEach(ex => { if (onMap(ex.targetRoom) && !known.has(ex.targetRoom)) hinted.add(ex.targetRoom); }));
       const shown = [...known, ...hinted];
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       for (const i of shown) {
@@ -240,7 +242,7 @@
       });
 
       // Sala actual: borde que late y Ruben
-      if (rooms[cur]) {
+      if (onMap(cur)) {
         const b = rect(cur), k = 0.5 + 0.5 * Math.sin(this.t * 0.12);
         ctx.strokeStyle = `rgba(217, 166, 52, ${0.6 + 0.4 * k})`; ctx.lineWidth = 3 + k * 2;
         ctx.beginPath(); ctx.roundRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 8); ctx.stroke();

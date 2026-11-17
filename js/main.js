@@ -98,7 +98,7 @@ class Game {
     return ['onInit', 'onBeforeUpdate', 'onAfterUpdate', 'onUpdate', 'onAction', 'onBeforeRoomLoad',
       'onRoomLoad', 'onFreezeInput', 'onAfterPlayerUpdate', 'onBlockExits', 'onKeepDialog',
       'onBeforeTogglePause', 'onPlayerHurt', 'onRestartGame', 'onRenderWorld', 'onRenderHUD',
-      'onEnemyTarget'];
+      'onEnemyTarget', 'onPlayerFall'];
   }
 
   // A quién persigue/ataca un enemigo este cuadro: el primer hook onEnemyTarget que devuelva
@@ -939,8 +939,10 @@ class Game {
     this.checkRoomExits();
     if (this.world.currentRoomIndex !== roomBefore) return;
 
-    // Caída al vacío = muerte
+    // Caída al vacío: un hook onPlayerFall puede llevar a Ruben a otra sala (abismo);
+    // si nadie la consume, muere
     if (this.player.y > room.height + 20) {
+      if (this.runHooksUntil('onPlayerFall')) return;
       this.killPlayer('fall');
       return;
     }
