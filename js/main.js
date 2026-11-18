@@ -418,7 +418,9 @@ class Game {
     const aim = this.getAim();
     const A = window.Aim, p = this.player;
     if (!A || !A.mouseAngle) return aim;
-    const useMouse = this.mouseAttack || (A.source() === 'mouse' && !aim.up && !aim.down);
+    // Jugando con mando (lo último que se tocó), el ratón no cuenta salvo un clic real
+    const padTurn = this.padAction || (!this.mouseAttack && A.usingPad && A.usingPad());
+    const useMouse = this.mouseAttack || (!padTurn && A.source() === 'mouse' && !aim.up && !aim.down);
     if (useMouse) {
       const ang = A.mouseAngle(this, p.x + p.width / 2, p.y + p.height / 2);
       if (ang !== null) aim.angle = ang;
@@ -582,7 +584,10 @@ class Game {
       this.togglePause();
     } else {
       for (const i in this.PAD_BUTTONS) {
-        if (justPressed(+i)) this.doAction(this.PAD_BUTTONS[i]);
+        if (justPressed(+i)) {
+          this.padAction = true;   // el tajo con mando no mira al ratón
+          try { this.doAction(this.PAD_BUTTONS[i]); } finally { this.padAction = false; }
+        }
       }
     }
     this.padPrev = pressed;
