@@ -371,7 +371,7 @@
     const life = (window.WaterControl && window.WaterControl.SHOT_LIFE) || 22;
     for (const s of shots.values()) {
       const fade = s.t > life - 6 ? Math.max(0, (life - s.t) / 6) : 1;
-      WC.drawOrb(ctx, s.x - cam.x, s.y - cam.y, s.r * (0.5 + 0.5 * fade), t + s.t);
+      WC.drawOrb(ctx, s.x - cam.x, s.y - cam.y, s.r * (0.5 + 0.5 * fade), t + s.t, s.vx, s.vy);
     }
     for (const gs of guides.values()) {
       const gx = gs.x - cam.x, gy = gs.y - cam.y, R = gs.r || 13;

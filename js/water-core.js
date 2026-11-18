@@ -470,21 +470,90 @@
 
 
   // Esfera de agua (la usan el orbe de Ruben, sus disparos y la bola de los maestros)
-  function drawOrb(ctx, x, y, r, t) {
+  // Contorno líquido: el borde ondula con varias olas que corren alrededor (no es un círculo)
+  const ORB_N = 22;
+  // dir / tail: en vuelo la parte de atrás se alarga en cola de gota (lágrima)
+  function orbPath(ctx, r, t, dir, tail) {
+    ctx.beginPath();
+    for (let i = 0; i <= ORB_N; i++) {
+      const a = (i / ORB_N) * Math.PI * 2;
+      let k = 1 + 0.065 * Math.sin(3 * a + t * 0.17) + 0.04 * Math.sin(5 * a - t * 0.26) + 0.025 * Math.sin(2 * a + t * 0.33);
+      let px = Math.cos(a), py = Math.sin(a);
+      if (tail > 0) {
+        // Coordenadas respecto de la dirección de vuelo: frente redondo, cola que se afina
+        const c = Math.cos(a - dir), s = Math.sin(a - dir);
+        const back = c < 0 ? -c : 0;
+        const along = c * (1 + tail * back * back * 1.6), across = s * (1 - 0.18 * tail) * (1 - 0.55 * tail * back * back);
+        px = along * Math.cos(dir) - across * Math.sin(dir);
+        py = along * Math.sin(dir) + across * Math.cos(dir);
+        k = 1 + (k - 1) * 0.6;
+      }
+      if (i === 0) ctx.moveTo(px * r * k, py * r * k); else ctx.lineTo(px * r * k, py * r * k);
+    }
+    ctx.closePath();
+  }
+  // vx / vy (opcionales): la esfera en vuelo se estira en la dirección en que va
+  function drawOrb(ctx, x, y, r, t, vx, vy) {
+    if (!(r > 0.5)) return;
     ctx.save();
-    const wob = Math.sin(t * 0.3) * 0.08;
     ctx.translate(x, y);
-    ctx.scale(1 + wob, 1 - wob);
-    const g = ctx.createRadialGradient(-r * 0.35, -r * 0.35, 1, 0, 0, r);
-    g.addColorStop(0, 'rgba(240, 253, 255, 0.95)');
-    g.addColorStop(0.45, 'rgba(126, 204, 220, 0.9)');
-    g.addColorStop(1, 'rgba(48, 120, 150, 0.9)');
+    const sp = (vx || vy) ? Math.hypot(vx, vy) : 0;
+    const tail = sp > 0.5 ? Math.min(0.75, sp * 0.065) : 0;
+    const dir = tail > 0 ? Math.atan2(vy, vx) : 0;
+    if (tail <= 0) {
+      const wob = Math.sin(t * 0.3) * 0.07;
+      ctx.scale(1 + wob, 1 - wob);
+    }
+    // Cuerpo translúcido: claro al centro y más hondo en el borde (como una gota grande)
+    const g = ctx.createRadialGradient(-r * 0.25, -r * 0.3, r * 0.1, 0, 0, r * 1.08);
+    g.addColorStop(0, 'rgba(214, 246, 252, 0.62)');
+    g.addColorStop(0.55, 'rgba(120, 200, 222, 0.66)');
+    g.addColorStop(1, 'rgba(36, 104, 142, 0.9)');
+    orbPath(ctx, r, t, dir, tail);
     ctx.fillStyle = g;
+    ctx.fill();
+    if (r >= 5) {
+      ctx.save();
+      ctx.clip();
+      // Sombra de refracción abajo (el agua "dobla" la luz)
+      ctx.fillStyle = 'rgba(28, 86, 122, 0.32)';
+      ctx.beginPath(); ctx.ellipse(r * 0.12, r * 0.62, r * 0.95, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      // Corrientes internas: dos remolinos que giran dentro de la esfera
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(240, 253, 255, 0.5)';
+      ctx.lineWidth = Math.max(1, r * 0.09);
+      const rot = t * 0.07;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.62, rot, rot + 1.5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(r * 0.08, r * 0.05, r * 0.34, -rot * 1.6 + 2.4, -rot * 1.6 + 3.6); ctx.stroke();
+      ctx.strokeStyle = 'rgba(30, 96, 132, 0.4)';
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.8, rot + Math.PI, rot + Math.PI + 1.1); ctx.stroke();
+      // Burbujitas que suben por dentro y reaparecen abajo
+      ctx.strokeStyle = 'rgba(244, 254, 255, 0.8)';
+      ctx.lineWidth = 0.9;
+      for (let i = 0; i < 3; i++) {
+        const ph = ((t * 0.012 + i * 0.37) % 1);
+        const bx = Math.sin(i * 2.1 + t * 0.05) * r * 0.45;
+        const by = r * (0.7 - ph * 1.4);
+        ctx.globalAlpha = Math.sin(ph * Math.PI);
+        ctx.beginPath(); ctx.arc(bx, by, r * (0.06 + 0.03 * i), 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+    // Contorno de tinta y un borde de luz abajo a la derecha (luz que atraviesa el agua)
+    orbPath(ctx, r, t, dir, tail);
     ctx.strokeStyle = OUT;
     ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.4, r * 0.28, r * 0.16, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(210, 246, 255, 0.75)';
+    ctx.lineWidth = Math.max(1, r * 0.1);
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0.2, 1.5); ctx.stroke();
+    // Brillos: reflejo grande que tiembla y un puntito
+    const sh = Math.sin(t * 0.21) * 0.08;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.beginPath(); ctx.ellipse(-r * 0.36, -r * 0.42, r * (0.3 + sh * 0.5), r * 0.15, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-r * 0.05, -r * 0.62, Math.max(0.8, r * 0.07), 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 

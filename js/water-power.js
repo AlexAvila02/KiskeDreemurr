@@ -517,6 +517,77 @@
   }
 
 
+  // Chorro de agua de la fuente al orbe: una cinta que se afina hacia la mano, con bordes
+  // que ondulan (olas que suben por el chorro), un hilo de luz y "cuentas" que viajan.
+  const STREAM_N = 18;
+  const SL = new Float32Array((STREAM_N + 1) * 2), SR = new Float32Array((STREAM_N + 1) * 2);
+  const SC = new Float32Array((STREAM_N + 1) * 2);
+  function qb(a, b, c, s) { const u = 1 - s; return u * u * a + 2 * u * s * b + s * s * c; }
+  function drawStream(ctx, sx, sy, ox, oy, r, t) {
+    const mx = (sx + ox) / 2, my = Math.min(sy, oy) - 40;
+    const base = 2.6 + 3.6 * st.size;
+    for (let i = 0; i <= STREAM_N; i++) {
+      const s = i / STREAM_N;
+      const x = qb(sx, mx, ox, s), y = qb(sy, my, oy, s);
+      // Tangente → normal
+      const tx = 2 * (1 - s) * (mx - sx) + 2 * s * (ox - mx), ty = 2 * (1 - s) * (my - sy) + 2 * s * (oy - my);
+      const tl = Math.hypot(tx, ty) || 1;
+      const nx = -ty / tl, ny = tx / tl;
+      // Ancho: grueso al salir del agua, fino al llegar; pulsos que suben hacia el orbe
+      const w = base * (1.25 - 0.6 * s) * (1 + 0.22 * Math.sin(s * 15 - t * 0.38)) + (s > 0.88 ? (s - 0.88) * r * 2.2 : 0);
+      const sway = Math.sin(s * 9 - t * 0.21) * 1.6 * Math.sin(s * Math.PI);
+      SC[i * 2] = x + nx * sway; SC[i * 2 + 1] = y + ny * sway;
+      SL[i * 2] = SC[i * 2] + nx * w; SL[i * 2 + 1] = SC[i * 2 + 1] + ny * w;
+      SR[i * 2] = SC[i * 2] - nx * w; SR[i * 2 + 1] = SC[i * 2 + 1] - ny * w;
+    }
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(SL[0], SL[1]);
+    for (let i = 1; i <= STREAM_N; i++) ctx.lineTo(SL[i * 2], SL[i * 2 + 1]);
+    for (let i = STREAM_N; i >= 0; i--) ctx.lineTo(SR[i * 2], SR[i * 2 + 1]);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(sx, sy, ox, oy);
+    grad.addColorStop(0, 'rgba(62, 140, 172, 0.88)');
+    grad.addColorStop(1, 'rgba(140, 212, 230, 0.78)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(58, 36, 22, 0.6)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    // Hilo de luz que corre por un costado del chorro
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(236, 252, 255, 0.75)';
+    ctx.lineWidth = 1.3;
+    ctx.setLineDash([9, 7]);
+    ctx.lineDashOffset = -t * 2.2;
+    ctx.beginPath();
+    for (let i = 1; i < STREAM_N; i++) {
+      const x = SC[i * 2] * 0.55 + SL[i * 2] * 0.45, y = SC[i * 2 + 1] * 0.55 + SL[i * 2 + 1] * 0.45;
+      if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Cuentas de agua que suben por dentro del chorro
+    ctx.fillStyle = 'rgba(244, 254, 255, 0.85)';
+    for (let k = 0; k < 4; k++) {
+      const s = (t * 0.022 + k * 0.25) % 1;
+      const f = s * STREAM_N, i = Math.min(STREAM_N - 1, f | 0), u = f - i;
+      const x = SC[i * 2] + (SC[i * 2 + 2] - SC[i * 2]) * u, y = SC[i * 2 + 1] + (SC[i * 2 + 3] - SC[i * 2 + 1]) * u;
+      ctx.globalAlpha = Math.sin(s * Math.PI);
+      ctx.beginPath(); ctx.arc(x, y, 0.8 + base * 0.25 * (1 - s * 0.5), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Al pie del chorro: el agua se abomba al subir (montículo con espuma)
+    const foam = 3 + st.size * 4;
+    ctx.fillStyle = 'rgba(126, 204, 220, 0.85)';
+    ctx.beginPath(); ctx.ellipse(sx, sy, base * 2.4, foam * (0.8 + 0.2 * Math.sin(t * 0.3)), 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = 'rgba(244, 254, 255, 0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(sx, sy, base * 2.4, foam * (0.8 + 0.2 * Math.sin(t * 0.3)), 0, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.restore();
+  }
+
   function drawControl(ctx, g, cam, t) {
     const p = g.player;
     if (st.holding && st.size > 0.02) {
@@ -524,25 +595,7 @@
       const r = orbRadius(st.size);
       const ox = h.x + Math.cos(st.angle) * (6 + r), oy = h.y + Math.sin(st.angle) * (6 + r);
       // Chorro de agua desde la fuente (laguna o charco) hasta el orbe; solo si está enganchada
-      if (st.connected && st.src) {
-      const sx = st.srcX, sy = srcY();
-      const mx = (sx + ox) / 2, my = Math.min(sy, oy) - 40;
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(58, 36, 22, 0.55)';
-      ctx.lineWidth = 3 + 5 * st.size + 2;
-      ctx.beginPath(); ctx.moveTo(sx - cam.x, sy - cam.y); ctx.quadraticCurveTo(mx - cam.x, my - cam.y, ox - cam.x, oy - cam.y); ctx.stroke();
-      ctx.strokeStyle = 'rgba(126, 204, 220, 0.9)';
-      ctx.lineWidth = 3 + 5 * st.size;
-      ctx.stroke();
-      ctx.setLineDash([6, 10]);
-      ctx.lineDashOffset = -t * 1.6;
-      ctx.strokeStyle = 'rgba(240, 253, 255, 0.95)';
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
-      }
+      if (st.connected && st.src) drawStream(ctx, st.srcX - cam.x, srcY() - cam.y, ox - cam.x, oy - cam.y, r, t);
       drawOrbAt(ctx, ox - cam.x, oy - cam.y, r, t);
       // Progreso de la maestría: arco dorado alrededor del orbe (hasta +77% = mejora)
       if (!st.upgraded) {
@@ -562,7 +615,7 @@
       if (s.on) {
         // Al final de su vida la bola se encoge antes de deshacerse
         const fade = s.t > SHOT_LIFE - 6 ? (SHOT_LIFE - s.t) / 6 : 1;
-        drawOrbAt(ctx, s.x - cam.x, s.y - cam.y, s.r * (0.5 + 0.5 * fade), t + s.t);
+        drawOrbAt(ctx, s.x - cam.x, s.y - cam.y, s.r * (0.5 + 0.5 * fade), t + s.t, s.vx, s.vy);
       }
     }
     if (guide.on) {
@@ -576,7 +629,7 @@
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(gx, gy, GR * 2.4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
-      drawOrbAt(ctx, gx, gy, GR, t);
+      drawOrbAt(ctx, gx, gy, GR, t, guide.vx, guide.vy);
     }
   }
 

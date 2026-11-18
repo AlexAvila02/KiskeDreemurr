@@ -652,3 +652,10 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `js/world-map.js`: no muestra salas con `hideOnMap`. `scripts/check-project.js` carga `abyss.js`.
 - `index.html`: `abyss.js?v=1`, `player.js?v=13`, `journal.js?v=8`, `main.js?v=12`, `world-map.js?v=3`, `journal.css?v=2`.
 - Playtest en navegador: caída → GRUTA DEL ECO; juntar bastón; equipar con clic, Enter y doble clic (alcance 1 ↔ 1,5; caja 76×69); tajo y bastón visibles; túnel → vuelve a la Laguna; 2ª caída → MADRIGUERA; mapa sin grutas; "Continuar" dentro de una gruta mantiene el túnel. Consola sin errores. **No probado:** el A del mando sobre la grilla y caídas en multijugador.
+
+## Agua que parece agua (Claude, 18/11, pedido del usuario) — Gemini: releé water-core.js, water-power.js y coop-elements.js del disco antes de guardar
+- `water-core.js` `drawOrb(ctx, x, y, r, t, vx?, vy?)`: la esfera ya no es un círculo con degradé. Borde que ondula (olas que corren alrededor), cuerpo translúcido más hondo en el borde, sombra de refracción, dos remolinos internos que giran, burbujitas que suben por dentro, borde de luz y reflejo que tiembla. Con `vx/vy` (bolas en vuelo, esfera guiada) toma forma de **lágrima**: frente redondo y cola afinada hacia atrás. Los parámetros nuevos son opcionales (npc-reactions.js sigue igual).
+- `water-power.js` `drawStream`: el chorro de la laguna a la mano ahora es una cinta que se afina hacia el orbe, con bordes que laten (pulsos que suben), vaivén, hilo de luz que corre, cuentas de agua viajando y un montículo con espuma al pie. Puntos en `Float32Array` fijos (sin basura por cuadro).
+- `coop-elements.js`: las bolas de los otros jugadores también pasan su velocidad (lágrima).
+- `index.html`: `water-core.js?v=5`, `water-power.js?v=8`, `coop-elements.js?v=3`.
+- Playtest en navegador: cargar en la Laguna (chorro + orbe), lanzar (lágrima en vuelo), caminar, saltar, cambiar de sala. Consola sin errores. **No probado:** esfera guiada (requiere maestría) ni multijugador.
