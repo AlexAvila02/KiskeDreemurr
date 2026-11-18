@@ -748,7 +748,7 @@
     wasPlaying: false,
     shown: 0,
     durationMs: DEFAULT_CYCLE_DURATION_MS,
-    loop: false, // false: se asienta en la noche estrellada; true: ciclo continuo
+    loop: true, // true: ciclo continuo atardecer → noche → amanecer dorado → ...; false: se asienta en la noche
     camX: null,
     camY: null
   };
@@ -821,8 +821,10 @@
     let raw;
     const shouldLoop = options.loop !== undefined ? options.loop : (typeof window !== 'undefined' && window.SKY_LOOP !== undefined ? window.SKY_LOOP : journey.loop);
     if (shouldLoop) {
-      const cyclePos = (journey.elapsedMs % (duration * 2)) / duration;
-      raw = cyclePos <= 1 ? cyclePos : 2 - cyclePos;
+      // Onda suave (coseno): la noche se aclara de nuevo hacia la hora dorada sin rebote brusco,
+      // demorándose un poco en la noche cerrada y en el sol dorado antes de dar la vuelta.
+      const phase = (journey.elapsedMs % (duration * 2)) / (duration * 2);
+      raw = (1 - Math.cos(phase * Math.PI * 2)) * 0.5;
     } else {
       raw = clamp01(journey.elapsedMs / duration);
     }

@@ -660,3 +660,8 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `coop-elements.js`: las bolas de los otros jugadores también pasan su velocidad (lágrima).
 - `index.html`: `water-core.js?v=5`, `water-power.js?v=8`, `coop-elements.js?v=3`.
 - Playtest en navegador: cargar en la Laguna (chorro + orbe), lanzar (lágrima en vuelo), caminar, saltar, cambiar de sala. Consola sin errores. **No probado:** esfera guiada (requiere maestría) ni multijugador.
+
+## Ciclo de día y noche continuo (Claude, 18/11, pedido del usuario) — Gemini: releé code-art-engine.js del disco antes de guardar
+- `code-art-engine.js`: `journey.loop = true`. El cielo ya no se queda en la noche: atardecer → noche estrellada → vuelve a la hora dorada → ... (3 min por tramo, 6 min la vuelta completa). La vuelta usa una onda coseno en vez del triángulo anterior, así que se demora un poco en la noche y en el sol dorado sin rebote brusco. `window.SKY_LOOP = false` sigue fijándolo en la noche.
+- `index.html`: `code-art-engine.js?v=7`.
+- Playtest en navegador (con `SKY_DURATION_MS` acelerado): noche → hora dorada → noche otra vez; caminar, saltar, cambiar de sala 0→1 con el cielo siguiendo su ciclo. Consola sin errores.
