@@ -52,7 +52,7 @@ Claude (Opus) trabaja en esta misma carpeta al mismo tiempo que vos. Estas regla
 ---
 
 ## 📝 Nota sobre modelos y roles de Gemini (decisión del usuario)
-- **Gemini 3.8 Flash** puede asumir plenamente las peticiones dirigidas a **Argon** (rol de director/coordinador) y desplegar a su vez subagentes ejecutores basados en Gemini 3.8 Flash (`flash` / `inherit`, como `flash-executor`) para realizar tareas puntuales y delimitadas.
+- **Gemini 4 Hydrogen** asume plenamente las peticiones del rol de director/coordinador (antes Argon / Gemini 3.8 Flash) y el subagente ejecutor (`flash-executor`) hereda el mismo modelo (`model: inherit`, **Gemini 4 Hydrogen**) para realizar tareas puntuales y delimitadas (actualizado por decisión del usuario, 18/11).
 
 ## 🔄 Protocolo de auto-verificación y reversión de subagentes (decisión del usuario, 11/11)
 Tras realizar cualquier acción que altere el código del juego:
