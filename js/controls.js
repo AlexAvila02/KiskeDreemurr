@@ -65,6 +65,12 @@ class ControlsManager {
         defaultKeys: ['KeyG', null]
       },
       {
+        id: 'potion',
+        name: 'Beber Poción de Regeneración',
+        icon: (window.UIIcons ? UIIcons.svg('potion') : ''),
+        defaultKeys: ['KeyR', 'KeyH']
+      },
+      {
         id: 'interact',
         name: 'Interactuar / Hablar / Abrir',
         icon: (window.UIIcons ? UIIcons.svg('scroll') : ''),
@@ -544,7 +550,8 @@ class ControlsManager {
       ['arrow-right', 'Moverse', null, 'Stick / Cruceta'],
       ['jump', 'Saltar', null, 'A'],
       ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
-      ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B · LB'],
+      ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B'],
+      ['potion', 'Beber Poción de Regeneración', null, 'LB'],
       ['scroll', 'Interactuar / Hablar / Abrir', null, 'Y'],
       ['scroll', 'Leer nota de Angelo', 'Arriba (↑ / W)', 'Stick / Cruceta arriba'],
       ['wind', 'Jalar / Soplar el Aire', null, 'Abajo/Arriba + L2'],

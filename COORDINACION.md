@@ -670,3 +670,11 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - `code-art-engine.js`: `journey.loop = true`. El cielo ya no se queda en la noche: atardecer → noche estrellada → vuelve a la hora dorada → ... (3 min por tramo, 6 min la vuelta completa). La vuelta usa una onda coseno en vez del triángulo anterior, así que se demora un poco en la noche y en el sol dorado sin rebote brusco. `window.SKY_LOOP = false` sigue fijándolo en la noche.
 - `index.html`: `code-art-engine.js?v=7`.
 - Playtest en navegador (con `SKY_DURATION_MS` acelerado): noche → hora dorada → noche otra vez; caminar, saltar, cambiar de sala 0→1 con el cielo siguiendo su ciclo. Consola sin errores.
+
+## Barra de vida de 20 y pociones de regeneración (Claude, 18/11, pedido del usuario) — Gemini: releé main.js, style.css e index.html del disco antes de guardar
+- `player.js`: vida 20 (antes 5 corazones). Los golpes de enemigos pasan de 1 a **4** (`enemies.js` ×2, `multiplayer.js`), así siguen haciendo falta 5 golpes para morir.
+- `main.js` `updateHUD`: los corazones (`.mask-node`) se reemplazan por una barra (`.hp-track` con relleno, "fantasma" que se vacía lento, marcas cada 4 y texto `16/20`). Clases en `#health-bar`: `hp-lost`, `hp-gained`, `hp-low` (≤25 %), `hp-regen`. Mando: **LB** pasa de agarrar a beber poción (B sigue agarrando).
+- Nuevo `js/potions.js` (hooks onInit/onAction/onAfterUpdate/onRestartGame): 5 pociones por partida; acción `potion` (R / H, LB) da +2 de vida cada 15 s durante 1 min; varias se acumulan; se pierden los efectos al morir; el reloj se detiene en pausa. API `window.Potions { count, restore(n), drink(), activeEffects() }`. `save-game.js` guarda y restaura `potions`.
+- HUD: `.hp-row` con la barra + casillero `#potion-indicator` (ícono nuevo `potion` en ui-icons.js); la barra de energía de stamina.js baja a su propia línea. Mientras regenera, aura verde animada (conic-gradient que gira y respira) alrededor de la barra.
+- `controls.js`: nueva acción "Beber Poción de Regeneración" en el menú de controles.
+- Playtest en navegador: empezar/continuar, caminar, saltar, golpe real del escarabajo (20→16), R bebe, +2 a los 15 s, cambio de sala 0→1 con el efecto activo, reinicio del juego vuelve a 5 pociones. Consola sin errores. **No probado:** LB en mando real ni multijugador.

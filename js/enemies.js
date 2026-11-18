@@ -517,7 +517,7 @@ class CrawlerEnemy {
     // 4. Colisión dañina con el jugador
     if (aabbOverlap(this.x, this.y, this.width, this.height, player.x, player.y, player.width, player.height)) {
       const knockDir = Math.sign((player.x + player.width / 2) - (this.x + this.width / 2)) || this.facing;
-      player.takeDamage(1, knockDir * 6);
+      player.takeDamage(4, knockDir * 6);
     }
   }
 
@@ -848,7 +848,7 @@ class FlyingShadeEnemy {
     // Colisión dañina con el jugador
     if (aabbOverlap(this.x, this.y, this.width, this.height, player.x, player.y, player.width, player.height)) {
       const knockDir = Math.sign((player.x + player.width / 2) - (this.x + this.width / 2)) || 1;
-      player.takeDamage(1, knockDir * 6);
+      player.takeDamage(4, knockDir * 6);
       // Pequeño rebote hacia atrás tras picar a Ruben para no quedarse pegada encima de él
       this.knockbackVx = -knockDir * 2.4;
       this.knockbackVy = -1.8;

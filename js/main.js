@@ -436,7 +436,7 @@ class Game {
   setupGamepad() {
     this.padPrev = [];
     this.padIndex = null;
-    this.PAD_BUTTONS = { 0: 'jump', 2: 'attack', 5: 'attack', 7: 'attack', 1: 'grab', 4: 'grab', 3: 'interact' };
+    this.PAD_BUTTONS = { 0: 'jump', 2: 'attack', 5: 'attack', 7: 'attack', 1: 'grab', 4: 'potion', 3: 'interact' };
 
     window.addEventListener('gamepadconnected', (e) => {
       this.padIndex = e.gamepad.index;
@@ -816,31 +816,25 @@ class Game {
   }
 
   updateHUD() {
-    // Corazones de salud: se actualizan en el lugar para poder animar pérdidas y curaciones
-    const maxHp = this.player.maxHp, hp = this.player.hp;
-    if (this.healthBar.children.length !== maxHp) {
-      this.healthBar.innerHTML = '';
-      for (let i = 0; i < maxHp; i++) {
-        const mask = document.createElement('div');
-        mask.className = 'mask-node' + (i < hp ? ' active' : '');
-        this.healthBar.appendChild(mask);
-      }
-    } else {
-      let gainedIndex = 0;
-      Array.from(this.healthBar.children).forEach((node, i) => {
-        const active = i < hp;
-        const was = node.classList.contains('active');
-        if (was && !active) {
-          node.classList.remove('active', 'gained');
-          this.retriggerClass(node, 'lost');
-        } else if (!was && active) {
-          node.classList.remove('lost');
-          node.classList.add('active');
-          node.style.animationDelay = `${gainedIndex++ * 70}ms`; // se rellenan en cascada
-          this.retriggerClass(node, 'gained');
-        }
-      });
+    // Barra de vida (20 puntos): relleno + "fantasma" que se vacía detrás al recibir daño
+    const maxHp = Math.max(1, this.player.maxHp), hp = Math.max(0, Math.min(maxHp, this.player.hp));
+    if (!this.hpFill) {
+      this.healthBar.innerHTML =
+        '<div class="hp-track"><div class="hp-ghost"></div><div class="hp-fill"></div><div class="hp-ticks"></div></div>' +
+        '<span class="hp-text"></span>';
+      this.hpFill = this.healthBar.querySelector('.hp-fill');
+      this.hpGhost = this.healthBar.querySelector('.hp-ghost');
+      this.hpText = this.healthBar.querySelector('.hp-text');
+      this.lastHp = hp;
     }
+    const pct = (hp / maxHp) * 100 + '%';
+    this.hpFill.style.width = pct;
+    this.hpGhost.style.width = pct;
+    this.hpText.textContent = `${Math.ceil(hp)}/${maxHp}`;
+    this.healthBar.classList.toggle('hp-low', hp > 0 && hp <= maxHp * 0.25);
+    if (hp < this.lastHp) this.retriggerClass(this.healthBar, 'hp-lost');
+    else if (hp > this.lastHp) this.retriggerClass(this.healthBar, 'hp-gained');
+    this.lastHp = hp;
 
     // Llaves (pulso al conseguir una nueva)
     if (this.lastKeyCount !== undefined && this.player.keys > this.lastKeyCount) {

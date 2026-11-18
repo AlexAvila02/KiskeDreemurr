@@ -61,6 +61,7 @@
       x: Math.round(rp.x),
       y: Math.round(rp.y),
       keys: p.keys | 0,
+      potions: window.Potions ? window.Potions.count : undefined,
       visited: Array.from(game.visitedRooms || [w.currentRoomIndex]),
       rooms
     };
@@ -95,6 +96,7 @@
     p.keys = s.keys | 0;
     p.dead = false;
     p.hp = p.maxHp;
+    if (window.Potions) window.Potions.restore(s.potions);
     p.vx = 0;
     p.vy = 0;
     p.facing = 1;

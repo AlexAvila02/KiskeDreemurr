@@ -55,8 +55,8 @@ class Player {
 
     // Estado y dirección
     this.facing = 1; // 1 = derecha, -1 = izquierda
-    this.hp = 5;
-    this.maxHp = 5;
+    this.hp = 20;
+    this.maxHp = 20;   // barra de vida de 20 (un golpe enemigo quita 4)
     this.invulnerableTimer = 0;
 
     // Mecánica de Ataque (Espada)

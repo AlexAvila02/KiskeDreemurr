@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Ruben: En Busca de Angelo - Metroidvania 2D</title>
-  <link rel="stylesheet" href="css/style.css?v=5">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <link rel="stylesheet" href="css/journal.css?v=3">
   <link rel="stylesheet" href="css/ui-icons.css?v=3">
   <link rel="stylesheet" href="css/world-map.css?v=1">
@@ -29,8 +29,16 @@
           <div class="portrait-glow"></div>
           <span class="portrait-name">RUBEN</span>
         </div>
-        <div id="health-bar" class="health-bar" title="Salud de Ruben">
-          <!-- Generado dinámicamente -->
+        <div class="hp-row">
+          <div id="health-bar" class="health-bar" title="Salud de Ruben">
+            <!-- Generado dinámicamente -->
+          </div>
+          <!-- Pociones de regeneración (js/potions.js) -->
+          <div id="potion-indicator" class="item-slot potion-slot" title="Pociones de regeneración (+2 de vida cada 15 s durante 1 min)">
+            <span class="slot-icon ui-icon" data-icon="potion"></span>
+            <span id="potion-count" class="slot-text">5</span>
+            <span id="potion-key" class="slot-key">R</span>
+          </div>
         </div>
         <div class="items-display">
           <div id="key-indicator" class="item-slot" title="Llave del Portón">
@@ -132,14 +140,14 @@
   </div>
 
   <!-- Scripts de la arquitectura modular sin dependencias externas -->
-  <script src="js/ui-icons.js?v=3"></script>
+  <script src="js/ui-icons.js?v=4"></script>
   <script src="js/audio.js?v=3"></script>
   <script src="js/particles.js?v=3"></script>
   <script src="js/code-art-engine.js?v=7"></script>
   <script src="js/terrain-art.js?v=3"></script>
-  <script src="js/enemies.js?v=4"></script>
-  <script src="js/controls.js?v=10"></script>
-  <script src="js/player.js?v=13"></script>
+  <script src="js/enemies.js?v=5"></script>
+  <script src="js/controls.js?v=11"></script>
+  <script src="js/player.js?v=14"></script>
   <script src="js/world.js?v=13"></script>
   <script src="js/menu-nav.js?v=4"></script>
   <!-- Expansión (Claude): fondo continuo entre secciones, salas 4-10 y Diario de Ruben -->
@@ -154,6 +162,7 @@
   <script src="js/sound-kit.js?v=1"></script>
   <!-- Energía elemental (Claude): barra azul compartida por Aire y Agua; va antes de los poderes -->
   <script src="js/stamina.js?v=4"></script>
+  <script src="js/potions.js?v=1"></script>
   <script src="js/wind-pull.js?v=12"></script>
   <!-- Ambientes, decorados, NPC y notas (Claude) -->
   <script src="js/ambience.js?v=2"></script>
@@ -169,11 +178,11 @@
   <script src="js/memories.js?v=2"></script>
   <script src="js/element-card.js?v=3"></script>
   <!-- Partida guardada (CONTINUAR): hooks onInit/onRoomLoad/onAfterUpdate, antes de main.js -->
-  <script src="js/save-game.js?v=3"></script>
+  <script src="js/save-game.js?v=4"></script>
   <script src="js/room-shortcuts.js?v=1"></script>
   <!-- Multijugador cooperativo (Claude): hasta 4 jugadores, el anfitrión hace de servidor (PeerJS/WebRTC) -->
-  <script src="js/multiplayer.js?v=7"></script>
+  <script src="js/multiplayer.js?v=8"></script>
   <script src="js/coop-elements.js?v=3"></script>
-  <script src="js/main.js?v=13"></script>
+  <script src="js/main.js?v=14"></script>
 </body>
 </html>

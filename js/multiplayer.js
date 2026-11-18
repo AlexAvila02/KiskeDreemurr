@@ -961,7 +961,7 @@
           if (MP.mode === 'host' && !e._mpTgt) continue; // ya lo resolvió enemy.update
           if (overlap(e, p)) {
             const kd = Math.sign((p.x + p.width / 2) - (e.x + e.width / 2)) || 1;
-            p.takeDamage(1, kd * 6);
+            p.takeDamage(4, kd * 6);
           }
         }
       }
