@@ -820,8 +820,8 @@ class Game {
     const maxHp = Math.max(1, this.player.maxHp), hp = Math.max(0, Math.min(maxHp, this.player.hp));
     if (!this.hpFill) {
       this.healthBar.innerHTML =
-        '<div class="hp-track"><div class="hp-ghost"></div><div class="hp-fill"></div><div class="hp-ticks"></div></div>' +
-        '<span class="hp-text"></span>';
+        '<div class="hp-track"><div class="hp-ghost"></div><div class="hp-fill"></div><div class="hp-ticks"></div>' +
+        '<span class="hp-text"></span></div>';
       this.hpFill = this.healthBar.querySelector('.hp-fill');
       this.hpGhost = this.healthBar.querySelector('.hp-ghost');
       this.hpText = this.healthBar.querySelector('.hp-text');

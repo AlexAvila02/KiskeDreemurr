@@ -1323,3 +1323,20 @@ body {
   0%, 100% { box-shadow: 0 2px 0 #2b1a10, 0 0 6px rgba(127, 224, 138, 0.5); }
   50%      { box-shadow: 0 2px 0 #2b1a10, 0 0 16px rgba(160, 255, 160, 0.95); }
 }
+
+/* Número de vida dentro de la barra, centrado sobre el relleno */
+.hp-track .hp-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  color: #fff4e6;
+  text-shadow: 0 1px 0 #3a2416, 1px 0 0 #3a2416, -1px 0 0 #3a2416, 0 -1px 0 #3a2416;
+  z-index: 2;
+  pointer-events: none;
+}
