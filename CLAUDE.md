@@ -15,7 +15,8 @@ Varios agentes de IA pueden trabajar en paralelo en esta carpeta. Sigue este flu
    ```
    Verifica sintaxis JS de todos los módulos, integridad de `<script src>` en `index.html`, y que todas las salas tengan `spawnEnemies`/`spawnDebris` como funciones válidas y biomas existentes.
 3. **Pushear siempre a `main`**: Al completar cualquier tarea, corrección o mejora (tras validar con `check-project.js`), realiza `git add`, `git commit` y **pushea siempre a `main`** (`git push origin main`) para mantener sincronizado el repositorio.
-4. **Extensión sin tocar `js/main.js` ni `js/world.js`**:
+4. **La página web (`ellos`) se actualiza sola**: cada push a `main` que toque `index.html`, `css/`, `js/` o `sounds/` dispara el GitHub Action `.github/workflows/sync-ellos.yml`, que copia el juego a `AlexAvila02/3llos` (`pages/juegos/kisukedreemurr`) y Netlify lo publica en el dominio .dev. **No ejecutes** `actualizar-kisukedreemurr.bat` (duplicaría commits y puede chocar con los del Action). Si la web no se actualiza, revisá la pestaña Actions del repo (usa el secreto `ELLOS_TOKEN`).
+5. **Extensión sin tocar `js/main.js` ni `js/world.js`**:
    - **Hooks del Motor (`window.GameHooks`)**: Cualquier script nuevo se engancha sin modificar `js/main.js`. **No envolver funciones del juego** (`game.update`, `doAction`, `loadRoom`, `player.update`...): usar los hooks. Contrato completo en **`MAPA.md`**. Los principales:
      - `onInit(game)` (registrar acá los demás) · `onBeforeUpdate / onAfterUpdate(game, running)` (también en pausa)
      - `onAction(game, action) → true` consume la acción · `onBeforeRoomLoad(game, index, sx, sy)` · `onRoomLoad(game, room, index, prevIndex, sx, sy)`

@@ -13,5 +13,6 @@ if errorlevel 1 (
 ) else (
   echo.
   echo Listo: GitHub esta actualizado.
+  echo La web ellos se actualiza sola en 1-2 minutos (GitHub Action sync-ellos).
 )
 pause
