@@ -1286,12 +1286,7 @@ body {
 .hp-row > #stamina-bar { order: 2; flex-basis: 100%; }
 .potion-slot { padding: 2px 8px; }
 
-/* Regenerando: aura verde animada alrededor de la barra (gira y respira) */
-@property --regen-a {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
+/* Regenerando: aura verde animada que fluye de derecha a izquierda detrás de la barra */
 .health-bar { position: relative; isolation: isolate; }
 .health-bar.hp-regen::before {
   content: '';
@@ -1302,18 +1297,24 @@ body {
   height: 36px;
   transform: translateY(-50%);
   border-radius: 16px;
-  background: conic-gradient(from var(--regen-a),
-    rgba(127, 224, 138, 0.15), #7fe08a, rgba(186, 255, 170, 0.9), rgba(63, 160, 80, 0.25),
-    #7fe08a, rgba(127, 224, 138, 0.15));
+  /* Bandas verdes repetidas; al mover el fondo hacia la izquierda, las ondas corren ← */
+  background: linear-gradient(90deg,
+    rgba(127, 224, 138, 0.2) 0%, #7fe08a 18%, rgba(186, 255, 170, 0.95) 25%, rgba(63, 160, 80, 0.3) 40%,
+    rgba(127, 224, 138, 0.2) 50%, #7fe08a 68%, rgba(186, 255, 170, 0.95) 75%, rgba(63, 160, 80, 0.3) 90%,
+    rgba(127, 224, 138, 0.2) 100%);
+  background-size: 200% 100%;
   filter: blur(3px) saturate(1.3);
   z-index: -1;
   pointer-events: none;
-  animation: regenSpin 2.4s linear infinite, regenBreath 1.6s ease-in-out infinite;
+  animation: regenFlow 1.8s linear infinite, regenBreath 1.6s ease-in-out infinite;
 }
 .health-bar.hp-regen .hp-track {
   animation: regenGlow 1.6s ease-in-out infinite;
 }
-@keyframes regenSpin { to { --regen-a: 360deg; } }
+@keyframes regenFlow {
+  from { background-position: 0% 0; }
+  to   { background-position: 200% 0; }
+}
 @keyframes regenBreath {
   0%, 100% { opacity: 0.8; transform: translateY(-50%) scale(1); }
   50%      { opacity: 1;    transform: translateY(-50%) scale(1.04, 1.18); }
