@@ -1291,10 +1291,10 @@ body {
 .health-bar.hp-regen::before {
   content: '';
   position: absolute;
-  left: -10px;
+  left: -8px;
   top: 50%;
-  width: 210px;            /* ancho de .hp-track (190px) + aura */
-  height: 36px;
+  width: 206px;            /* ancho de .hp-track (190px) + aura */
+  height: 29px;
   transform: translateY(-50%);
   border-radius: 16px;
   /* Bandas verdes repetidas; al mover el fondo hacia la derecha, las ondas corren → */
@@ -1303,7 +1303,7 @@ body {
     rgba(127, 224, 138, 0.2) 50%, #7fe08a 68%, rgba(186, 255, 170, 0.95) 75%, rgba(63, 160, 80, 0.3) 90%,
     rgba(127, 224, 138, 0.2) 100%);
   background-size: 200% 100%;
-  filter: blur(3px) saturate(1.3);
+  filter: blur(2.4px) saturate(1.3);
   z-index: -1;
   pointer-events: none;
   animation: regenFlow 1.8s linear infinite, regenBreath 1.6s ease-in-out infinite;
