@@ -1276,14 +1276,16 @@ body {
 
 /* Fila: barra de vida + pociones; la barra de energía (js/stamina.js) baja a su propia línea */
 .hp-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: start;
   align-items: center;
   gap: 8px 10px;
 }
-.hp-row > #health-bar { order: 0; }
-.hp-row > #potion-indicator { order: 1; }
-.hp-row > #stamina-bar { order: 2; flex-basis: 100%; }
+.hp-row > #health-bar { grid-column: 1; grid-row: 1; }
+.hp-row > #potion-indicator { grid-column: 2; grid-row: 1; justify-self: start; }
+/* La energía va debajo y conserva su ancho original (180 px de .stamina-bar) */
+.hp-row > #stamina-bar { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
 .potion-slot { padding: 2px 8px; }
 
 /* Regenerando: aura verde animada que fluye de izquierda a derecha detrás de la barra */
