@@ -13,6 +13,7 @@ on:
       - 'css/**'
       - 'js/**'
       - 'sounds/**'
+      - '.github/workflows/sync-ellos.yml'
   workflow_dispatch:
 
 concurrency:
