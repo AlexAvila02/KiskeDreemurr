@@ -2,7 +2,7 @@
  * Pociones de regeneración - Ruben: En Busca de Angelo (Claude)
  *
  * Ruben empieza cada partida con 5 pociones. Beber una (acción "potion": R / H, o LB en
- * el mando) da +2 de vida cada 15 s durante 1 minuto (4 curaciones, +8 en total).
+ * el mando) da +1 de vida cada 7 s durante ~1 minuto (8 curaciones, +8 en total).
  * Varias pociones bebidas se acumulan: cada una lleva su propio reloj.
  *
  * El reloj cuenta cuadros de lógica (60 por segundo), así que se detiene en pausa.
@@ -16,9 +16,9 @@
   'use strict';
 
   const START_COUNT = 5;
-  const HEAL_AMOUNT = 2;
-  const TICK_FRAMES = 15 * 60;   // cada 15 s
-  const TICKS = 4;               // durante 1 minuto
+  const HEAL_AMOUNT = 1;
+  const TICK_FRAMES = 7 * 60;    // cada 7 s
+  const TICKS = 8;               // 8 × 7 s = 56 s (~1 minuto)
 
   const state = { count: START_COUNT, effects: [] };
   let els = null;
@@ -48,7 +48,7 @@
         for (const e of state.effects) left = Math.max(left, TICKS * TICK_FRAMES - e.t);
         els.slot.title = `Regenerando · quedan ${Math.ceil(left / 60)} s`;
       } else {
-        els.slot.title = 'Pociones de regeneración (+2 de vida cada 15 s durante 1 min)';
+        els.slot.title = 'Pociones de regeneración (+1 de vida cada 7 s durante 1 min)';
       }
     }
     if (game && game.healthBar) game.healthBar.classList.toggle('hp-regen', active);
@@ -69,7 +69,7 @@
       window.particleSystem.createDust(p.x + p.width / 2, p.y + p.height / 2, 14, '#7fe08a');
     }
     if (els && els.slot && game.retriggerClass) game.retriggerClass(els.slot, 'slot-pulse');
-    game.showNotification(`Poción de regeneración · +${HEAL_AMOUNT} de vida cada 15 s durante 1 min (quedan ${state.count})`);
+    game.showNotification(`Poción de regeneración · +${HEAL_AMOUNT} de vida cada 7 s durante 1 min (quedan ${state.count})`);
     hud(game);
   }
 
