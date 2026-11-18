@@ -183,16 +183,25 @@ class Player {
 
     // Dirección del tajo: adelante, arriba, abajo (solo en el aire) o diagonales.
     // aimAng está en el marco de Ruben: 0 = adelante, -90° = arriba, +90° = abajo.
-    if (aim.right) this.facing = 1;
-    if (aim.left) this.facing = -1;
-    const horiz = !!(aim.left || aim.right);
-    let vert = 0;
-    if (aim.up) vert = -1;
-    else if (aim.down && !this.isGrounded) vert = 1;
-    else if (aim.down && horiz) vert = 1;   // en el suelo: abajo-adelante (barrido bajo)
-    if (vert === 0) this.attackAim = 0;
-    else if (horiz) this.attackAim = vert * Math.PI / 4;
-    else this.attackAim = vert * Math.PI / 2;
+    // aim.angle (rad, mundo; lo pone main.js con el ratón): tajo hacia donde apunta el ratón.
+    if (typeof aim.angle === 'number') {
+      const cx = Math.cos(aim.angle), sy = Math.sin(aim.angle);
+      if (Math.abs(cx) > 0.05) this.facing = cx > 0 ? 1 : -1;
+      let a = Math.atan2(sy, Math.abs(cx));               // al marco de Ruben (-90°..90°)
+      if (this.isGrounded) a = Math.min(a, Math.PI / 4);  // en el suelo, como mucho abajo-adelante
+      this.attackAim = a;
+    } else {
+      if (aim.right) this.facing = 1;
+      if (aim.left) this.facing = -1;
+      const horiz = !!(aim.left || aim.right);
+      let vert = 0;
+      if (aim.up) vert = -1;
+      else if (aim.down && !this.isGrounded) vert = 1;
+      else if (aim.down && horiz) vert = 1;   // en el suelo: abajo-adelante (barrido bajo)
+      if (vert === 0) this.attackAim = 0;
+      else if (horiz) this.attackAim = vert * Math.PI / 4;
+      else this.attackAim = vert * Math.PI / 2;
+    }
     const dirX = this.facing * Math.cos(this.attackAim);
     const dirY = Math.sin(this.attackAim);
     this.isAttacking = true;

@@ -15,6 +15,7 @@
  *   .isStickHeld()            el stick derecho está inclinado ahora
  *   .forgetStale(keepIdleStick)  si el ratón está quieto hace > 3 s, o el stick suelto
  *                              (salvo keepIdleStick), la fuente pasa a 'none'
+ *   .mouseAngle(game, x, y)   ángulo hacia el ratón aunque la fuente activa sea otra (tajo con clic)
  *   .target(game, x, y)       ángulo (rad, mundo) desde (x, y) hacia donde apunta el jugador,
  *                              o null si no hay dirección clara este cuadro
  * Hooks: onInit (escucha el ratón) · onBeforeUpdate (lee el stick, antes que las habilidades).
@@ -41,6 +42,14 @@
       if (a.source === 'mouse' && performance.now() - a.mouseT > MOUSE_FRESH_MS) a.source = 'none';
       if (a.source === 'stick' && !a.stickHeld && !keepIdleStick) a.source = 'none';
     },
+    // Ángulo (rad, mundo) desde (x, y) hacia la última posición del ratón, sin importar
+    // la fuente activa (lo usa el tajo de Ruben al hacer clic). null si está encima.
+    mouseAngle(game, x, y) {
+      if (a.mouseT < 0) return null;
+      const cam = game.camera || { x: 0, y: 0 };
+      const dx = a.mouseX + cam.x - x, dy = a.mouseY + cam.y - y;
+      return dx * dx + dy * dy < 36 ? null : Math.atan2(dy, dx);
+    },
     target(game, x, y) {
       if (a.source === 'stick') return a.stickHeld ? a.stickAngle : null;
       if (a.source === 'mouse') {
@@ -59,14 +68,17 @@
     // Ratón: posición en píxeles del canvas (corrige el escalado por CSS)
     const canvas = game.canvas;
     if (canvas) {
-      canvas.addEventListener('mousemove', (e) => {
+      const track = (e) => {
         const r = canvas.getBoundingClientRect();
         if (!r.width || !r.height) return;
         a.mouseX = (e.clientX - r.left) * (canvas.width / r.width);
         a.mouseY = (e.clientY - r.top) * (canvas.height / r.height);
         a.mouseT = performance.now();
         a.source = 'mouse';
-      });
+      };
+      canvas.addEventListener('mousemove', track);
+      // pointerdown llega antes que el mousedown de main.js: el clic apunta donde está el ratón
+      canvas.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') track(e); });
     }
   });
 })();

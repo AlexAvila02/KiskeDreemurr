@@ -678,3 +678,10 @@ Sin cambios de comportamiento: el código de cada función se movió **tal cual*
 - HUD: `.hp-row` con la barra + casillero `#potion-indicator` (ícono nuevo `potion` en ui-icons.js); la barra de energía de stamina.js baja a su propia línea. Mientras regenera, aura verde animada detrás de la barra: ondas que corren de izquierda a derecha (linear-gradient con background-position) y respiran.
 - `controls.js`: nueva acción "Beber Poción de Regeneración" en el menú de controles.
 - Playtest en navegador: empezar/continuar, caminar, saltar, golpe real del escarabajo (20→16), R bebe, +2 a los 15 s, cambio de sala 0→1 con el efecto activo, reinicio del juego vuelve a 5 pociones. Consola sin errores. **No probado:** LB en mando real ni multijugador.
+
+## Tajo hacia el ratón (Claude, 18/11, pedido del usuario) — Gemini: releé main.js, player.js y aim.js del disco antes de guardar
+- `player.attack(enemies, aim)`: acepta `aim.angle` (rad, mundo). Si está, Ruben se gira hacia ese lado y el tajo sale en ese ángulo exacto (marco de Ruben −90°..90°); en el suelo, como mucho abajo-adelante (45°). Sin `angle`, sigue igual que antes (teclas arriba/abajo/diagonales).
+- `main.js` `getAttackAim()`: clic izquierdo → siempre hacia el ratón; tecla de ataque → hacia el ratón si se lo movió hace poco (`Aim.source() === 'mouse'`) y no se aprieta arriba/abajo; si no, las teclas. El mando no cambia.
+- `aim.js`: nuevo `Aim.mouseAngle(game, x, y)` (ángulo al ratón aunque la fuente activa sea otra) y `pointerdown` también actualiza la posición (llega antes que el `mousedown` de main.js).
+- `index.html`: `aim.js?v=2`, `player.js?v=15`, `main.js?v=16`.
+- Playtest en navegador: clics arriba, diagonal, izquierda (Ruben se gira) y derecha, con el ángulo correcto en cada tajo; consola sin errores. **No probado:** multijugador.

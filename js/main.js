@@ -367,7 +367,10 @@ class Game {
     // Controles táctiles / de ratón en el canvas
     this.canvas.addEventListener('mousedown', (e) => {
       if (this.isPaused) return;
-      if (e.button === 0) this.doAction('attack');          // Clic izquierdo: atacar
+      if (e.button === 0) {                                  // Clic izquierdo: atacar hacia el ratón
+        this.mouseAttack = true;
+        try { this.doAction('attack'); } finally { this.mouseAttack = false; }
+      }
       else if (e.button === 2) { e.preventDefault(); this.doAction('grab'); } // Clic derecho: agarrar/lanzar
     });
 
@@ -409,6 +412,20 @@ class Game {
     };
   }
 
+  // Hacia dónde va el tajo: con clic, siempre hacia el ratón; con teclado, hacia el ratón si
+  // se lo movió hace poco y no se aprieta arriba/abajo; si no, las teclas (getAim)
+  getAttackAim() {
+    const aim = this.getAim();
+    const A = window.Aim, p = this.player;
+    if (!A || !A.mouseAngle) return aim;
+    const useMouse = this.mouseAttack || (A.source() === 'mouse' && !aim.up && !aim.down);
+    if (useMouse) {
+      const ang = A.mouseAngle(this, p.x + p.width / 2, p.y + p.height / 2);
+      if (ang !== null) aim.angle = ang;
+    }
+    return aim;
+  }
+
   // Acción del jugador (la usan teclado, mouse y mando)
   doAction(action) {
     if (!this.isPlaying || this.isPaused || this.deathTimer > 0) return;
@@ -425,7 +442,7 @@ class Game {
     }
 
     if (action === 'jump') this.player.jump();
-    else if (action === 'attack') this.player.attack(this.enemies, this.getAim());
+    else if (action === 'attack') this.player.attack(this.enemies, this.getAttackAim());
     else if (action === 'grab') this.player.interactOrThrow(this.debrisItems);
     else if (action === 'interact') this.checkInteractions();
   }
