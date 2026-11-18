@@ -104,13 +104,14 @@
         '  <div class="map-title">MAPA DEL REINO</div>' +
         '  <canvas class="map-canvas" width="880" height="420"></canvas>' +
         '  <div class="map-room-name"></div>' +
-        '  <div class="map-hint">M / R3 · Esc / B para cerrar</div>' +
+        '  <div class="map-hint">M / R3 · Esc / B / Start para cerrar</div>' +
         '</div>';
       m.addEventListener('click', (e) => { if (e.target === m) this.close(); });
       hud.appendChild(m);
       this.modal = m;
       this.canvas = m.querySelector('canvas');
       this.nameEl = m.querySelector('.map-room-name');
+      this.hintEl = m.querySelector('.map-hint');
     }
 
     isOpen() { return !!this.modal && !this.modal.classList.contains('hidden'); }
@@ -120,6 +121,9 @@
       if (!g.isPlaying || g.isPaused || g.deathTimer > 0 || this.isOpen()) return false;
       if (g.journal && g.journal.isOpen && g.journal.isOpen()) return false;
       if (g.controlsManager && g.controlsManager.isModalOpen && g.controlsManager.isModalOpen()) return false;
+      const mp = document.getElementById('mp-modal');
+      if (mp && !mp.classList.contains('hidden')) return false;
+      if (window.ElementCard && window.ElementCard.busy && window.ElementCard.busy()) return false;
       return true;
     }
 
@@ -131,6 +135,11 @@
       this.modal.classList.remove('hidden');
       const room = g.world.getCurrentRoom();
       this.nameEl.textContent = room ? room.name : '';
+      if (this.hintEl) {
+        const cm = g.controlsManager;
+        const mBound = cm && cm.getActionForKey && cm.getActionForKey('KeyM');
+        this.hintEl.textContent = mBound ? 'R3 · Esc / B / Start para cerrar' : 'M / R3 · Esc / B / Start para cerrar';
+      }
       if (window.soundManager && window.soundManager.playPickup) try { window.soundManager.playPickup(); } catch (e) { /* */ }
       const loop = () => { this.t++; this.draw(); if (this.isOpen()) this.raf = requestAnimationFrame(loop); };
       cancelAnimationFrame(this.raf);

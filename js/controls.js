@@ -66,7 +66,7 @@ class ControlsManager {
       },
       {
         id: 'interact',
-        name: 'Interactuar / Leer / Abrir',
+        name: 'Interactuar / Hablar / Abrir',
         icon: (window.UIIcons ? UIIcons.svg('scroll') : ''),
         defaultKeys: ['KeyE', 'Enter']
       }
@@ -341,6 +341,7 @@ class ControlsManager {
 
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
 
       const { actionId, slotIndex } = this.listeningSlot;
 
@@ -450,6 +451,19 @@ class ControlsManager {
     if (!this.listContainer) this.cacheDOMElements();
     if (!this.listContainer) return;
 
+    // Preservar desplazamiento y foco al reconstruir la lista
+    const prevScroll = this.listContainer.scrollTop;
+    const nav = this.game && this.game.menuNav;
+    const hadPadFocus = !!(nav && nav.focused && this.listContainer.contains(nav.focused));
+    const hadDomFocus = !!(document.activeElement && this.listContainer.contains(document.activeElement));
+    const focusedBtn = (hadPadFocus ? nav.focused : null) || (hadDomFocus ? document.activeElement : null);
+    let focusAction = focusedBtn && focusedBtn.dataset ? focusedBtn.dataset.action : null;
+    let focusSlot = focusedBtn && focusedBtn.dataset ? focusedBtn.dataset.slot : null;
+    if (!focusAction && this.listeningSlot) {
+      focusAction = this.listeningSlot.actionId;
+      focusSlot = String(this.listeningSlot.slotIndex);
+    }
+
     this.listContainer.innerHTML = '';
 
     for (const act of this.actions) {
@@ -472,6 +486,8 @@ class ControlsManager {
         const keyBtn = document.createElement('button');
         keyBtn.type = 'button';
         keyBtn.className = 'btn-key-slot';
+        keyBtn.dataset.action = act.id;
+        keyBtn.dataset.slot = String(slotIdx);
 
         const currentKey = keys[slotIdx];
         keyBtn.textContent = this.formatKeyName(currentKey);
@@ -503,6 +519,15 @@ class ControlsManager {
     }
 
     this.renderMousePadRows();
+
+    this.listContainer.scrollTop = prevScroll;
+    if (focusAction) {
+      const btn = this.listContainer.querySelector(`.btn-key-slot[data-action="${focusAction}"][data-slot="${focusSlot}"]`);
+      if (btn) {
+        if (hadPadFocus && nav) nav.setFocus(btn, false);
+        else if (hadDomFocus) btn.focus({ preventScroll: true });
+      }
+    }
   }
 
   /**
@@ -520,14 +545,16 @@ class ControlsManager {
       ['jump', 'Saltar', null, 'A'],
       ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
       ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B · LB'],
-      ['scroll', 'Interactuar / Leer', null, 'Y'],
+      ['scroll', 'Interactuar / Hablar / Abrir', null, 'Y'],
+      ['scroll', 'Leer nota de Angelo', 'Arriba (↑ / W)', 'Stick / Cruceta arriba'],
       ['wind', 'Jalar / Soplar el Aire', null, 'Abajo/Arriba + L2'],
       ['wind', 'Apuntar el aire', 'Mover el ratón', 'Stick derecho'],
       ['water', 'Dominio del Agua (cerca del agua)', 'Apuntar: ratón', 'L2 · stick der.'],
       ['water', 'Esfera guiada (tras mejorar)', null, 'L3 · stick izq.'],
-      ['book', 'Diario de Ruben', null, 'Select'],
-      ['gear', 'Pausa', null, 'Start'],
-      ['gamepad', 'En menús: elegir / volver', 'Clic', 'A / B']
+      ['book', 'Mapa del Reino', 'M (teclado)', 'R3'],
+      ['book', 'Diario de Ruben', 'I / Tab (teclado)', 'Select'],
+      ['gear', 'Pausa', 'Esc (teclado)', 'Start'],
+      ['gamepad', 'En menús: elegir / volver', 'Clic', 'A (✕) / B (○)']
     ];
     for (const [ic, name, mouse, pad] of rows) {
       const row = document.createElement('div');
@@ -558,9 +585,7 @@ class ControlsManager {
     // Actualizar pista en el diálogo de notas
     const dialogHint = document.querySelector('.dialog-hint');
     if (dialogHint) {
-      const interactKey = this.getPrimaryDisplayKey('interact');
-      const jumpKey = this.getPrimaryDisplayKey('jump');
-      dialogHint.textContent = `[Presiona ${interactKey} o ${jumpKey} para cerrar]`;
+      dialogHint.textContent = '[Acercate para interactuar · Alejate para cerrar]';
     }
   }
 }

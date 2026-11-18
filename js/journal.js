@@ -757,7 +757,7 @@
       } else {
         if (sm && sm.playUnlockAbility) sm.playUnlockAbility();
         const verb = EQUIP[c.item] ? 'equipalo' : 'miralo';
-        this.game.showNotification(`Encontraste: ${info.name} · ${verb} en el Diario (${this.openKeyLabel()})`);
+        this.game.showNotification(`Encontraste: ${info.name} · ${verb} en el Diario (${this.openKeyLabel()} / Select)`);
       }
       this.selectedItem = c.item;
     }
@@ -812,7 +812,11 @@
     // ---------------- Interfaz ----------------
     openKeyLabel() {
       const cm = this.game.controlsManager;
-      if (cm && cm.getActionForKey && cm.getActionForKey('KeyI')) return 'Tab';
+      if (cm && cm.getActionForKey) {
+        if (!cm.getActionForKey('KeyI')) return 'I';
+        if (!cm.getActionForKey('Tab')) return 'Tab';
+        return 'Select';
+      }
       return 'I';
     }
 
@@ -875,7 +879,7 @@
             <div class="journal-notes" id="journal-notes"></div>
           </div>
           <div class="journal-footer">
-            <span><b>Clic</b> en EQUIPAR o <b>doble clic</b> · <b>Enter</b> equipa · <b>Q</b>/<b>E</b> pestañas · <b id="journal-footer-key">I</b>/<b>Esc</b> cerrar · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b> equipar · <b>LB</b>/<b>RB</b> pestañas</span>
+            <span><b>Clic</b> o <b>A</b> en objeto: ir a <b>EQUIPAR</b> · ${window.UIIcons ? window.UIIcons.svg('gamepad', 'ui-inline') : ''} <b>A</b>/<b>Enter</b> confirmar · <b>LB</b>/<b>RB</b> o <b>Q</b>/<b>E</b> pestañas · <b>B</b>/<b id="journal-footer-key">I</b>/<b>Esc</b> cerrar</span>
           </div>
         </div>`;
       const notif = document.getElementById('notification');
@@ -920,6 +924,11 @@
         if (pause) pause.classList.add('hidden');
       }
       if (document.activeElement && this.modal.contains(document.activeElement)) document.activeElement.blur();
+      if (this.hudBtn && document.activeElement === this.hudBtn) this.hudBtn.blur();
+      if (this.game.menuNav) {
+        this.game.menuNav.clearHighlight();
+        this.game.menuNav.focused = null;
+      }
       this.refreshHud();
     }
 
@@ -931,7 +940,16 @@
       if (tab === 'stats') this.renderStats();
       if (tab === 'notes') this.renderNotes();
       const nav = this.game.menuNav;
-      if (nav) { nav.clearHighlight(); nav.focused = null; }
+      const tabBtn = this.modal.querySelector('.journal-tab[data-tab="' + tab + '"]');
+      // Mantener el foco en la pestaña activa al cambiar con LB/RB o Q/E
+      if (nav && tabBtn) {
+        nav.lastFocus['journal-modal'] = tabBtn;
+        if (this.isOpen()) nav.setFocus(tabBtn, false);
+        else { nav.clearHighlight(); nav.focused = null; }
+      } else if (nav) {
+        nav.clearHighlight();
+        nav.focused = null;
+      }
     }
     cycleTab(dir) {
       const order = ['items', 'stats', 'notes'];
@@ -994,6 +1012,17 @@
     renderItemDetail() {
       const box = this.modal.querySelector('#journal-item-detail');
       const id = this.selectedItem;
+      // Si es el mismo objeto equipable, actualizar el botón en el lugar para no perder el foco
+      const curSplash = box.querySelector('.journal-splash');
+      const curBtn = box.querySelector('.journal-equip-btn');
+      if (id && this.ownsItem(id) && curSplash && curSplash.dataset.item === id && EQUIP[id] && curBtn) {
+        const on = this.save.equipped.includes(id);
+        const hadPadFocus = curBtn.classList.contains('pad-focus');
+        curBtn.className = 'journal-equip-btn' + (on ? ' on' : '') + (hadPadFocus ? ' pad-focus' : '');
+        curBtn.textContent = on ? '✓ EQUIPADO' : 'EQUIPAR';
+        curBtn.title = on ? 'Clic para quitar' : 'Clic para equipar';
+        return;
+      }
       box.innerHTML = '';
       this.splashCanvas = null;
       if (!id || !this.ownsItem(id)) {
@@ -1097,6 +1126,15 @@
     // Pestaña ESTADÍSTICAS: las 4 estadísticas de Ruben (radar + filas de texto) y los objetos equipados
     renderStats() {
       const box = this.modal.querySelector('#journal-stats');
+      // Guardar scroll y foco actual en un botón .stat-equip para restaurarlos al reconstruir la lista
+      const prevScroll = box.scrollTop;
+      const nav = this.game.menuNav;
+      const activeEl = (nav && nav.focused && box.contains(nav.focused))
+        ? nav.focused
+        : (box.contains(document.activeElement) ? document.activeElement : null);
+      const focusedSlot = activeEl && activeEl.classList && activeEl.classList.contains('stat-equip') ? activeEl : null;
+      const focusedItem = focusedSlot ? focusedSlot.dataset.item : null;
+      const hadPadFocus = !!(focusedSlot && nav && nav.focused === focusedSlot);
       box.innerHTML = '';
 
       const sec = el('div', 'stats-section');
@@ -1137,6 +1175,14 @@
       box.appendChild(el('p', 'stats-foot', any
         ? 'Las estadísticas solo suben con los objetos que equipás. Las armas y la ropa se ven en Ruben.'
         : 'Las estadísticas solo suben con objetos: buscalos por el reino y equipalos acá.'));
+      box.scrollTop = prevScroll;
+      if (focusedItem) {
+        const nb = box.querySelector('.stat-equip[data-item="' + focusedItem + '"]');
+        if (nb) {
+          if (hadPadFocus && nav) nav.setFocus(nb, false);
+          else nb.focus({ preventScroll: true });
+        }
+      }
     }
 
     renderNotes() {
@@ -1153,7 +1199,7 @@
       });
       list.appendChild(el('div', 'journal-notes-count', `Notas encontradas: ${found} de ${total}`));
       if (!entries.length) {
-        list.appendChild(el('p', 'journal-notes-empty', 'Todavía no leíste ninguna nota. Pasá por encima de los pergaminos con sello rojo.'));
+        list.appendChild(el('p', 'journal-notes-empty', 'Todavía no leíste ninguna nota. Acercate a los pergaminos y pulsá Arriba (↑) para leerlos.'));
       }
       for (const { room, tab } of entries) {
         const card = el('article', 'journal-note');
@@ -1193,10 +1239,30 @@
           if (just(9)) { this.close(false); return true; }
           if (just(4)) { this.cycleTab(-1); return true; }
           if (just(5)) { this.cycleTab(1); return true; }
-          // A sobre un objeto equipable de la grilla = equipar / quitar
           const fo = nav.focused;
-          if (just(0) && fo && fo.classList && fo.classList.contains('journal-slot') && EQUIP[fo.dataset.item]) {
-            this.toggleEquip(fo.dataset.item);
+          // Scroll con mando en NOTAS DE ANGELO cuando el foco está en las pestañas
+          if (this.tab === 'notes' && fo && (fo.id === 'journal-tab-notes' || (fo.classList && fo.classList.contains('journal-tab')))) {
+            const notesBox = this.modal.querySelector('#journal-notes');
+            const k = this.game.keys || {};
+            if (notesBox && notesBox.scrollHeight > notesBox.clientHeight) {
+              if (k.PadDown && notesBox.scrollTop + notesBox.clientHeight < notesBox.scrollHeight - 2) {
+                notesBox.scrollTop += 4;
+                return true;
+              }
+              if (k.PadUp && notesBox.scrollTop > 0) {
+                notesBox.scrollTop = Math.max(0, notesBox.scrollTop - 4);
+                return true;
+              }
+            }
+          }
+          // Confirmación en dos pasos: A sobre un objeto de la grilla lo selecciona y pasa el foco a EQUIPAR
+          if (just(0) && fo && fo.classList && fo.classList.contains('journal-slot')) {
+            const id = fo.dataset.item;
+            if (this.selectedItem !== id) fo.click();
+            if (EQUIP[id]) {
+              const eqBtn = this.modal.querySelector('#journal-item-detail .journal-equip-btn');
+              if (eqBtn) nav.setFocus(eqBtn, true);
+            }
             return true;
           }
           return origHandle(pressed, prev);
@@ -1237,15 +1303,31 @@
           if ((e.code === 'Enter' || e.code === 'Space') && document.activeElement && this.modal.contains(document.activeElement)) {
             e.preventDefault();
             const ae = document.activeElement;
-            // Enter sobre un objeto equipable de la grilla = equipar / quitar
-            if (ae.classList.contains('journal-slot') && EQUIP[ae.dataset.item]) this.toggleEquip(ae.dataset.item);
-            else ae.click();
+            // Confirmación en dos pasos: sobre un objeto equipable de la grilla, pasar el foco a EQUIPAR
+            if (ae.classList.contains('journal-slot')) {
+              if (EQUIP[ae.dataset.item]) {
+                if (this.selectedItem !== ae.dataset.item) ae.click();
+                const eqBtn = this.modal.querySelector('#journal-item-detail .journal-equip-btn');
+                if (eqBtn) {
+                  eqBtn.focus();
+                  if (nav) nav.setFocus(eqBtn, true);
+                }
+              } else {
+                ae.click();
+              }
+            } else {
+              ae.click();
+            }
             return;
           }
-          // Sin nada enfocado, Enter equipa / quita el objeto seleccionado
+          // Sin nada enfocado en el modal, Enter mueve el foco al botón EQUIPAR del objeto seleccionado
           if (e.code === 'Enter' && this.tab === 'items' && EQUIP[this.selectedItem]) {
             e.preventDefault();
-            this.toggleEquip(this.selectedItem);
+            const eqBtn = this.modal.querySelector('#journal-item-detail .journal-equip-btn');
+            if (eqBtn) {
+              eqBtn.focus();
+              if (nav) nav.setFocus(eqBtn, true);
+            }
             return;
           }
           if (e.code === 'Space' || e.code === 'Enter') e.preventDefault();
@@ -1271,6 +1353,10 @@
     const j = game.journal;
     if (!j) return;
     j.save = emptySave();
+    j.selectedItem = 'llave';
+    j.tab = 'items';
+    j.counted = new WeakSet();
+    j.lastKeys = 0;
     j.persist();
     j.syncRoomsWithSave();
     j.applyPassives();

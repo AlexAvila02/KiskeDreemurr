@@ -460,7 +460,9 @@
         window.soundManager.playUnlockAbility();
       }
       if (g.showNotification) {
-        g.showNotification('✦ ¡Habilidad aprendida: Jalar el Aire! (Abajo + F / L2)');
+        const cm = g.controlsManager;
+        const k = cm && cm.getPrimaryDisplayKey ? cm.getPrimaryDisplayKey('windPull') : 'F';
+        g.showNotification('✦ ¡Habilidad aprendida: Jalar el Aire! (Abajo + ' + k + ' / L2)');
       }
       if (window.particleSystem) {
         const px = g.player.x + g.player.width / 2;
@@ -788,6 +790,16 @@
       stopSound();
     });
 
+    H.onRestartGame = H.onRestartGame || [];
+    H.onRestartGame.push(() => {
+      state.unlocked = false;
+      state.storageChecked = false;
+      clearAll();
+      state.active = false;
+      state.power = 0;
+      stopSound();
+    });
+
     window.GameHooks.onRenderWorld.push((game, ctx, cam) => {
       try { render(game, ctx, cam); } catch (e) { console.error('[Viento]', e); }
     });
@@ -855,15 +867,6 @@
   window.GameHooks = window.GameHooks || { onInit: [], onRoomLoad: [], onUpdate: [], onRenderWorld: [], onAction: [] };
   window.GameHooks.onInit = window.GameHooks.onInit || [];
   window.GameHooks.onRenderWorld = window.GameHooks.onRenderWorld || [];
-  window.GameHooks.onRestartGame = window.GameHooks.onRestartGame || [];
-  window.GameHooks.onRestartGame.push(() => {
-    state.unlocked = false;
-    state.storageChecked = false;
-    clearAll();
-    state.active = false;
-    state.power = 0;
-    stopSound();
-  });
   window.GameHooks.onInit.push((game) => {
     try { install(game); } catch (e) { console.error('[Viento] no se pudo iniciar:', e); }
   });

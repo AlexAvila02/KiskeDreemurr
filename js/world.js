@@ -145,13 +145,13 @@ class World {
           x: 140,
           y: 415,
           speaker: "Nota de Angelo",
-          text: "«Ruben: si lees esto, no me esperes en casa. Seguí el camino viejo hacia el bosque para buscar reconocimiento y levantar a nuestro pueblo. — A.»"
+          text: "«Ruben: si leés esto, no me esperes en casa. Seguí el camino viejo hacia el bosque para buscar reconocimiento y levantar a nuestro pueblo. — A.»"
         },
         {
           x: 520,
           y: 245,
           speaker: "Nota de Angelo",
-          text: "«Las piedras del viejo muro se desprenden. Papá decía que el reino se defendía con ingenio, no solo con espada. Presiona K para levantar piedras y lanzarlas». — A."
+          text: "«Las piedras del viejo muro se desprenden. Papá decía que el reino se defendía con ingenio, no solo con espada. Agarrá piedras y lanzalas (K / clic der. / B). — A.»"
         }
       ],
       exits: [
@@ -199,7 +199,7 @@ class World {
           y: 415,
           style: 'aire', // pergamino azul transparente (recuerdo del aire)
           speaker: "Nota de Angelo",
-          text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salte bien alto puede llegar. Búscala arriba hacia el oeste. Si te plantas firme, mantén Abajo + F (o L2) para jalar el aire y atraer a las criaturas hacia ti. — A.»"
+          text: "«Encontré la llave del Portón Norte, pero la dejé en lo alto del molino, donde solo alguien que salte bien alto puede llegar. Buscala arriba hacia el oeste. Si te plantás firme, mantené Abajo + F (o L2) para jalar el aire y atraer a las criaturas hacia vos. — A.»"
         }
       ],
       exits: [
@@ -256,7 +256,7 @@ class World {
           x: 940,
           y: 115,
           speaker: "Carta Sellada de Angelo",
-          text: "«Hermano Ruben: esta llave abre el Portón Norte. Si lograste subir hasta aquí, confío plenamente en ti. No me detendré hasta levantar nuestro reino. Te espero más adelante. — A.»"
+          text: "«Hermano Ruben: esta llave abre el Portón Norte. Si lograste subir hasta aquí, confío plenamente en vos. No me detendré hasta levantar nuestro reino. Te espero más adelante. — A.»"
         }
       ],
       exits: [
@@ -303,7 +303,7 @@ class World {
           x: 610,
           y: 235,
           speaker: "Rastro Reciente de Angelo",
-          text: "«¡Ruben, atravesaste el Portón Norte! El Bosque de los Susurros es espeso y la niebla arrecia, pero sé que estás cerca. Mantén la espada en alto. Pronto nos reuniremos. — A.»"
+          text: "«¡Ruben, atravesaste el Portón Norte! El Bosque de los Susurros es espeso y la niebla arrecia, pero sé que estás cerca. Mantené la espada en alto. Pronto nos reuniremos. — A.»"
         }
       ],
       exits: [

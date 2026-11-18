@@ -399,11 +399,12 @@
     ctx.restore();
   }
 
-  // Burbuja "E · Hablar" sobre la cabeza
+  // Burbuja "E · Hablar" (o "E / Y · Hablar" si hay mando conectado) sobre la cabeza
   function drawPrompt(ctx, g, n, cam, t) {
     const cm = g.controlsManager;
     const key = cm && cm.getPrimaryDisplayKey ? cm.getPrimaryDisplayKey('interact') : 'E';
-    drawBubble(ctx, `${key} · Hablar`, n.x - cam.x, n.y - cam.y - 78 + Math.sin(t * 0.08) * 2);
+    const label = (g.padIndex !== null && g.padIndex !== undefined) ? `${key} / Y · Hablar` : `${key} · Hablar`;
+    drawBubble(ctx, label, n.x - cam.x, n.y - cam.y - 78 + Math.sin(t * 0.08) * 2);
   }
 
   // Cápsula oscura con borde mostaza (mismo estilo que los avisos) centrada en (x, y)

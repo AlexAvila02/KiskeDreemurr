@@ -188,7 +188,7 @@
         const g = keyOf('waterGuide', 'G');
         return [
           ['Soltar', g, 'L3'],
-          ['Guiar', 'Flechas', 'Stick izquierdo'],
+          ['Guiar', 'W A S D / Flechas', 'Stick izquierdo'],
           ['Reventar', `${g} otra vez`, 'L3 otra vez']
         ];
       },
@@ -251,8 +251,8 @@
 #element-card .ec-hint{position:absolute;right:26px;bottom:9px;color:#8c5a2b;font-family:'Cinzel',serif;font-weight:800;font-size:14px;
   letter-spacing:1px;animation:ecBlink 1.3s ease-in-out infinite}
 @keyframes ecBlink{50%{opacity:.35}}
-@media (max-width:760px){#element-card .ec-paper{flex-direction:column;gap:8px;padding:16px}#element-card canvas{width:150px;height:150px}
-  #element-card h2{font-size:22px}#element-card .ec-desc{font-size:15px}#element-card table{font-size:14px}#element-card .ec-hint{bottom:-30px}}`;
+@media (max-width:760px){#element-card .ec-paper{flex-direction:column;gap:8px;padding:16px 16px 34px}#element-card canvas{width:150px;height:150px}
+  #element-card h2{font-size:22px}#element-card .ec-desc{font-size:15px}#element-card table{font-size:14px}}`;
     document.head.appendChild(s);
   }
 
@@ -267,7 +267,7 @@
     el.innerHTML = '<div class="ec-paper"><canvas width="260" height="260" aria-hidden="true"></canvas><div class="ec-body">' +
       '<span class="ec-tag"></span><h2></h2><p class="ec-desc"></p>' +
       '<table><thead><tr><th>Acción</th><th>Teclado</th><th>Mando</th></tr></thead><tbody></tbody></table>' +
-      '<p class="ec-note"></p></div><div class="ec-hint">Intro · A</div></div>';
+      '<p class="ec-note"></p></div><div class="ec-hint">Intro / Esc / Clic · A / B</div></div>';
     el.addEventListener('mousedown', (e) => { e.stopPropagation(); close(); });
     host.appendChild(el);
     st.el = el;

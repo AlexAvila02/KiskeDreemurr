@@ -28,7 +28,8 @@ class MenuNavigator {
     this.defaults = {
       'controls-modal': 'btn-save-controls',
       'pause-modal': 'btn-pause-resume',
-      'overlay-screen': 'btn-start'
+      'overlay-screen': 'btn-start',
+      'mp-modal': 'mp-host'
     };
 
     // Si se vuelve a usar el ratón, quitar el resaltado del mando
@@ -108,16 +109,34 @@ class MenuNavigator {
     const vertical = dir === 'up' || dir === 'down';
     const sign = (dir === 'up' || dir === 'left') ? -1 : 1;
 
-    let best = null, bestScore = Infinity;
-    for (const el of items) {
-      if (el === this.focused) continue;
-      const c = center(el);
-      const main = (vertical ? c.y - c0.y : c.x - c0.x) * sign;
-      const cross = Math.abs(vertical ? c.x - c0.x : c.y - c0.y);
-      if (main <= 4) continue; // no está en esa dirección
-      const score = main + cross * 2.5;
-      if (score < bestScore) { bestScore = score; best = el; }
+    const findBest = (pool) => {
+      let candidate = null, bestScore = Infinity;
+      for (const el of pool) {
+        if (el === this.focused) continue;
+        const c = center(el);
+        const main = (vertical ? c.y - c0.y : c.x - c0.x) * sign;
+        const cross = Math.abs(vertical ? c.x - c0.x : c.y - c0.y);
+        if (main <= 4) continue; // no está en esa dirección
+        const score = main + cross * 2.5;
+        if (score < bestScore) { bestScore = score; candidate = el; }
+      }
+      return candidate;
+    };
+
+    let best = null;
+    const list = container.id === 'controls-modal' ? document.getElementById('controls-list') : null;
+    if (list && vertical && list.contains(this.focused)) {
+      // Priorizar botones dentro de #controls-list antes de saltar a los botones externos
+      const listItems = items.filter(el => list.contains(el));
+      best = findBest(listItems);
+      if (!best && dir === 'down' && list.scrollTop + list.clientHeight < list.scrollHeight - 4) {
+        // Desplazar hacia abajo para mostrar la sección fija "Ratón y mando" antes de salir de la lista
+        list.scrollTop = Math.min(list.scrollHeight, list.scrollTop + 72);
+        return;
+      }
     }
+
+    if (!best) best = findBest(items);
 
     // Sin destino: arriba/abajo dan la vuelta al otro extremo del menú
     if (!best && vertical) {
@@ -157,7 +176,7 @@ class MenuNavigator {
       this.clearHighlight();
       if (!container && document.activeElement && document.activeElement.blur) {
         const ae = document.activeElement;
-        if (ae.closest && ae.closest('#overlay-screen, #pause-modal, #controls-modal')) ae.blur();
+        if (ae.closest && ae.closest('#overlay-screen, #pause-modal, #controls-modal, #mp-modal, #journal-modal, #map-modal')) ae.blur();
       }
       this.focused = null;
       this.activeId = id;
@@ -202,6 +221,7 @@ class MenuNavigator {
     if (just(1)) {
       if (id === 'controls-modal' && cm) cm.closeModal();
       else if (id === 'pause-modal') this.game.togglePause(false);
+      else if (id === 'mp-modal' && window.Multiplayer && window.Multiplayer.close) window.Multiplayer.close();
       return true;
     }
 
@@ -209,6 +229,7 @@ class MenuNavigator {
     if (just(9)) {
       if (id === 'controls-modal' && cm) cm.closeModal();
       else if (id === 'pause-modal') this.game.togglePause(false);
+      else if (id === 'mp-modal' && window.Multiplayer && window.Multiplayer.close) window.Multiplayer.close();
       else if (this.focused) {
         if (window.soundManager && window.soundManager.init) window.soundManager.init();
         this.focused.click();

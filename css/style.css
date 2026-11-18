@@ -393,6 +393,7 @@ body {
   top: 76px;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 130;
   background: rgba(48, 30, 18, 0.94);
   border: 2px solid #d9a634;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);

@@ -158,7 +158,9 @@ class Game {
       this.overlayScreen.classList.add('hidden');
       this.isPlaying = true;
       this.irisOpen = 1; // apertura en iris al comenzar
-      this.showNotification("Seguí las notas de Angelo...");
+      if (!this.notification || this.notification.classList.contains('hidden')) {
+        this.showNotification("Seguí las notas de Angelo...");
+      }
     });
 
     // Botón de Modificar Controles desde la Pantalla de Inicio
@@ -305,6 +307,9 @@ class Game {
           this.controlsManager.closeModal();
           return;
         }
+        // Si el modal de multijugador está abierto, no pausar
+        const mpEl = document.getElementById('mp-modal');
+        if (mpEl && !mpEl.classList.contains('hidden')) return;
         if (this.isPlaying) {
           this.togglePause();
           return;
@@ -319,10 +324,19 @@ class Game {
 
       this.keys[e.code] = true;
 
-      // Pantalla de inicio: ENTER comienza (si no está abierto el menú de controles)
+      // Pantalla de inicio: ENTER comienza o activa el botón enfocado (si no hay modales abiertos)
       if (!this.isPlaying && e.code === 'Enter' && !e.repeat) {
         const modalOpen = this.controlsManager && this.controlsManager.isModalOpen && this.controlsManager.isModalOpen();
-        if (!modalOpen && !this.overlayScreen.classList.contains('hidden')) { e.preventDefault(); this.btnStart.click(); }
+        const mpEl = document.getElementById('mp-modal');
+        const mpOpen = mpEl && !mpEl.classList.contains('hidden');
+        if (!modalOpen && !mpOpen && !this.overlayScreen.classList.contains('hidden')) {
+          e.preventDefault();
+          if (this.menuNav && this.menuNav.focused && this.overlayScreen.contains(this.menuNav.focused) && !this.menuNav.focused.disabled) {
+            this.menuNav.focused.click();
+          } else {
+            this.btnStart.click();
+          }
+        }
         return;
       }
 
@@ -427,6 +441,7 @@ class Game {
     window.addEventListener('gamepadconnected', (e) => {
       this.padIndex = e.gamepad.index;
       this.padPrev = [];
+      this.padJustConnected = true;
       this.showNotification('Mando conectado');
     });
     window.addEventListener('gamepaddisconnected', (e) => {
@@ -445,7 +460,7 @@ class Game {
     if (!pads) return null;
     if (this.padIndex !== null && pads[this.padIndex] && pads[this.padIndex].connected) return pads[this.padIndex];
     // Algunos navegadores no avisan la conexión hasta tocar un botón: buscar cualquiera
-    for (const p of pads) if (p && p.connected) { this.padIndex = p.index; this.padPrev = []; return p; }
+    for (const p of pads) if (p && p.connected) { this.padIndex = p.index; this.padPrev = []; this.padJustConnected = true; return p; }
     return null;
   }
 
@@ -486,6 +501,12 @@ class Game {
     }
 
     const pressed = Array.from(pad.buttons, b => !!b && (b.pressed || b.value > 0.5));
+    // Evitar disparos fantasma en el primer cuadro tras conectar el mando
+    if (this.padJustConnected) {
+      this.padJustConnected = false;
+      this.padPrev = pressed;
+      return;
+    }
     const justPressed = (i) => pressed[i] && !this.padPrev[i];
     const anyJust = pressed.some((v, i) => v && !this.padPrev[i]);
 
@@ -644,7 +665,8 @@ class Game {
           this.activeNote = room.door;
           this.showDialog(
             "Portón Cerrado",
-            "El Portón Norte está trabado con candado. Angelo dejó la llave en lo alto del molino."
+            "El Portón Norte está trabado con candado. Angelo dejó la llave en lo alto del molino.",
+            true
           );
         }
         return;

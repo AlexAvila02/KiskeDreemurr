@@ -635,6 +635,7 @@
       g.isPlaying = false;
       if (g.isPaused) g.togglePause(false);
       g.overlayScreen.classList.remove('hidden');
+      closeModal();
       g.showNotification('Se cerró la sala del anfitrión');
     }
   }
@@ -730,7 +731,6 @@
 
     // Escribir en los campos no mueve a Ruben ni dispara atajos del juego
     modal.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape') { e.stopPropagation(); closeModal(); return; }
       if (e.target && e.target.tagName === 'INPUT') {
         e.stopPropagation();
         if (e.code === 'Enter' || e.code === 'NumpadEnter') {
@@ -739,6 +739,14 @@
         }
       }
     });
+    // Cerrar con Escape en fase de captura para que main.js no despausar por debajo
+    window.addEventListener('keydown', (e) => {
+      if (MP.ui && !MP.ui.modal.classList.contains('hidden') && e.code === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeModal();
+      }
+    }, true);
     modal.addEventListener('keyup', (e) => { if (e.target && e.target.tagName === 'INPUT') e.stopPropagation(); });
     ui.name.addEventListener('change', () => {
       const n = cleanName(ui.name.value);
@@ -752,11 +760,18 @@
     ui.leave.addEventListener('click', () => {
       const wasGuest = MP.mode === 'guest';
       leave();
-      if (wasGuest) hostLostToMenu();
+      if (wasGuest) { hostLostToMenu(); closeModal(); }
     });
     ui.close.addEventListener('click', closeModal);
     ui.code.addEventListener('click', () => {
-      try { navigator.clipboard.writeText(MP.code); setStatus('Código copiado'); } catch (e) { /* */ }
+      try {
+        navigator.clipboard.writeText(MP.code).then(
+          () => setStatus('Código copiado'),
+          () => setStatus('Copiá el código manualmente: ' + MP.code, true)
+        );
+      } catch (e) {
+        setStatus('Copiá el código manualmente: ' + MP.code, true);
+      }
     });
 
     // Botones MULTIJUGADOR en la pantalla de inicio y en la pausa
@@ -788,8 +803,13 @@
   function openModal(fromPause) {
     if (!MP.ui) return;
     if (window.soundManager && window.soundManager.init) window.soundManager.init();
+    const pauseEl = document.getElementById('pause-modal');
+    if (fromPause === undefined) {
+      const g = game();
+      fromPause = !!(g && g.isPaused && pauseEl && !pauseEl.classList.contains('hidden'));
+    }
     MP.ui.fromPause = !!fromPause;
-    if (fromPause) document.getElementById('pause-modal').classList.add('hidden');
+    if (fromPause && pauseEl) pauseEl.classList.add('hidden');
     MP.ui.modal.classList.remove('hidden');
     refreshUI();
   }
@@ -822,6 +842,11 @@
     ui.leave.classList.toggle('mp-hidden', !inRoom && MP.mode !== 'connecting');
     ui.hostBtn.disabled = ui.joinBtn.disabled = MP.mode === 'connecting';
     ui.name.disabled = inRoom;
+    // Evitar que el foco del mando salte a "Salir de la sala" al crear o conectarse
+    const nav = game() && game().menuNav;
+    if ((inRoom || MP.mode === 'connecting') && nav && (nav.focused === ui.hostBtn || nav.focused === ui.joinBtn)) {
+      nav.setFocus(ui.close, false);
+    }
     ui.code.textContent = MP.code;
     ui.code.title = 'Clic para copiar';
     // Lista de jugadores (yo incluido)
@@ -1005,6 +1030,7 @@
     isGuest: () => MP.mode === 'guest',
     isActive: () => MP.mode === 'host' || MP.mode === 'guest',
     open: () => openModal(),
+    close: () => closeModal(),
     leave: () => leave(),
     // Los demás jugadores de esta sala: [{ id, name, slot, st, ghost }] (coop-elements.js)
     others: () => playersInMyRoom(),

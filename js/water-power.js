@@ -88,7 +88,11 @@
     if (st.mastery >= MASTERY_MAX - 1e-6) {
       st.upgraded = true;
       if (window.soundManager && window.soundManager.playUnlockAbility) window.soundManager.playUnlockAbility();
-      if (g.showNotification) g.showNotification('✦ ¡Dominio del Agua mejorado! Esfera guiada: G / L3 y guíala con el stick');
+      if (g.showNotification) {
+        const cm = g.controlsManager;
+        const k = cm && cm.getPrimaryDisplayKey ? cm.getPrimaryDisplayKey('waterGuide') : 'G';
+        g.showNotification('✦ ¡Dominio del Agua mejorado! Esfera guiada: ' + k + ' / L3 y guíala con el stick');
+      }
       const p = g.player;
       burst(p.x + p.width / 2, p.y + 10, 22, 5);
       if (window.particleSystem) window.particleSystem.createShockwave(p.x + p.width / 2, p.y + 19, 40, 'rgba(170, 230, 255, 0.9)', 3);
@@ -100,7 +104,11 @@
     st.learned = true;
     try { window.localStorage.setItem(SAVE_KEY, '1'); } catch (e) { /* */ }
     if (window.soundManager && window.soundManager.playUnlockAbility) window.soundManager.playUnlockAbility();
-    if (g && g.showNotification) g.showNotification('✦ ¡Habilidad aprendida: Dominio del Agua! (F / L2 cerca del agua)');
+    if (g && g.showNotification) {
+      const cm = g.controlsManager;
+      const k = cm && cm.getPrimaryDisplayKey ? cm.getPrimaryDisplayKey('windPull') : 'F';
+      g.showNotification('✦ ¡Habilidad aprendida: Dominio del Agua! (' + k + ' / L2 cerca del agua)');
+    }
     if (g && g.player) burst(g.player.x + g.player.width / 2, g.player.y + 10, 18, 4.5);
   }
 

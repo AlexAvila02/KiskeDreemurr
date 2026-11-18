@@ -478,11 +478,11 @@
           'Tu hermano Angelo se sentó en esta misma orilla. Quería aprender, pero tenía prisa; siempre la tuvo. Me dijo que vendría alguien más paciente.',
           'Somos cuatro los maestros que sostenemos este reino. La Tierra le da forma a cada sala. El Viento hace circular el aire para que todo lo vivo respire. El Fuego mantiene tibio el suelo para que nada se congele. Y yo le doy la humedad, para que la vida pueda florecer.',
           'Veo que el aire ya te obedece. Bien: es el primero que se aprende, porque nos rodea a todos; hasta quien agita una mano lo está empujando. Ahora te toca el agua.',
-          'Escucha: el agua no se empuja, se invita. Cerca de la laguna, mantén F (L2 en el mando) y subirá a tu mano. Apunta con el ratón o el stick derecho, y suéltala.'
+          'Escucha: el agua no se empuja, se invita. Cerca de la laguna, mantené F (o L2 en el mando) y subirá a tu mano. Apunta con el ratón o el stick derecho, y suéltala.'
         ],
         farewell: 'Haz sonar las tres campanas que cuelgan sobre la laguna. Cuanto más tiempo la sostengas, más fuerte sale el agua.',
         farewellLake: 'Bien hecho. Ahora mira arriba: la campana que cuelga sobre mi cabeza. Tu agua se deshace antes de llegar. Úsala, úsala mucho: el agua crece con quien la practica. Cuando tu esfera sea mucho más grande, el agua te obedecerá también en el aire.',
-        farewellUpgraded: '¿Lo sientes? Tu agua ya no se cae. Pulsa G (L3 en el mando) cerca de la laguna: saldrá una esfera que puedes guiar por el aire con el stick o las flechas. Llévala hasta la campana del techo.',
+        farewellUpgraded: '¿Lo sientes? Tu agua ya no se cae. Pulsa G (L3 en el mando) cerca de la laguna: saldrá una esfera que puedes guiar por el aire con el stick izquierdo o las teclas de movimiento. Llévala hasta la campana del techo.',
         farewellDone: 'Las cuatro campanas cantan. Ve, Ruben: donde haya agua que te escuche, no estarás solo.'
       }
     ],
