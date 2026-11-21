@@ -43,6 +43,16 @@
         '«Dicen los sabios que la vida vino del agua, hermanito. No se la empuja: se la invita. Algún día vas a tener que acordarte de esto... por si yo no estoy.»',
         'Ruben recuerda cómo se invita al agua. ¿Angelo ya sabía que iba a irse?'
       ]
+    },
+    {
+      id: 'earth',
+      title: 'Recuerdo de la Tierra',
+      learned: () => !!(window.EarthPower && window.EarthPower.isLearned()),
+      lines: [
+        'La roca sube bajo sus pies y, con ella, otro recuerdo. Las canteras, hace años. Papá le muestra a Angelo cómo se lee una veta; Ruben juega a apilar piedritas.',
+        '«La tierra es lo contrario del aire, hijo: no se mueve, se sostiene. Por eso hay que pedirle permiso dos veces.» Angelo lo escucha serio, como nunca.',
+        'Ruben recuerda cómo se le pide a la tierra. Y algo más: papá llevaba a los dos a las canteras. ¿Qué buscaban ahí?'
+      ]
     }
   ];
 

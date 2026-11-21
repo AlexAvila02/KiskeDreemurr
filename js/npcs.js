@@ -67,6 +67,16 @@
     if (n.teaches === 'water' && window.WaterControl && window.WaterControl.isLearned() && n.lineIdx === 0) {
       n.lineIdx = n.lines.length;
     }
+    // Otros maestros: window.ElementTeachers[teaches] = { isLearned(), learn(g), blockedText?(g), farewellText?(g, n) }
+    const T = n.teaches && n.teaches !== 'water' && window.ElementTeachers ? window.ElementTeachers[n.teaches] : null;
+    if (T && T.isLearned() && n.lineIdx === 0) n.lineIdx = n.lines.length;
+    const blocked = T && T.blockedText ? T.blockedText(g) : null;
+    if (blocked) {
+      g.activeNote = n;
+      g.showDialog(n.name, blocked, true);
+      state.talkT = 70;
+      return;
+    }
     let text;
     if (n.lineIdx < n.lines.length) {
       text = n.lines[n.lineIdx];
@@ -74,7 +84,7 @@
       if (n.lineIdx < n.lines.length) text += '  ▸';
     } else {
       // Tras sus líneas, la despedida (los maestros ya no suben estadísticas: solo los objetos)
-      text = farewellText(n, g.world.getCurrentRoom());
+      text = (T && T.farewellText && T.farewellText(g, n)) || farewellText(n, g.world.getCurrentRoom());
     }
     g.activeNote = n;
     g.showDialog(n.name, text, true);
@@ -83,6 +93,7 @@
     if (n.lineIdx >= n.lines.length && n.teaches === 'water' && window.WaterControl) {
       window.WaterControl.learn(g);
     }
+    if (T && n.lineIdx >= n.lines.length && !T.isLearned()) T.learn(g);
   }
 
   // ---------------- piezas compartidas por los dos dibujos ----------------

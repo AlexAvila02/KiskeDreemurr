@@ -65,6 +65,12 @@ class ControlsManager {
         defaultKeys: ['KeyG', null]
       },
       {
+        id: 'earth',
+        name: 'Tierra: levantar un pilar de roca (apuntá con el ratón)',
+        icon: (window.UIIcons ? UIIcons.svg('earth') : ''),
+        defaultKeys: ['KeyQ', 'KeyV']
+      },
+      {
         id: 'potion',
         name: 'Beber Poción de Regeneración',
         icon: (window.UIIcons ? UIIcons.svg('potion') : ''),
@@ -549,7 +555,7 @@ class ControlsManager {
     const rows = [
       ['arrow-right', 'Moverse', null, 'Stick / Cruceta'],
       ['jump', 'Saltar', null, 'A'],
-      ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB · RT'],
+      ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB'],
       ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B'],
       ['potion', 'Beber Poción de Regeneración', null, 'LB'],
       ['scroll', 'Interactuar / Hablar / Abrir', null, 'Y'],
@@ -558,6 +564,7 @@ class ControlsManager {
       ['wind', 'Apuntar el aire', 'Mover el ratón', 'Stick derecho'],
       ['water', 'Dominio del Agua (cerca del agua)', 'Apuntar: ratón', 'L2 · stick der.'],
       ['water', 'Esfera guiada (tras mejorar)', null, 'L3 · stick izq.'],
+      ['earth', 'Tierra: pilar de roca (antes de aprenderla, RT ataca)', 'Apuntar: ratón', 'RT · stick der.'],
       ['book', 'Mapa del Reino', 'M (teclado)', 'R3'],
       ['book', 'Diario de Ruben', 'I / Tab (teclado)', 'Select'],
       ['gear', 'Pausa', 'Esc (teclado)', 'Start'],

@@ -48,10 +48,11 @@
     // Torre del Este (js/levels-torre.js)
     catalejo:   { name: 'Catalejo de Angelo', desc: 'Con él, Angelo vio el humo de las canteras.', kind: 'Recuerdo' },
     // Canteras del Este (js/levels-canteras.js)
-    cuarzo:     { name: 'Cuarzo Ahumado', desc: 'Pesado y tibio: guarda algo de la tierra.', kind: 'Amuleto' }
+    cuarzo:     { name: 'Cuarzo Ahumado', desc: 'Pesado y tibio: guarda algo de la tierra.', kind: 'Amuleto' },
+    farol:      { name: 'Farol del Minero', desc: 'Angelo lo dejó en la cornisa más alta de la mina.', kind: 'Recuerdo' }
   };
   const ITEM_ORDER = ['llave', 'cuchillo', 'baston', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla',
-    'retrato', 'catalejo', 'colmillo', 'caparazon', 'cuarzo', 'sello'];
+    'retrato', 'catalejo', 'colmillo', 'caparazon', 'cuarzo', 'farol', 'sello'];
   // Fondo del splash art de cada objeto: [centro claro, borde, rayos]
   const SPLASH = {
     llave:      ['#fff1c4', '#c98a3a', '#e9b04a'],
@@ -67,7 +68,8 @@
     colmillo:   ['#f6f0e4', '#5a4636', '#d8c7a8'],
     caparazon:  ['#eaf2e0', '#3d5a2f', '#a7c47a'],
     catalejo:   ['#fdf3dc', '#5a3a22', '#e0b25a'],
-    cuarzo:     ['#efe8f4', '#4a3a5a', '#b9a6cf']
+    cuarzo:     ['#efe8f4', '#4a3a5a', '#b9a6cf'],
+    farol:      ['#fff3d2', '#6e4a2a', '#f2b45a']
   };
 
 
@@ -101,7 +103,8 @@
     retrato:    { slot: 'charm',  stat: 'dmg',  bonus: 0.15 },
     sello:      { slot: 'charm',  stat: 'def',  bonus: 0.12 },
     catalejo:   { slot: 'charm',  stat: 'rng',  bonus: 0.2 },
-    cuarzo:     { slot: 'charm',  stat: 'def',  bonus: 0.18 }
+    cuarzo:     { slot: 'charm',  stat: 'def',  bonus: 0.18 },
+    farol:      { slot: 'charm',  stat: 'move', bonus: 0.15 }
   };
 
   // ------------------------------------------------------------------
@@ -128,6 +131,17 @@
   function fs(c, fill) { c.fillStyle = fill; c.fill(); c.stroke(); }
 
   const ICONS = {
+    farol(c) {
+      // Farol de minero: asa, techo, vidrio con llama y base
+      c.lineWidth = 1.8;
+      c.beginPath(); c.arc(0, -11, 5, Math.PI, 0); c.stroke();
+      c.beginPath(); c.moveTo(-8, -6); c.lineTo(8, -6); c.lineTo(5, -10); c.lineTo(-5, -10); c.closePath(); fs(c, '#6e4a2a');
+      c.beginPath(); c.roundRect(-7, -6, 14, 14, 2); fs(c, '#ffe6a6');
+      c.save(); c.fillStyle = '#f29a3a';
+      c.beginPath(); c.moveTo(0, -3); c.quadraticCurveTo(4, 2, 0, 5); c.quadraticCurveTo(-4, 2, 0, -3); c.fill(); c.restore();
+      c.beginPath(); c.moveTo(-3.5, -6); c.lineTo(-3.5, 8); c.moveTo(3.5, -6); c.lineTo(3.5, 8); c.stroke();
+      c.beginPath(); c.roundRect(-9, 8, 18, 4, 1.5); fs(c, '#6e4a2a');
+    },
     cuarzo(c) {
       // Racimo de cristales ahumados sobre una piedra
       c.lineWidth = 1.8;

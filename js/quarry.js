@@ -6,7 +6,8 @@
  *                    (`facing` 1 / -1 = hacia dónde apunta la pluma).
  *  - 'stone-blocks'  pila de bloques cortados con marcas de cincel (`rows` 1-3).
  *  - 'mine-mouth'    boca de la mina con marco de vigas, tapada por rocas enormes, cartel y pico.
- * NPC: `look: 'stonecutter'` (Bruno, el cantero) vía `window.NPCLooks` de npcs.js.
+ * NPC: `look: 'stonecutter'` (Bruno, el cantero) y `look: 'earth-master'` (Maestra Greda) vía
+ * `window.NPCLooks` de npcs.js. La mina se abre con `pr.open` (0..1, lo escribe earth-power.js).
  * Se dibujan DETRÁS de Ruben (capa world de AnimationRegistry, orden 48; los NPC van en 50).
  * Hooks: onInit, onBeforeUpdate (reloj). Sin basura por cuadro.
  */
@@ -119,8 +120,12 @@
   }
 
   // ---------------- Boca de la mina, tapada ----------------
+  // pr.open (0..1, lo escribe earth-power.js): las rocas se hunden en el suelo y adentro
+  // se ve la luz de un farol
   function drawMine(ctx, pr, cam, t) {
-    const x = pr.x - cam.x, gy = pr.y - cam.y;
+    const open = pr.open || 0;
+    const quake = open > 0 && open < 1 ? Math.sin(t * 1.7) * 1.6 : 0;
+    const x = pr.x - cam.x + quake, gy = pr.y - cam.y;
     const W = 150, H = 170;
     ctx.save();
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -148,14 +153,32 @@
     ctx.beginPath(); ctx.roundRect(x - 62, gy - 118, 14, 118, 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.roundRect(x + 48, gy - 118, 14, 118, 2); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.roundRect(x - 72, gy - 130, 144, 16, 3); ctx.fill(); ctx.stroke();
-    // Rocas enormes que tapan la entrada
-    rock(ctx, x, gy, -26, -28, 34, 28, '#9d9483');
-    rock(ctx, x, gy, 28, -30, 32, 30, '#8a8172');
-    rock(ctx, x, gy, 2, -74, 30, 24, '#a8a08f');
-    rock(ctx, x, gy, -34, -82, 18, 16, '#938a7a');
-    rock(ctx, x, gy, 36, -84, 16, 14, '#9d9483');
+    // Mina abierta: luz cálida de un farol al fondo
+    if (open > 0) {
+      ctx.save();
+      ctx.globalAlpha = open * (0.55 + Math.sin(t * 0.07) * 0.08);
+      ctx.fillStyle = '#f2b45a';
+      ctx.beginPath(); ctx.ellipse(x, gy - 46, 30, 36, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = open;
+      ctx.fillStyle = '#ffe9b0';
+      ctx.beginPath(); ctx.arc(x + 4, gy - 50, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // Rocas enormes que tapan la entrada (al abrirse se hunden; lo de abajo del suelo no se ve)
+    if (open < 1) {
+      const sink = open * open * 140;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x - 110, gy - 240, 220, 240); ctx.clip();
+      ink(ctx, 2.2);
+      rock(ctx, x, gy + sink, -26, -28, 34, 28, '#9d9483');
+      rock(ctx, x, gy + sink, 28, -30, 32, 30, '#8a8172');
+      rock(ctx, x, gy + sink * 1.1, 2, -74, 30, 24, '#a8a08f');
+      rock(ctx, x, gy + sink * 1.2, -34, -82, 18, 16, '#938a7a');
+      rock(ctx, x, gy + sink * 1.2, 36, -84, 16, 14, '#9d9483');
+      ctx.restore();
+    }
     // Polvito que cae de las rocas cada tanto
-    const k = (t * 0.01) % 1;
+    const k = (t * (open > 0 && open < 1 ? 0.05 : 0.01)) % 1;
     ctx.fillStyle = 'rgba(200, 190, 170, ' + (0.6 * (1 - k)).toFixed(2) + ')';
     ctx.beginPath(); ctx.arc(x + 12, gy - 98 + k * 60, 1.6, 0, Math.PI * 2); ctx.arc(x - 20, gy - 102 + ((k + 0.5) % 1) * 60, 1.3, 0, Math.PI * 2); ctx.fill();
     // Cartel tallado
@@ -273,6 +296,111 @@
     ctx.restore();
   }
 
+  // ---------------- Maestra Greda, de la Tierra (NPC) ----------------
+  // Mujer mayor y robusta, poncho color tierra con guarda, trenza gris larga, vara con una
+  // piedra atada. Mientras Ruben no le habla está agachada con la palma en el suelo,
+  // escuchando a la tierra (n.listen 0..1, suavizado acá).
+  function drawEarthMaster(ctx, n, cam, t, talking, f, mouthOpen) {
+    const want = n.lineIdx ? 0 : 1;
+    if (n.listen === undefined) n.listen = want;
+    n.listen += (want - n.listen) * 0.08;
+    const ls = n.listen;
+    const x = n.x - cam.x, fy = n.y - cam.y;
+    const breathe = Math.sin(t * 0.035) * 0.02;
+    const bob = talking ? Math.abs(Math.sin(t * 0.3)) * 1.3 : 0;
+    const crouch = ls * 14;
+    const blink = ls > 0.5 || (t % 230) < 7;
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.fillStyle = 'rgba(40, 22, 10, 0.22)';
+    ctx.beginPath(); ctx.ellipse(x, fy + 1, 20, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+    // Vara con piedra (clavada en el suelo, detrás)
+    const sx = x - f * 17;
+    ink(ctx, 4.5);
+    ctx.beginPath(); ctx.moveTo(sx, fy); ctx.lineTo(sx + f * 2, fy - 64); ctx.stroke();
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(sx, fy); ctx.lineTo(sx + f * 2, fy - 64); ctx.stroke();
+    ink(ctx, 2);
+    ctx.fillStyle = '#b48a5a';
+    ctx.beginPath(); ctx.ellipse(sx + f * 2, fy - 68, 6.5, 5.5, 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#d9a634'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(sx + f * 2 - 5, fy - 64); ctx.lineTo(sx + f * 2 + 5, fy - 64); ctx.stroke();
+    ink(ctx, 2);
+    // Cuerpo (se agacha al escuchar la tierra)
+    ctx.translate(x, fy);
+    ctx.scale(1 - breathe * 0.5, 1 + breathe);
+    ctx.translate(-x, -fy - bob);
+    const by = fy + crouch;
+    // Pies
+    ctx.fillStyle = '#5a3a22';
+    ctx.beginPath(); ctx.ellipse(x - 7, fy - 3, 7, 3.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x + 7, fy - 3, 7, 3.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Falda larga
+    ctx.fillStyle = '#7a4a32';
+    ctx.beginPath(); ctx.moveTo(x - 13, by - 30); ctx.quadraticCurveTo(x - 19, fy - 6, x - 15, fy - 5); ctx.lineTo(x + 15, fy - 5); ctx.quadraticCurveTo(x + 19, fy - 6, x + 13, by - 30); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Poncho con guarda
+    ctx.fillStyle = '#b5814a';
+    ctx.beginPath(); ctx.moveTo(x, by - 46); ctx.lineTo(x - 21, by - 20); ctx.quadraticCurveTo(x, by - 14, x + 21, by - 20); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#5e7a4a'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x - 18, by - 22); ctx.quadraticCurveTo(x, by - 16.5, x + 18, by - 22); ctx.stroke();
+    ctx.strokeStyle = '#e8d7a8'; ctx.lineWidth = 1.2;
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(x + i * 6 - 2, by - 26); ctx.lineTo(x + i * 6, by - 30); ctx.lineTo(x + i * 6 + 2, by - 26); ctx.stroke(); }
+    ink(ctx, 2);
+    // Mano: en reposo sobre el poncho; al escuchar, la palma apoyada en el suelo
+    const hx2 = x + f * (14 + ls * 6), hy2 = by - 24 + ls * (fy - 4 - (by - 24));
+    ctx.strokeStyle = OUT; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(x + f * 10, by - 34); ctx.lineTo(hx2, hy2); ctx.stroke();
+    ctx.strokeStyle = '#b5814a'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x + f * 10, by - 34); ctx.lineTo(hx2, hy2); ctx.stroke();
+    ink(ctx, 2);
+    ctx.fillStyle = '#c98f62';
+    ctx.beginPath(); ctx.ellipse(hx2, hy2, 4.2, 3.2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (ls > 0.6) {
+      // Ondas en la tierra bajo la palma
+      const k = (t * 0.02) % 1;
+      ctx.save(); ctx.globalAlpha = (1 - k) * 0.7 * ls; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.ellipse(hx2, fy + 1, 6 + k * 22, 1.5 + k * 3, 0, Math.PI, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    // Cabeza
+    const hx = x + f * (1.5 + ls * 5), hy = by - 54 + ls * 4;
+    ctx.fillStyle = '#c98f62';
+    ctx.beginPath(); ctx.arc(hx, hy, 9.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Pelo gris recogido y trenza larga a la espalda
+    ctx.fillStyle = '#bdb5a8';
+    ctx.beginPath(); ctx.arc(hx - f * 1, hy - 3, 9.8, Math.PI * 1.05, Math.PI * 1.95); ctx.closePath(); ctx.fill(); ctx.stroke();
+    const sway = Math.sin(t * 0.03) * 1.5;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.ellipse(hx - f * (8 + i * 1.5) + sway * i * 0.3, hy + 2 + i * 7, 3.4 - i * 0.3, 4.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = '#5e7a4a';
+    ctx.beginPath(); ctx.arc(hx - f * 13 + sway, hy + 30, 2.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Ojos (cerrados mientras escucha)
+    ctx.fillStyle = OUT;
+    for (let k = -1; k <= 1; k += 2) {
+      const ex = hx + f * 2 + k * 3.6, ey = hy - 1;
+      if (blink) { ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(ex, ey - 0.6, 1.8, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+      else { ctx.beginPath(); ctx.arc(ex + f * 0.6, ey, 1.5, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ink(ctx, 2);
+    // Nariz y boca
+    ctx.fillStyle = '#b5785a';
+    ctx.beginPath(); ctx.arc(hx + f * 4.5, hy + 2, 2.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (mouthOpen) {
+      const m = 0.5 + 0.5 * Math.sin(t * 0.6);
+      ctx.fillStyle = '#5a2418';
+      ctx.beginPath(); ctx.ellipse(hx + f * 2.5, hy + 6, 2.2, 0.8 + m * 1.8, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(hx + f * 2.5, hy + 4.5, 2.6, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    }
+    // Pendiente de piedra verde
+    ink(ctx, 1.4);
+    ctx.fillStyle = '#7fae7a';
+    ctx.beginPath(); ctx.arc(hx - f * 6, hy + 7, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
   function drawProps(ctx, room, cam, t) {
     const list = room.props;
     if (!list) return;
@@ -286,6 +414,7 @@
 
   window.NPCLooks = window.NPCLooks || {};
   window.NPCLooks.stonecutter = drawStonecutter;
+  window.NPCLooks['earth-master'] = drawEarthMaster;
 
   function install(g) {
     window.GameHooks.onBeforeUpdate.push((game, running) => { if (running) clock.t++; });

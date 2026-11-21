@@ -24,7 +24,7 @@
  * Integración: GameHooks onAfterUpdate / onFreezeInput / onAction / onRestartGame. Los poderes
  * consultan window.Stamina.canUse() en su condición de activación. Sin basura por cuadro.
  *
- * API: window.Stamina.canUse() · .getRatio() · .getCapacity() · .refill() · .isCollapsed()
+ * API: window.Stamina.canUse() · .getRatio() · .getCapacity() · .refill() · .isCollapsed() · .spend(n)
  */
 (function () {
   'use strict';
@@ -238,7 +238,18 @@
     getRatio: () => value / cap,
     getCapacity: () => cap / BASE,   // 1 = inicial … 2 = máximo
     isCollapsed: () => collapseT > 0,
-    refill: () => { value = cap; locked = false; resetFatigue(); draw(); }
+    refill: () => { value = cap; locked = false; resetFatigue(); draw(); },
+    // Gasto de una sola vez (poderes instantáneos, como el pilar de la Tierra): también hace
+    // crecer la capacidad. Devuelve false si no alcanza la energía.
+    spend: (n) => {
+      if (locked || collapseT > 0 || value <= 0) return false;
+      value = Math.max(0, value - n);
+      if (cap < CAP_MAX) cap = Math.min(CAP_MAX, cap + n * GROW);
+      saveCap();
+      if (value <= 0) { locked = true; collapseT = COLLAPSE_FRAMES; }
+      draw();
+      return true;
+    }
   };
 
   window.GameHooks = window.GameHooks || {};

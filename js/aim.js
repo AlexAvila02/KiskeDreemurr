@@ -20,6 +20,7 @@
  *                              (salvo keepIdleStick), la fuente pasa a 'none'
  *   .usingPad()               lo último que se usó fue el mando (el tajo no mira al ratón)
  *   .mouseAngle(game, x, y)   ángulo hacia el ratón aunque la fuente activa sea otra (tajo con clic)
+ *   .mousePoint(game)        punto del mundo bajo el ratón (si la fuente es el ratón) o null
  *   .target(game, x, y)       ángulo (rad, mundo) desde (x, y) hacia donde apunta el jugador,
  *                              o null si no hay dirección clara este cuadro
  * Hooks: onInit (escucha el ratón) · onBeforeUpdate (lee el stick, antes que las habilidades).
@@ -30,6 +31,7 @@
   const STICK_DEAD = 0.35;
   const MOUSE_FRESH_MS = 3000;
   const PAD_GRACE_MS = 2000;
+  const mp = { x: 0, y: 0 };
   const a = { source: 'none', mouseX: 0, mouseY: 0, mouseT: -1e9, padT: -1e9, stickHeld: false, stickAngle: 0 };
 
   // ¿El mando se está usando este cuadro? (cualquier botón o un stick inclinado)
@@ -66,6 +68,13 @@
       const cam = game.camera || { x: 0, y: 0 };
       const dx = a.mouseX + cam.x - x, dy = a.mouseY + cam.y - y;
       return dx * dx + dy * dy < 36 ? null : Math.atan2(dy, dx);
+    },
+    // Punto del mundo bajo el ratón (objeto reutilizado) si la fuente activa es el ratón; si no, null
+    mousePoint(game) {
+      if (a.source !== 'mouse') return null;
+      const cam = game.camera || { x: 0, y: 0 };
+      mp.x = a.mouseX + cam.x; mp.y = a.mouseY + cam.y;
+      return mp;
     },
     target(game, x, y) {
       if (a.source === 'stick') return a.stickHeld ? a.stickAngle : null;

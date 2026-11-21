@@ -91,6 +91,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `water-core.js` | Claude | Superficie con olas, nado, gotas / bruma / burbujas, charcos, esfera de agua (`drawOrb`), viento de cualquier jugador sobre el agua, salpicaduras de los demás jugadores al nadar / pisar charcos, sonidos → usa `SoundKit`, `WindPull.bands/forceFrom` | `WaterCore` (interna) |
 | `water-quest.js` | Claude | Campanas y escena de las macetas (sala 12) → usa `WaterCore` | `WaterQuest` (interna) |
 | `water-power.js` | Claude | Dominio del Agua: orbe, disparo, esfera guiada, maestría → usa `WaterCore`, `WaterQuest`, `Aim` | `WaterControl` |
+| `earth-power.js` | Claude | Dominio de la Tierra: acción `earth` (Q / V, RT; antes de aprenderla RT ataca) levanta pilares de roca (`type: 'earth'` en `room.platforms`, pool de 3, 12 s) que alzan a Ruben, lanzan enemigos y abren la mina de la sala 23 (`prop.earthSeal` → salida a la 24). Maestra vía `window.ElementTeachers.earth`. Guardado `ruben_tierra_v1` → usa `Aim.mousePoint`, `Stamina.spend`, `SoundKit` | `EarthPower` |
 | `memories.js` | Claude | Recuerdos de Ruben: al aprender un elemento (viento, agua) muestra un recuerdo con Angelo (viñeta sepia y líneas que avanzan solas, sin bloquear). Elemento nuevo = una entrada en `MEMORIES` | `Memories` |
 | `multiplayer.js` | Claude | Cooperativo hasta 4 (PeerJS/WebRTC, CDN): anfitrión = servidor de enemigos, mundo y sala; los demás se dibujan como Ruben con su color · `Multiplayer.others()` = los demás de esta sala | `Multiplayer` |
 | `coop-elements.js` | Claude | Viento y agua entre jugadores: el viento de un compañero te arrastra (jalar) o te empuja (soplar), sus bolas de agua te empapan; dibuja el agua ajena (revienta en enemigos y moja a los maestros) y pasa el viento ajeno a `wind-pull.js`. Escribe `player.windHit` (pose en `player.js`) → usa `WindPull.netState/setRemotes/forceFrom`, `WaterControl.netState/shots`, `WaterCore` | `CoopElements` |
@@ -112,5 +113,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 
 - **Ninguna función del juego ni del jugador está envuelta** por otro archivo. Si necesitás engancharte en algo que no tiene hook, agregá el hook en `main.js` (en `HOOK_NAMES` y en esta tabla) en vez de envolver.
 - Apuntado con ratón / stick: usar `Aim`, no agregar otro listener de `mousemove`.
+- Maestros nuevos: `npcs.js` llama a `window.ElementTeachers[teaches] = { isLearned(), learn(g), blockedText?(g), farewellText?(g, n) }` (el agua sigue con su código propio). Dibujo de un NPC nuevo: `window.NPCLooks[look]`.
+- Poderes de un solo uso que gastan energía: `Stamina.spend(n)` (devuelve false si no alcanza).
 - Sonidos de ruido o tonos sintetizados: usar `SoundKit` (música y efectos clásicos siguen en `audio.js`).
 - Al cambiar cómo se conectan los archivos, actualizar este `MAPA.md`.

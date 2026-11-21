@@ -86,6 +86,38 @@
     ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
   }
 
+  // Tierra: un pilar de roca que sube del suelo con piedritas saltando y grietas
+  function drawEarth(ctx, t) {
+    const cx = 130, cy = 130;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const s = 1 + Math.sin(t * 2) * 0.03;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(2 - s, s);
+    ctx.strokeStyle = INK; ctx.lineWidth = 5;
+    blob(ctx, 0, 0, 104, '#efe1c2');
+    ctx.restore();
+    // Suelo
+    ctx.strokeStyle = INK; ctx.lineWidth = 5;
+    ctx.fillStyle = '#8c6a46';
+    ctx.beginPath(); ctx.moveTo(40, 186); ctx.quadraticCurveTo(130, 176, 220, 186); ctx.lineTo(212, 214); ctx.quadraticCurveTo(130, 228, 48, 214); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Pilar que sube y baja un poco (squash & stretch)
+    const rise = 0.5 + 0.5 * Math.sin(t * 2.4);
+    const top = 120 - rise * 46, w = 52 + (1 - rise) * 6;
+    ctx.fillStyle = '#a8977c';
+    ctx.beginPath(); ctx.moveTo(cx - w / 2, 186); ctx.lineTo(cx - w / 2 + 4, top + 8); ctx.quadraticCurveTo(cx, top - 8, cx + w / 2 - 4, top + 8); ctx.lineTo(cx + w / 2, 186); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx - 12, top + 26); ctx.lineTo(cx - 2, top + 40); ctx.lineTo(cx - 10, top + 56); ctx.moveTo(cx + 10, top + 50); ctx.lineTo(cx + 16, top + 66); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 248, 230, 0.7)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(cx - w / 2 + 9, top + 18); ctx.lineTo(cx - w / 2 + 11, 176); ctx.stroke();
+    // Piedritas que saltan
+    ctx.strokeStyle = INK; ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) {
+      const k = (t * 0.9 + i / 4) % 1;
+      const dir = i % 2 ? 1 : -1;
+      const px = cx + dir * (34 + k * 46 + i * 4), py = 184 - Math.sin(k * Math.PI) * (40 + i * 8);
+      blob(ctx, px, py, 6 - i * 0.8, i % 2 ? '#8c7a62' : '#b5a68c');
+    }
+  }
+
   function drawWater(ctx, t, guided) {
     const cx = 130, cy = 130;
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -194,6 +226,25 @@
       },
       note: '',
       draw: (ctx, t) => drawWater(ctx, t, true)
+    },
+    {
+      id: 'earth',
+      memory: 'earth',
+      element: 'Elemento de la Tierra',
+      title: '¡Dominas la Tierra!',
+      desc: 'Levanta pilares de roca donde apuntes: sirven de escalón, de muro y lanzan a los enemigos.',
+      accent: '#a0743e',
+      learned: () => !!(window.EarthPower && window.EarthPower.isLearned()),
+      controls: () => {
+        const q = keyOf('earth', 'Q');
+        return [
+          ['Pilar', q, 'RT'],
+          ['Apuntar', 'Ratón', 'Stick derecho'],
+          ['Sin apuntar', 'Delante de Ruben', 'Delante de Ruben']
+        ];
+      },
+      note: 'Cada pilar gasta un poco de la barra azul.',
+      draw: (ctx, t) => drawEarth(ctx, t)
     }
   ];
 

@@ -455,7 +455,8 @@ class Game {
   setupGamepad() {
     this.padPrev = [];
     this.padIndex = null;
-    this.PAD_BUTTONS = { 0: 'jump', 2: 'attack', 5: 'attack', 7: 'attack', 1: 'grab', 4: 'potion', 3: 'interact' };
+    // RT = Tierra (earth-power.js lo convierte en ataque mientras no se aprendió)
+    this.PAD_BUTTONS = { 0: 'jump', 2: 'attack', 5: 'attack', 7: 'earth', 1: 'grab', 4: 'potion', 3: 'interact' };
 
     window.addEventListener('gamepadconnected', (e) => {
       this.padIndex = e.gamepad.index;

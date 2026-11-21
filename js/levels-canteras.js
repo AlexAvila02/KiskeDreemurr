@@ -6,8 +6,10 @@
  *   19 Cima de la Torre ──► 20 Adarve del Este (castillo)  hueco del suelo ▼
  *   21 Borde de las Canteras (montana)  hueco del techo ▲, cabaña con humo de Bruno el cantero
  *   22 Terrazas de Piedra    (montana)  dos fosos a los abismos, piedra floja (breakable)
- *   23 Fondo de la Cantera   (montana)  boca de la mina tapada con rocas (la abrirá la Tierra,
- *                                       pendiente), carta de Angelo y el Cuarzo Ahumado
+ *   23 Fondo de la Cantera   (montana)  Maestra Greda (enseña la Tierra), boca de la mina tapada
+ *                                       que se abre con la Tierra, carta de Angelo y el Cuarzo Ahumado
+ *   24 Galerías de la Mina   (montana)  adentro de la mina: un barranco que solo se sube con
+ *                                       pilares de roca; el Farol del Minero
  *
  * El 20 y el 21 se unen como el Molino y el Portón Norte: bajar por el hueco del suelo cae
  * sobre la viga bajo el hueco del techo; subir saltando por ese hueco hace la animación de
@@ -212,7 +214,7 @@
     ],
     tablets: [
       {
-        x: 1100, y: 415,
+        x: 640, y: 415,
         speaker: 'Carta de Angelo',
         text: '«Ruben: la mina está tapada y las rocas no se mueven ni con espada ni con piedras. Bruno dice que solo la tierra las aparta, y que la tierra escucha a quien ya domina el aire. Voy a buscar otra entrada por la montaña. Si llegás antes que yo, pedile paso a la Maestra. — A.»'
       }
@@ -223,7 +225,24 @@
     ],
     props: [
       { type: 'stone-blocks', x: 160, y: 460, rows: 2 },
-      { type: 'mine-mouth', x: 1270, y: 460 }
+      // La boca de la mina: la abre el poder de la Tierra (js/earth-power.js agrega la salida a la 24)
+      { type: 'mine-mouth', x: 1270, y: 460, earthSeal: true }
+    ],
+    npcs: [
+      {
+        id: 'greda',
+        look: 'earth-master',
+        teaches: 'earth',
+        name: 'Maestra Greda',
+        x: 1120, y: 460, facing: -1,
+        lines: [
+          'Shh... la tierra me venía contando que alguien bajaba por el montacargas. Soy Greda, la Maestra de la Tierra. Esta mina la tapé yo.',
+          'Tu hermano estuvo aquí. Golpeó las rocas, les gritó, quiso empujarlas con el viento. La tierra no se apura por nadie, y menos por alguien con prisa.',
+          'El aire y la tierra son opuestos: uno nunca se queda quieto, la otra nunca se mueve sola. Solo quien ya sabe mover el aire entiende lo que es sostener algo.',
+          'Abre la palma, así. No empujes: pide. Con la tecla de la Tierra (Q, o RT en el mando) la roca subirá donde apuntes. Úsala de escalón, de muro, o para sacarte de encima a los bichos.'
+        ],
+        farewell: 'Ahora pídele a las rocas de la mina que se aparten: apunta a la entrada y pide. Adentro está lo que tu hermano dejó.'
+      }
     ],
     exits: [
       { x: 0, y: 340, w: 40, h: 120, targetRoom: 22, targetX: 1680, targetY: 410 }
@@ -237,5 +256,59 @@
       crawler(1050, 460, 80)
     ],
     spawnDebris: () => [stone(240, 460), stone(800, 460)]
+  });
+
+  // ==========================================================
+  // SALA 24: Galerías de la Mina (montana) — solo se entra con la mina abierta
+  // El barranco del medio (210 px) y la cornisa del farol no se alcanzan saltando:
+  // hay que levantar pilares de roca (js/earth-power.js).
+  // ==========================================================
+  R({
+    id: 24,
+    name: 'GALERÍAS DE LA MINA',
+    biome: 'montana',
+    width: 1760,
+    height: 540,
+    platforms: [
+      ground(0, 620),
+      { x: 620, y: 250, w: 420, h: 290, type: 'ground' },   // meseta de roca
+      ground(1040, 720),
+      ceiling(0, 1760),
+      wall(1730),
+      ruin(250, 370, 120),
+      ruin(1300, 200, 140)               // cornisa alta (farol)
+    ],
+    tablets: [
+      {
+        x: 420, y: 415,
+        speaker: 'Inscripción minera',
+        text: '«Lo que la tierra sostiene, la tierra lo puede levantar.»'
+      },
+      {
+        x: 1600, y: 415,
+        speaker: 'Carta de Angelo',
+        text: '«Ruben: si leés esto, la Maestra te abrió la mina. A mí no. Entré por la chimenea, desde arriba, y por ahí me voy. Dice que más allá de la montaña vive un sabio que estudia cómo arden las cosas: el cuarto elemento. Te dejo mi farol en la cornisa alta; a mí ya no me alcanzaba la mano. — A.»'
+      }
+    ],
+    collectibles: [
+      { item: 'emblema', x: 830, y: 214 },
+      { item: 'farol', x: 1370, y: 164 }
+    ],
+    props: [
+      { type: 'stone-blocks', x: 140, y: 460, rows: 1 },
+      { type: 'stone-blocks', x: 1480, y: 460, rows: 2 }
+    ],
+    exits: [
+      { x: 0, y: 340, w: 40, h: 120, targetRoom: 23, targetX: 1170, targetY: 410 }
+    ],
+    spawnEnemies: () => [
+      crawler(380, 460, 120),
+      shade(520, 230),
+      crawler(820, 250, 120),
+      crawler(1180, 460, 110),
+      shade(1300, 300),
+      crawler(1560, 460, 100)
+    ],
+    spawnDebris: () => [stone(200, 460), stone(1100, 460)]
   });
 })();

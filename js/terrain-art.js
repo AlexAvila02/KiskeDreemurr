@@ -702,6 +702,7 @@
   }
 
   function drawPlatform(ctx, p, sx, sy, biomeKey, biome) {
+    if (p.type === 'earth') return;   // pilares de la Tierra: los dibuja js/earth-power.js
     const key = biomeKey in EXTRA ? biomeKey : 'pradera';
     const cv = getCanvas(p, key, biome);
     ctx.drawImage(cv, Math.round(sx - PAD), Math.round(sy - PAD));
