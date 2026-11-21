@@ -73,6 +73,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `menu-nav.js` | Claude | Navegación de menús con teclado/mando | `MenuNavigator` |
 | `bg-continuity.js` | Claude | Fondo continuo entre salas; molino con aspas del viento | `BgContinuity` |
 | `levels-expansion.js` | Claude | Salas 4-12 (`PendingRooms`), parches a 0-3, animación de llegada por un hueco | `LevelsExpansion` |
+| `levels-torre.js` | Claude | Torre del Este: salas 16-19 (`PendingRooms`) detrás de la puerta tapiada del Salón del Trono; parche a la sala 10 (pared → `breakables` + salida a la 16) en onInit / onRestartGame | `LevelsTorre` |
 | `abyss.js` | Claude | Abismos: caer por un barranco lleva a una gruta con enemigos y un objeto (salas 13-15, `room.abyss`, `hideOnMap`); túnel de vuelta a la sala de origen (hook `onPlayerFall`) | `Abyss` |
 | `journal.js` | Claude | Diario: objetos, notas leídas, estadísticas de Ruben (solo objetos equipados: arma, vestimenta, recuerdos) | `game.journal` |
 | `animation-registry.js` | Gemini | Capas, skins y FX de animación | `AnimationRegistry` |

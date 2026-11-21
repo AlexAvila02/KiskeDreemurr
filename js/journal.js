@@ -44,10 +44,12 @@
     // Objetos de los abismos (js/abyss.js): se consiguen cayendo por los barrancos
     baston:     { name: 'Bastón del Ermitaño', desc: 'Una vara larga: llega mucho más lejos.', kind: 'Arma' },
     colmillo:   { name: 'Colmillo de Topo', desc: 'Afilado por años de cavar en la oscuridad.', kind: 'Amuleto' },
-    caparazon:  { name: 'Caparazón Hueco', desc: 'La coraza vacía de un escarabajo gigante.', kind: 'Amuleto' }
+    caparazon:  { name: 'Caparazón Hueco', desc: 'La coraza vacía de un escarabajo gigante.', kind: 'Amuleto' },
+    // Torre del Este (js/levels-torre.js)
+    catalejo:   { name: 'Catalejo de Angelo', desc: 'Con él, Angelo vio el humo de las canteras.', kind: 'Recuerdo' }
   };
   const ITEM_ORDER = ['llave', 'cuchillo', 'baston', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla',
-    'retrato', 'colmillo', 'caparazon', 'sello'];
+    'retrato', 'catalejo', 'colmillo', 'caparazon', 'sello'];
   // Fondo del splash art de cada objeto: [centro claro, borde, rayos]
   const SPLASH = {
     llave:      ['#fff1c4', '#c98a3a', '#e9b04a'],
@@ -61,7 +63,8 @@
     cuchillo:   ['#eef5f7', '#4a5b6e', '#b9c9d4'],
     baston:     ['#e6f7ea', '#2f5a45', '#8fd3a8'],
     colmillo:   ['#f6f0e4', '#5a4636', '#d8c7a8'],
-    caparazon:  ['#eaf2e0', '#3d5a2f', '#a7c47a']
+    caparazon:  ['#eaf2e0', '#3d5a2f', '#a7c47a'],
+    catalejo:   ['#fdf3dc', '#5a3a22', '#e0b25a']
   };
 
 
@@ -93,7 +96,8 @@
     brujula:    { slot: 'charm',  stat: 'move', bonus: 0.12 },
     campanilla: { slot: 'charm',  stat: 'atk',  bonus: 0.15 },
     retrato:    { slot: 'charm',  stat: 'dmg',  bonus: 0.15 },
-    sello:      { slot: 'charm',  stat: 'def',  bonus: 0.12 }
+    sello:      { slot: 'charm',  stat: 'def',  bonus: 0.12 },
+    catalejo:   { slot: 'charm',  stat: 'rng',  bonus: 0.2 }
   };
 
   // ------------------------------------------------------------------
@@ -120,6 +124,22 @@
   function fs(c, fill) { c.fillStyle = fill; c.fill(); c.stroke(); }
 
   const ICONS = {
+    catalejo(c) {
+      // Catalejo de latón en diagonal: tres tramos, lente con brillo y correa de cuero
+      c.save();
+      c.rotate(-0.55);
+      c.lineWidth = 1.8;
+      c.beginPath(); c.roundRect(-13, -3, 9, 6, 1.5); fs(c, '#8a5a32');
+      c.beginPath(); c.roundRect(-5, -4.2, 9, 8.4, 1.5); fs(c, '#d9a634');
+      c.beginPath(); c.roundRect(3, -5.4, 9, 10.8, 1.8); fs(c, '#c8963e');
+      c.beginPath(); c.ellipse(12.5, 0, 1.8, 5.2, 0, 0, Math.PI * 2); fs(c, '#9fd0ea');
+      c.save(); c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 1.2;
+      c.beginPath(); c.moveTo(4.5, -3.4); c.lineTo(10.5, -3.4); c.stroke();
+      c.beginPath(); c.moveTo(-3.5, -2.4); c.lineTo(2.5, -2.4); c.stroke(); c.restore();
+      c.lineWidth = 1.4; c.strokeStyle = '#6e3a1e';
+      c.beginPath(); c.moveTo(-9, 3); c.quadraticCurveTo(-2, 12, 7, 5.4); c.stroke();
+      c.restore();
+    },
     emblema(c) {
       c.beginPath();
       c.moveTo(-11, -12); c.lineTo(11, -12); c.lineTo(11, 0);
