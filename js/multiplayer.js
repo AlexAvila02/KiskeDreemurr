@@ -286,12 +286,14 @@
       try { e.takeDamage(amount, knockback); } catch (err) { /* */ }
     }
     apply(s) {
-      // s = [id, clase, x, y, mira, vivo, vida, viento] (viento: [1 atrapado | 2 mareado, giro] o 0)
+      // s = [id, clase, x, y, mira, vivo, vida, viento, estado] (viento: [1 atrapado | 2 mareado, giro] o 0;
+      // estado: lo que la clase quiera mandar con netState() → applyNetState(), p. ej. el dash de la avispa)
       this.tx = s[2]; this.ty = s[3];
       this.netFx = s[7] || 0;
       const e = this.real;
       if (e.lookX !== undefined) e.lookX = s[4]; else e.facing = s[4];
       e.hp = s[6];
+      if (e.applyNetState) { try { e.applyNetState(s[8] || 0); } catch (err) { /* */ } }
       if (!s[5] && e.alive) {
         e.alive = false;
         e.dyingTimer = e.DYING_FRAMES || 26;
@@ -348,7 +350,8 @@
       if (!e.alive && !(e.dyingTimer > 0)) continue;
       enemies.push([e._mpId, e.constructor && e.constructor.name, r1(e.x), r1(e.y),
         e.lookX !== undefined ? e.lookX : (e.facing || 1), e.alive ? 1 : 0, Math.round(e.hp || 0),
-        window.WindPull && window.WindPull.netFxOf ? window.WindPull.netFxOf(e) : 0]);
+        window.WindPull && window.WindPull.netFxOf ? window.WindPull.netFxOf(e) : 0,
+        e.netState ? e.netState() : 0]);
     }
     const players = [];
     for (const pl of MP.players.values()) {

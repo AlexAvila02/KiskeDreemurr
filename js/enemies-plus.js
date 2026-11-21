@@ -59,6 +59,51 @@ class WaspEnemy extends FlyingShadeEnemy {
     this.stateT = t;
   }
 
+  // Multijugador: el anfitrión manda [estado, ángulo del dash]; el invitado solo anima
+  // (preparación, estela, mareo) y se calcula el golpe del dash contra su propio Ruben
+  netState() {
+    return [WaspEnemy.STATES.indexOf(this.state), Math.round(this.aimA * 100) / 100,
+      this.netHitSeq | 0, this.netHitWho || '', this.netHitDash | 0];
+  }
+  applyNetState(s) {
+    this._net = true;
+    if (!s) return;
+    const st = WaspEnemy.STATES[s[0]] || 'hover';
+    this.aimA = +s[1] || 0;
+    // ¿El anfitrión dice que esta avispa le pegó a este jugador?
+    const seq = s[2] | 0;
+    if (this._netSeq === undefined) this._netSeq = seq;
+    else if (seq !== this._netSeq) {
+      this._netSeq = seq;
+      const M = window.Multiplayer, g = window.gameInstance, p = g && g.player;
+      if (M && M._state && s[3] && M._state.myId === s[3] && p && !p.dead) {
+        const dir = Math.sign(p.x + p.width / 2 - (this.x + this.width / 2)) || 1;
+        p.takeDamage(s[4] ? 5 : 3, dir * (s[4] ? 8 : 6));
+      }
+    }
+    if (st === this.state) return;
+    if (st === 'windup') { this.alert = 40; WaspEnemy.sfxWindup(); }
+    if (st === 'dash') { this.trailN = 0; WaspEnemy.sfxDash(); }
+    this.state = st;
+  }
+  netUpdate() {
+    if (this.hitCooldown > 0) this.hitCooldown--;
+    if (this.alert > 0) this.alert--;
+    const st = this.state, dash = st === 'dash';
+    if (dash) this.pushTrail();
+    else if (this.trailN > 0 && (this.flapT * 10 | 0) % 2 === 0) this.trailN--;
+    this.curl += ((st === 'windup' || dash ? 1 : 0) - this.curl) * 0.2;
+    this.stretch += ((dash ? 1.45 : 1) - this.stretch) * 0.3;
+    const realVx = this.x - this.prevX;
+    this.prevX = this.x;
+    this.tilt += ((dash ? 0 : realVx * 0.16) - this.tilt) * 0.2;
+    this.flapT += st === 'windup' || dash ? 0.95 : 0.7;
+    const g = window.gameInstance, p = g && g.player;
+    if (dash && p && !p.dead && aabbOverlap(this.x, this.y, this.width, this.height, p.x, p.y, p.width, p.height)) {
+      p.takeDamage(5, (Math.sign(p.x + p.width / 2 - (this.x + this.width / 2)) || 1) * 8);
+    }
+  }
+
   pushTrail() {
     this.trailX[this.trailI] = this.x + this.width / 2;
     this.trailY[this.trailI] = this.y + this.height / 2;
@@ -74,6 +119,7 @@ class WaspEnemy extends FlyingShadeEnemy {
       }
       return;
     }
+    if (this._net) { this.netUpdate(); return; }
     if (this.hitCooldown > 0) this.hitCooldown--;
     if (this.alert > 0) this.alert--;
     if (this.dashCd > 0) this.dashCd--;
@@ -197,6 +243,13 @@ class WaspEnemy extends FlyingShadeEnemy {
       const knockDir = Math.sign(px - cx) || this.lookX || 1;
       const dashing = this.state === 'dash';
       player.takeDamage(dashing ? 5 : 3, knockDir * (dashing ? 8 : 6));
+      // Multijugador: el blanco era otro jugador (acá no tiene vida). Se le avisa por red,
+      // porque en su pantalla la avispa llega con retraso y rebotaría antes de tocarlo.
+      if (typeof player.hp !== 'number') {
+        this.netHitSeq = (this.netHitSeq | 0) + 1;
+        this.netHitWho = this._mpTgt || '';
+        this.netHitDash = dashing ? 1 : 0;
+      }
       this.knockbackVx = -knockDir * 3;
       this.knockbackVy = -2.2;
       if (dashing) this.setState('recover', 40);
@@ -488,8 +541,50 @@ class ScorpionEnemy extends CrawlerEnemy {
     }
   }
 
+  // La punta de la cola (y un poco delante) es la zona que pica: 3 de daño + veneno
+  stingCheck(victim) {
+    if (this.stung || this.strikeK <= 0.5 || !victim || victim.dead || typeof victim.hp !== 'number') return;
+    const tx = this.tail[10], ty = this.tail[11];
+    if (!aabbOverlap(tx - 17, ty - 14, 34, 30, victim.x, victim.y, victim.width, victim.height)) return;
+    this.stung = true;
+    const hp0 = victim.hp;
+    victim.takeDamage(3, this.facing * 5);
+    if (victim.hp < hp0 && window.Poison) window.Poison.apply(victim);
+    if (window.particleSystem) window.particleSystem.createDust(tx, ty, 6, '#9be05a');
+  }
+
+  // Multijugador: el anfitrión manda el estado; el invitado solo lo anima (y se calcula
+  // su propia picadura, como el resto del daño en el invitado)
+  netState() { return [ScorpionEnemy.STATES.indexOf(this.state)]; }
+  applyNetState(s) {
+    this._net = true;
+    const st = ScorpionEnemy.STATES[s ? s[0] : 0] || 'walk';
+    if (st === this.state) return;
+    if (st === 'windup') { this.alert = 26; this.sx = 0.86; this.vsx = 0; ScorpionEnemy.sfxRattle(); }
+    if (st === 'strike') { this.stung = false; ScorpionEnemy.sfxStrike(); }
+    this.state = st;
+  }
+  netUpdate(world, player) {
+    const s = this.speed, cs = this.chaseSpeed, f = this.facing;
+    this.speed = 0; this.chaseSpeed = 0;
+    super.update(world, player);
+    this.speed = s; this.chaseSpeed = cs; this.facing = f;
+    if (!this.alive) return;
+    // Patas según cuánto se movió de verdad (la posición llega por red)
+    const mv = Math.abs(this.x - (this._px === undefined ? this.x : this._px));
+    this._px = this.x;
+    this.animT += mv * 0.22;
+    const st = this.state;
+    this.tailK += ((st === 'windup' || st === 'strike' ? 1 : 0) - this.tailK) * (st === 'recover' ? 0.12 : 0.2);
+    this.strikeK += ((st === 'strike' ? 1 : 0) - this.strikeK) * (st === 'strike' ? 0.55 : 0.15);
+    this.claw += ((st === 'windup' ? 1.3 : mv > 1.1 ? 1 : 0.3) - this.claw) * 0.15;
+    this.computeTail();
+    if (st === 'strike' && window.gameInstance) this.stingCheck(window.gameInstance.player);
+  }
+
   update(world, player) {
     if (!this.alive) { super.update(world, player); return; }
+    if (this._net) { this.netUpdate(world, player); return; }
     if (this.strikeCd > 0) this.strikeCd--;
 
     if (this.state === 'walk') {
@@ -532,16 +627,11 @@ class ScorpionEnemy extends CrawlerEnemy {
       } else if (this.state === 'strike') {
         this.strikeK += (1 - this.strikeK) * 0.55;
         this.computeTail();
-        // La punta de la cola (y un poco delante) es la zona que pica
-        const tx = this.tail[10], ty = this.tail[11];
-        if (!this.stung && this.strikeK > 0.5 &&
-            aabbOverlap(tx - 17, ty - 14, 34, 30, player.x, player.y, player.width, player.height)) {
-          this.stung = true;
-          const hp0 = player.hp;
-          player.takeDamage(3, this.facing * 5);
-          if (player.hp < hp0 && window.Poison) window.Poison.apply(player);
-          if (window.particleSystem) window.particleSystem.createDust(tx, ty, 6, '#9be05a');
-        }
+        // Pica a su blanco; en multijugador el blanco puede ser otro jugador (sin vida acá),
+        // así que también revisa al Ruben de esta computadora
+        this.stingCheck(player);
+        const g = window.gameInstance;
+        if (g && g.player && g.player !== player) this.stingCheck(g.player);
         if (this.stateT <= 0) {
           this.state = 'recover';
           this.stateT = 30;
@@ -784,6 +874,8 @@ class ScorpionEnemy extends CrawlerEnemy {
   }
 }
 
+WaspEnemy.STATES = ['hover', 'windup', 'dash', 'recover', 'dizzy'];
+ScorpionEnemy.STATES = ['walk', 'windup', 'strike', 'recover'];
 window.WaspEnemy = WaspEnemy;
 window.ScorpionEnemy = ScorpionEnemy;
 
