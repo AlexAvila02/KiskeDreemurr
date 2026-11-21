@@ -8,7 +8,8 @@
  *   16 Galería de los Estandartes  (castillo)  dos fosos que dan a los abismos
  *   17 Pie de la Torre del Este    (castillo)  hueco del techo ▲
  *   18 Escalera Derrumbada         (castillo)  hueco del suelo ▼ / hueco del techo ▲
- *   19 Cima de la Torre            (castillo)  hueco del suelo ▼, brisa, Catalejo de Angelo
+ *   19 Cima de la Torre            (castillo)  hueco del suelo ▼, brisa, Catalejo de Angelo;
+ *                                              sigue a la derecha hacia las canteras (sala 20)
  *
  * Los pisos de la torre se unen igual que el Portón Norte y el Molino (salas 1 y 2):
  * se sube saltando por un hueco del techo (salida `hint: 'up'`) y se llega con la
@@ -188,7 +189,7 @@
     platforms: [
       ground(130, 1310),
       ceiling(0, 1440),
-      wall(0), wall(1410),
+      wall(0),                           // a la derecha sigue el adarve (js/levels-canteras.js)
       ruin(300, 370, 130), ruin(520, 290, 120),
       ruin(740, 210, 120),
       ruin(960, 140, 120),               // almena más alta (catalejo)
@@ -207,7 +208,8 @@
     ],
     exits: [
       { x: 30, y: 470, w: 100, h: 80, targetRoom: 18, targetX: 1115, targetY: 60,
-        hint: { dir: 'down', x: 30, w: 100 } }
+        hint: { dir: 'down', x: 30, w: 100 } },
+      { x: 1400, y: 340, w: 40, h: 120, targetRoom: 20, targetX: 60, targetY: 410 }
     ],
     spawnEnemies: () => [
       shade(450, 220),

@@ -7,7 +7,9 @@
  * Al terminar repite la despedida. Alejarse cierra el diálogo (como las notas de Angelo).
  *
  * Dibujos: Maestro del Agua (look: 'water-master', enseña con teaches: 'water') y el
- * viejo pastor (por defecto). Decorados en props.js, notas en notes.js, brisa en ambience.js.
+ * viejo pastor (por defecto). Otro archivo puede sumar un dibujo con
+ * `window.NPCLooks[look] = (ctx, n, cam, t, hablando, mira, bocaAbierta) => {...}` (ej. quarry.js:
+ * 'stonecutter'). Decorados en props.js, notas en notes.js, brisa en ambience.js.
  * Los dos reaccionan al agua y al viento de Ruben: el estado lo calcula npc-reactions.js y
  * lo deja en `npc.fx` (brazos, pelo, ojos); acá solo se dibuja.
  * Hooks: onAction · onKeepDialog · onBeforeUpdate · onBeforeRoomLoad (ver MAPA.md); dibuja en
@@ -449,7 +451,10 @@
         n.pray = (n.pray || 0) + (want - (n.pray || 0)) * 0.08;
         if (n.pray < 0.005) n.pray = 0;
       }
-      if (n.look === 'water-master') drawWaterMaster(ctx, n, cam, state.t, talking, look);
+      // Dibujos de otros archivos: window.NPCLooks[look](ctx, n, cam, t, talking, mira, bocaAbierta)
+      const custom = n.look && window.NPCLooks && window.NPCLooks[n.look];
+      if (custom) custom(ctx, n, cam, state.t, talking, look, talking && state.talkT > 0);
+      else if (n.look === 'water-master') drawWaterMaster(ctx, n, cam, state.t, talking, look);
       else drawShepherd(ctx, n, cam, state.t, talking, look);
       const reacting = !!(fx && (fx.phase || fx.sayT > 0));
       if (state.near === n && !talking && !n.busy && !reacting) drawPrompt(ctx, g, n, cam, state.t);

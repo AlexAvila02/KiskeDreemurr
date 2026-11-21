@@ -49,7 +49,7 @@ Los niveles existen y son habitables porque los cuatro maestros los mantienen:
 Cada maestro vive en una zona distinta del mapa.
 - **Maestro del Agua (Arroyo)**: cuando Ruben lo encuentra está **rezando**. Al enseñar dice que los mejores sabios están cada vez más convencidos de que la vida viene del agua, y que él cree en sus palabras. *(En el juego. Falta la animación de despedida al terminar el entrenamiento.)*
 - **Maestro del Fuego**: un científico, alguien con grandes conocimientos de química (la combustión). **(pendiente)**
-- **Maestros del Viento y de la Tierra**. **(pendiente)**
+- **Maestros del Viento y de la Tierra**. **(pendiente)** La **Maestra de la Tierra** vive en la vieja mina al fondo de las Canteras del Este (sala 23), que tapó con rocas; Bruno el cantero (sala 21) cuenta que la tierra solo escucha a quien ya mueve el aire. *En el juego: la mina tapada y la pista; la maestra y su poder, pendientes.*
 
 ### Energía elemental
 Usar los elementos gasta una barra de energía. Cuanto más intenso el uso (un viento que barre toda la sala), más rápido se gasta y antes se cansa Ruben. Usarla una y otra vez la **hace crecer**: Ruben se acostumbra. *En el juego: `js/stamina.js` (hasta el doble de capacidad).*

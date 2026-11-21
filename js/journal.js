@@ -46,10 +46,12 @@
     colmillo:   { name: 'Colmillo de Topo', desc: 'Afilado por años de cavar en la oscuridad.', kind: 'Amuleto' },
     caparazon:  { name: 'Caparazón Hueco', desc: 'La coraza vacía de un escarabajo gigante.', kind: 'Amuleto' },
     // Torre del Este (js/levels-torre.js)
-    catalejo:   { name: 'Catalejo de Angelo', desc: 'Con él, Angelo vio el humo de las canteras.', kind: 'Recuerdo' }
+    catalejo:   { name: 'Catalejo de Angelo', desc: 'Con él, Angelo vio el humo de las canteras.', kind: 'Recuerdo' },
+    // Canteras del Este (js/levels-canteras.js)
+    cuarzo:     { name: 'Cuarzo Ahumado', desc: 'Pesado y tibio: guarda algo de la tierra.', kind: 'Amuleto' }
   };
   const ITEM_ORDER = ['llave', 'cuchillo', 'baston', 'emblema', 'panuelo', 'mapa', 'brujula', 'campanilla',
-    'retrato', 'catalejo', 'colmillo', 'caparazon', 'sello'];
+    'retrato', 'catalejo', 'colmillo', 'caparazon', 'cuarzo', 'sello'];
   // Fondo del splash art de cada objeto: [centro claro, borde, rayos]
   const SPLASH = {
     llave:      ['#fff1c4', '#c98a3a', '#e9b04a'],
@@ -64,7 +66,8 @@
     baston:     ['#e6f7ea', '#2f5a45', '#8fd3a8'],
     colmillo:   ['#f6f0e4', '#5a4636', '#d8c7a8'],
     caparazon:  ['#eaf2e0', '#3d5a2f', '#a7c47a'],
-    catalejo:   ['#fdf3dc', '#5a3a22', '#e0b25a']
+    catalejo:   ['#fdf3dc', '#5a3a22', '#e0b25a'],
+    cuarzo:     ['#efe8f4', '#4a3a5a', '#b9a6cf']
   };
 
 
@@ -97,7 +100,8 @@
     campanilla: { slot: 'charm',  stat: 'atk',  bonus: 0.15 },
     retrato:    { slot: 'charm',  stat: 'dmg',  bonus: 0.15 },
     sello:      { slot: 'charm',  stat: 'def',  bonus: 0.12 },
-    catalejo:   { slot: 'charm',  stat: 'rng',  bonus: 0.2 }
+    catalejo:   { slot: 'charm',  stat: 'rng',  bonus: 0.2 },
+    cuarzo:     { slot: 'charm',  stat: 'def',  bonus: 0.18 }
   };
 
   // ------------------------------------------------------------------
@@ -124,6 +128,22 @@
   function fs(c, fill) { c.fillStyle = fill; c.fill(); c.stroke(); }
 
   const ICONS = {
+    cuarzo(c) {
+      // Racimo de cristales ahumados sobre una piedra
+      c.lineWidth = 1.8;
+      c.beginPath(); c.ellipse(0, 9, 12, 4.5, 0, 0, Math.PI * 2); fs(c, '#9d9483');
+      const xtal = (x, h, w, tilt, fill) => {
+        c.save(); c.translate(x, 8); c.rotate(tilt);
+        c.beginPath(); c.moveTo(-w, 0); c.lineTo(-w, -h + w); c.lineTo(0, -h); c.lineTo(w, -h + w); c.lineTo(w, 0); c.closePath();
+        fs(c, fill);
+        c.save(); c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1.2;
+        c.beginPath(); c.moveTo(-w * 0.4, -2); c.lineTo(-w * 0.4, -h + w + 1); c.stroke(); c.restore();
+        c.restore();
+      };
+      xtal(-6, 14, 3.4, -0.45, '#8c7a9c');
+      xtal(6, 13, 3.2, 0.42, '#a593b5');
+      xtal(0, 21, 4.4, 0, '#6e5a80');
+    },
     catalejo(c) {
       // Catalejo de latón en diagonal: tres tramos, lente con brillo y correa de cuero
       c.save();

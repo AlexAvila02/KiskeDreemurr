@@ -74,6 +74,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `bg-continuity.js` | Claude | Fondo continuo entre salas; molino con aspas del viento | `BgContinuity` |
 | `levels-expansion.js` | Claude | Salas 4-12 (`PendingRooms`), parches a 0-3, animación de llegada por un hueco | `LevelsExpansion` |
 | `levels-torre.js` | Claude | Torre del Este: salas 16-19 (`PendingRooms`) detrás de la puerta tapiada del Salón del Trono; parche a la sala 10 (pared → `breakables` + salida a la 16) en onInit / onRestartGame | `LevelsTorre` |
+| `levels-canteras.js` | Claude | Canteras del Este: salas 20-23 (`PendingRooms`); la salida 19 → 20 está en `levels-torre.js` | — |
 | `abyss.js` | Claude | Abismos: caer por un barranco lleva a una gruta con enemigos y un objeto (salas 13-15, `room.abyss`, `hideOnMap`); túnel de vuelta a la sala de origen (hook `onPlayerFall`) | `Abyss` |
 | `journal.js` | Claude | Diario: objetos, notas leídas, estadísticas de Ruben (solo objetos equipados: arma, vestimenta, recuerdos) | `game.journal` |
 | `animation-registry.js` | Gemini | Capas, skins y FX de animación | `AnimationRegistry` |
@@ -83,7 +84,8 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `wind-pull.js` | Claude | Jalar / soplar el aire, aturdir enemigos, molino → usa `Aim`, `SoundKit`. `WindPull.forceAt(x, y, roce)` = fuerza del viento propio en un punto; `bands()` = todas las franjas activas (propia + otros jugadores; las usan pasto, agua y molino); `strongestAt(x, y, roce)` = la más fuerte en un punto (maestros); `forceFrom(fuente, x, y)` = la de una franja. En el anfitrión el viento de todos atrapa/empuja enemigos; `netFxOf` / `applyNetFx` muestran en el invitado si un enemigo está atrapado o mareado | `WindPull` |
 | `ambience.js` | Claude | Brisa de sala (`ambience: 'breeze'`) con sonido → usa `SoundKit` | `Ambience` |
 | `props.js` | Claude | Decorados de sala (`props`: cabaña, ovejas) → usa `Ambience` | — |
-| `npcs.js` | Claude | NPC, diálogos, burbuja de texto; dibujos del pastor y el maestro (leen `npc.fx`) | `NPCs` |
+| `quarry.js` | Claude | Decorados de la cantera (`props`: `quarry-crane`, `stone-blocks`, `mine-mouth`; capa world orden 48) y el dibujo del cantero (`NPCLooks.stonecutter`) | `Quarry`, `NPCLooks.stonecutter` |
+| `npcs.js` | Claude | NPC, diálogos, burbuja de texto; dibujos del pastor y el maestro (leen `npc.fx`). Otros dibujos: `window.NPCLooks[look](ctx, n, cam, t, hablando, mira, bocaAbierta)` | `NPCs` |
 | `npc-reactions.js` | Claude | Reacciones de los maestros a los poderes: mojados (el Maestro del Agua junta el agua en una bola y la devuelve; el pastor se sacude) y con viento (pelo y ojos). Escribe `npc.fx` → usa `WindPull.strongestAt`, `WaterCore`, `NPCs.drawBubble`. `splash(g, npc, vol, vx, quién)`: el maestro devuelve el agua al que lo mojó | `NpcReactions` |
 | `notes.js` | Claude | Cartel "↑ Leer" de las notas de Angelo → usa `NPCs.drawBubble` | — |
 | `water-core.js` | Claude | Superficie con olas, nado, gotas / bruma / burbujas, charcos, esfera de agua (`drawOrb`), viento de cualquier jugador sobre el agua, salpicaduras de los demás jugadores al nadar / pisar charcos, sonidos → usa `SoundKit`, `WindPull.bands/forceFrom` | `WaterCore` (interna) |
