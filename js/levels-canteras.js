@@ -29,6 +29,9 @@
   const crawler = (x, top, patrol) => new CrawlerEnemy(x, top - 24, patrol);
   const stone = (x, top) => new ThrowableDebris(x, top - 18);
   const shade = (x, y) => new FlyingShadeEnemy(x, y);
+  // Avispa (dash) y alacrán (picadura venenosa): js/enemies-plus.js
+  const wasp = (x, y) => new WaspEnemy(x, y);
+  const scorpion = (x, top, patrol) => new ScorpionEnemy(x, top - 22, patrol);
 
   // ==========================================================
   // SALA 20: Adarve del Este (castillo) — hueco del suelo (x 1470-1570) junto a la pared
@@ -68,7 +71,7 @@
     spawnEnemies: () => [
       shade(360, 220),
       crawler(560, 460, 140),
-      shade(980, 240),
+      wasp(980, 240),
       crawler(1120, 460, 120),
       shade(1320, 200)
     ],
@@ -137,7 +140,7 @@
     spawnEnemies: () => [
       crawler(480, 460, 90),
       shade(1300, 270),
-      crawler(1500, 460, 110),
+      scorpion(1500, 460, 110),
       crawler(1700, 350, 50)
     ],
     spawnDebris: () => [stone(380, 460), stone(1200, 460)]
@@ -186,10 +189,10 @@
     spawnEnemies: () => [
       crawler(320, 460, 120),
       shade(600, 240),
-      crawler(840, 460, 120),
+      scorpion(840, 460, 120),
       crawler(990, 260, 40),
       shade(1150, 230),
-      crawler(1380, 460, 90),
+      scorpion(1380, 460, 90),
       crawler(1640, 460, 60)
     ],
     spawnDebris: () => [stone(150, 460), stone(720, 460), stone(1300, 460), stone(1420, 460)]
@@ -250,7 +253,7 @@
     spawnEnemies: () => [
       crawler(380, 460, 120),
       shade(600, 220),
-      crawler(760, 460, 120),
+      scorpion(760, 460, 120),
       crawler(900, 360, 40),
       shade(1000, 200),
       crawler(1050, 460, 80)
@@ -305,8 +308,8 @@
       crawler(380, 460, 120),
       shade(520, 230),
       crawler(820, 250, 120),
-      crawler(1180, 460, 110),
-      shade(1300, 300),
+      scorpion(1180, 460, 110),
+      wasp(1300, 300),
       crawler(1560, 460, 100)
     ],
     spawnDebris: () => [stone(200, 460), stone(1100, 460)]

@@ -272,7 +272,7 @@ class World {
       spawnEnemies: () => [
         new CrawlerEnemy(360, 436, 140),
         new FlyingShadeEnemy(520, 180),
-        new FlyingShadeEnemy(750, 140)
+        new WaspEnemy(750, 160)
       ],
       spawnDebris: () => [
         new ThrowableDebris(240, 352),

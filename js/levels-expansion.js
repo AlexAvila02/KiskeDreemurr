@@ -34,6 +34,9 @@
   // Enemigo caminante parado sobre una superficie de altura `top`
   const crawler = (x, top, patrol) => new CrawlerEnemy(x, top - 24, patrol);
   const stone = (x, top) => new ThrowableDebris(x, top - 18);
+  // Avispa (dash) y alacrán (picadura venenosa): js/enemies-plus.js
+  const wasp = (x, y) => new WaspEnemy(x, y);
+  const scorpion = (x, top, patrol) => new ScorpionEnemy(x, top - 22, patrol);
 
   // ==========================================================
   // SALA 4: Claro de las Luciérnagas (bosque)
@@ -75,7 +78,7 @@
       crawler(240, 460, 110),
       crawler(900, 460, 140),
       new FlyingShadeEnemy(620, 230),
-      new FlyingShadeEnemy(1350, 190),
+      wasp(1350, 190),
       crawler(1500, 460, 120)
     ],
     spawnDebris: () => [stone(150, 460), stone(820, 460)]
@@ -122,7 +125,7 @@
     spawnEnemies: () => [
       crawler(300, 460, 150),
       new FlyingShadeEnemy(560, 200),
-      crawler(1150, 460, 120),
+      scorpion(1150, 460, 120),
       new FlyingShadeEnemy(1220, 250)
     ],
     spawnDebris: () => [stone(140, 460), stone(520, 460), stone(700, 460), stone(260, 360)]
@@ -168,7 +171,7 @@
       crawler(420, 460, 130),
       new FlyingShadeEnemy(640, 210),
       crawler(1040, 300, 50),
-      crawler(1250, 460, 160),
+      scorpion(1250, 460, 160),
       new FlyingShadeEnemy(1380, 200)
     ],
     spawnDebris: () => [stone(260, 460), stone(1000, 460)]
@@ -208,7 +211,7 @@
     ],
     spawnEnemies: () => [
       new FlyingShadeEnemy(560, 250),
-      new FlyingShadeEnemy(1000, 230),
+      wasp(1000, 230),
       crawler(1060, 320, 40),
       new FlyingShadeEnemy(1380, 240),
       crawler(1700, 460, 120)
@@ -252,8 +255,8 @@
       crawler(420, 460, 140),
       new FlyingShadeEnemy(660, 200),
       crawler(1080, 320, 50),
-      new FlyingShadeEnemy(1150, 220),
-      crawler(1440, 460, 80)
+      wasp(1150, 220),
+      scorpion(1440, 460, 80)
     ],
     spawnDebris: () => [stone(300, 360), stone(620, 460), stone(1120, 460), stone(950, 460)]
   });
@@ -294,8 +297,8 @@
       crawler(330, 460, 140),
       new FlyingShadeEnemy(480, 200),
       crawler(640, 460, 110),
-      new FlyingShadeEnemy(900, 260),
-      crawler(1160, 460, 150),
+      wasp(900, 260),
+      scorpion(1160, 460, 150),
       new FlyingShadeEnemy(1450, 190),
       crawler(1380, 270, 50)
     ],
@@ -341,7 +344,7 @@
       new FlyingShadeEnemy(600, 220),
       new FlyingShadeEnemy(900, 200),
       crawler(960, 460, 160),
-      new FlyingShadeEnemy(1200, 250)
+      wasp(1200, 250)
     ],
     spawnDebris: () => [stone(180, 460), stone(1300, 460)]
   });

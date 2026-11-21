@@ -32,6 +32,9 @@
   const crawler = (x, top, patrol) => new CrawlerEnemy(x, top - 24, patrol);
   const stone = (x, top) => new ThrowableDebris(x, top - 18);
   const shade = (x, y) => new FlyingShadeEnemy(x, y);
+  // Avispa (dash) y alacrán (picadura venenosa): js/enemies-plus.js
+  const wasp = (x, y) => new WaspEnemy(x, y);
+  const scorpion = (x, top, patrol) => new ScorpionEnemy(x, top - 22, patrol);
 
   // ==========================================================
   // SALA 16: Galería de los Estandartes (castillo)
@@ -77,7 +80,7 @@
       shade(520, 220),
       crawler(960, 460, 140),
       crawler(1160, 260, 45),
-      shade(1240, 270),
+      wasp(1240, 270),
       crawler(1600, 460, 120),
       shade(1760, 200)
     ],
@@ -121,7 +124,7 @@
     spawnEnemies: () => [
       crawler(330, 460, 120),
       shade(700, 210),
-      crawler(1000, 460, 100),
+      scorpion(1000, 460, 100),
       shade(1120, 230)
     ],
     spawnDebris: () => [stone(200, 460), stone(1180, 460)]
@@ -169,7 +172,7 @@
     spawnEnemies: () => [
       crawler(620, 460, 150),
       shade(360, 260),
-      shade(800, 170),
+      wasp(800, 170),
       crawler(1000, 460, 110),
       crawler(720, 230, 40)
     ],
@@ -214,7 +217,7 @@
     spawnEnemies: () => [
       shade(450, 220),
       crawler(720, 460, 140),
-      shade(900, 250),
+      wasp(900, 250),
       crawler(1200, 460, 100),
       shade(1250, 200)
     ],

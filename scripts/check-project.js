@@ -92,7 +92,7 @@ try {
 
   // Archivos de salas extra (js/levels-*.js) que llenan window.PendingRooms antes de crear World
   const levelFiles = fs.readdirSync(jsDir).filter(f => /^levels-.*\.js$/.test(f)).sort();
-  const loadOrder = ['enemies.js', 'world.js', ...levelFiles, 'abyss.js'];
+  const loadOrder = ['enemies.js', 'enemies-plus.js', 'world.js', ...levelFiles, 'abyss.js'];
   for (const file of loadOrder) {
     const code = fs.readFileSync(path.join(jsDir, file), 'utf8');
     vm.runInContext(code, sandbox, { filename: `js/${file}` });

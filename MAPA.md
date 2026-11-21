@@ -67,6 +67,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `code-art-engine.js` | Gemini | Fondos procedurales y molino | `CodeArt` |
 | `terrain-art.js` | Claude | Suelo, plataformas y muros pintados por zona; pasto que dobla el viento | `TerrainArt` |
 | `enemies.js` | ambos | Escarabajo, polilla, piedras arrojables | clases |
+| `enemies-plus.js` | Claude | Avispa (dash), alacrán (picadura venenosa) y veneno de Ruben | `WaspEnemy`, `ScorpionEnemy`, `window.Poison` · hooks `onAfterUpdate`, `onRenderWorld`, `onRestartGame` |
 | `controls.js` | Gemini | Teclas reasignables y menú de controles | `ControlsManager` |
 | `player.js` | ambos | Ruben: física, salto regulable, ataque, pose de viento/agua | `Player` |
 | `world.js` | ambos | Salas 0-3, biomas, colisiones; copia las salas por partida | `World` |
