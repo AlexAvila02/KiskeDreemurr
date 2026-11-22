@@ -212,6 +212,22 @@ class Player {
     this.anim.lunge = 1;
     this.anim.sx = 1.12; this.anim.vsx = 0;
     window.soundManager.playSlash();
+
+    // El tajo golpea durante sus primeros cuadros (no solo en el cuadro del botón): así
+    // un enemigo rápido (el dash de la avispa) que entra en la caja un instante después
+    // también recibe el golpe. Cada enemigo se golpea como mucho una vez por tajo.
+    this.swingId = (this.swingId | 0) + 1;
+    this.swingDX = dirX;
+    this.swingDY = dirY;
+    this.swingFrames = Player.SWING_ACTIVE_FRAMES;
+    this.swingConnected = false;
+    this.swingHitCheck(enemies);
+  }
+
+  // Revisa la caja del tajo actual contra los enemigos (la caja sigue a Ruben)
+  swingHitCheck(enemies) {
+    if (!enemies) return;
+    const dirX = this.swingDX, dirY = this.swingDY;
     let connected = false;
 
     // Actualizar hitbox de ataque según la dirección (+10% de rango)
@@ -228,14 +244,22 @@ class Player {
 
     // Comprobar colisión con enemigos
     for (const enemy of enemies) {
-      if (!enemy.alive) continue;
+      if (!enemy || !enemy.alive || enemy.swingHitId === this.swingId) continue;
       if (
         this.attackBox.x < enemy.x + enemy.width &&
         this.attackBox.x + this.attackBox.w > enemy.x &&
         this.attackBox.y < enemy.y + enemy.height &&
         this.attackBox.y + this.attackBox.h > enemy.y
       ) {
+        enemy.swingHitId = this.swingId;
+        // La invulnerabilidad del enemigo (15 cuadros) era más larga que el tajo más
+        // rápido (12 cuadros): el segundo tajo hacía chispas pero no quitaba vida.
+        // El ritmo de la espada ya lo limita el tajo, así que un tajo nuevo siempre pega.
+        const real = enemy.real || enemy;   // multijugador: el invitado usa un intermediario
+        if (real.hitCooldown > 0) real.hitCooldown = 0;
+        const hp0 = real.hp;
         enemy.takeDamage(15 * this.mods.attackDamage, (dirX || this.facing * 0.5) * 8);
+        if (!(real.hitCooldown > 0 || real.hp < hp0 || !real.alive)) continue;   // no le entró
         // Chispas en el punto de contacto
         const hx = Math.max(enemy.x, Math.min(enemy.x + enemy.width, this.x + this.width / 2 + dirX * 16));
         const hy = Math.max(enemy.y, Math.min(enemy.y + enemy.height, this.y + this.height / 2 + dirY * 16));
@@ -243,7 +267,10 @@ class Player {
         connected = true;
       }
     }
-    if (connected) {
+    // Pogo, retroceso y hit-stop solo la primera vez que el tajo conecta
+    if (!connected || this.swingConnected) return;
+    this.swingConnected = true;
+    {
       if (dirY > 0.5 && !this.isGrounded) {
         // Pogo: el tajo hacia abajo rebota a Ruben
         this.vy = -8.6;
@@ -386,6 +413,12 @@ class Player {
     if (this.attackTimer > 0) {
       this.attackTimer--;
       if (this.attackTimer === 0) this.isAttacking = false;
+    }
+    // Cuadros activos del tajo: sigue buscando enemigos que entren en la caja
+    if (this.swingFrames > 0) {
+      this.swingFrames--;
+      const g = window.gameInstance;
+      if (this.swingFrames > 0 && this.isAttacking && !this.dead && g && g.enemies) this.swingHitCheck(g.enemies);
     }
 
     // Salto regulable: si se suelta el botón mientras sube, la subida se corta
@@ -1304,3 +1337,6 @@ class Player {
     ctx.restore();
   }
 }
+
+// Cuadros en que el tajo puede golpear (el del botón incluido; el tajo dura 12)
+Player.SWING_ACTIVE_FRAMES = 6;
