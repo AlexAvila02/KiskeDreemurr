@@ -81,7 +81,7 @@ Si una flecha dice "→ usa X", X tiene que cargarse antes.
 | `animation-registry.js` | Gemini | Capas, skins y FX de animación | `AnimationRegistry` |
 | `aim.js` | Claude | Apuntado compartido: ratón sobre el canvas y stick derecho (un solo lector) | `Aim` |
 | `sound-kit.js` | Claude | Sonidos sintetizados compartidos: ruidos blanco/rosado/marrón, bucles con filtro, golpes y tonos | `SoundKit` |
-| `sunset-theme.js` | Claude | Tema del Atardecer: vals original sintetizado que suena en las salas de pradera (dos vueltas, descanso, repite) | `SunsetTheme` · hooks `onRoomLoad`, `onAfterUpdate`, `onRestartGame` |
+| `sunset-theme.js` | Claude | Tema del Atardecer: shuffle original sintetizado (melodía, armonía, bajo, acordes y batería) que suena en las salas de pradera (una tanda, descanso, repite) | `SunsetTheme` · hooks `onRoomLoad`, `onAfterUpdate`, `onRestartGame` |
 | `stamina.js` | Claude | Barra de energía elemental (gasta según la intensidad: `WindPull.getPower()`; la capacidad crece con el uso hasta el doble) y cansancio de Ruben (`player.fatigue`: cansado / de rodillas / agotado 5 s) | `Stamina` |
 | `wind-pull.js` | Claude | Jalar / soplar el aire, aturdir enemigos, molino → usa `Aim`, `SoundKit`. `WindPull.forceAt(x, y, roce)` = fuerza del viento propio en un punto; `bands()` = todas las franjas activas (propia + otros jugadores; las usan pasto, agua y molino); `strongestAt(x, y, roce)` = la más fuerte en un punto (maestros); `forceFrom(fuente, x, y)` = la de una franja. En el anfitrión el viento de todos atrapa/empuja enemigos; `netFxOf` / `applyNetFx` muestran en el invitado si un enemigo está atrapado o mareado | `WindPull` |
 | `ambience.js` | Claude | Brisa de sala (`ambience: 'breeze'`) con sonido → usa `SoundKit` | `Ambience` |
