@@ -584,10 +584,12 @@ class Game {
       // Start (o Select) pausa
       this.togglePause();
     } else {
-      for (const i in this.PAD_BUTTONS) {
+      // Botones reasignables desde el menú de controles (controls.js → getPadMap)
+      const padMap = (this.controlsManager && this.controlsManager.getPadMap && this.controlsManager.getPadMap()) || this.PAD_BUTTONS;
+      for (const i in padMap) {
         if (justPressed(+i)) {
           this.padAction = true;   // el tajo con mando no mira al ratón
-          try { this.doAction(this.PAD_BUTTONS[i]); } finally { this.padAction = false; }
+          try { this.doAction(padMap[i]); } finally { this.padAction = false; }
         }
       }
     }

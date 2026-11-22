@@ -87,6 +87,16 @@ class ControlsManager {
     // Mapeo actual: { [actionId]: [key1, key2] }
     this.bindings = {};
 
+    // Botones del mando (reasignables): { [índiceBotón]: actionId }
+    // Índices del mapeo estándar: 0 A · 1 B · 2 X · 3 Y · 4 LB · 5 RB · 7 RT
+    this.padStorageKey = 'ruben_game_pad_v1';
+    this.defaultPadMap = { 0: 'jump', 2: 'attack', 5: 'attack', 7: 'earth', 1: 'grab', 4: 'potion', 3: 'interact' };
+    // Botones que otros módulos leen directo (L2 aire/agua, Select diario, Start pausa,
+    // L3 esfera, R3 mapa, cruceta): no se pueden asignar en mandos estándar
+    this.PAD_RESERVED = [6, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+    this.PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Select', 'Start', 'L3', 'R3', '↑', '↓', '←', '→', 'Guía'];
+    this.padMap = {};
+
     // Estado del reasignador en UI
     this.listeningSlot = null; // { actionId, slotIndex, buttonElement }
 
@@ -102,6 +112,7 @@ class ControlsManager {
    */
   init() {
     this.loadBindings();
+    this.loadPadMap();
     this.cacheDOMElements();
     this.setupModalEvents();
     this.updateControlsGuideUI();
@@ -147,6 +158,93 @@ class ControlsManager {
     this.bindings = defaults;
   }
 
+  /** Carga los botones del mando guardados (o los de fábrica) */
+  loadPadMap() {
+    this.padMap = Object.assign({}, this.defaultPadMap);
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.padStorageKey) || 'null');
+      if (saved && typeof saved === 'object') {
+        const map = {};
+        for (const k in saved) {
+          if (/^\d+$/.test(k) && this.padActionIds().includes(saved[k])) map[k] = saved[k];
+        }
+        if (Object.keys(map).length) this.padMap = map;
+      }
+    } catch (e) { /* sin localStorage: valores de fábrica */ }
+  }
+
+  savePadMap() {
+    try { localStorage.setItem(this.padStorageKey, JSON.stringify(this.padMap)); } catch (e) { /* nada */ }
+  }
+
+  /** Acciones que se pueden poner en un botón del mando */
+  padActionIds() {
+    return ['jump', 'attack', 'grab', 'interact', 'potion', 'earth'];
+  }
+
+  /** { [índiceBotón]: actionId } que usa main.js al leer el mando */
+  getPadMap() {
+    return this.padMap;
+  }
+
+  /** Nombre de un botón del mando (A, LB...) o "Botón N" en mandos no estándar */
+  padButtonName(i) {
+    const pad = this.game && this.game.getPad ? this.game.getPad() : null;
+    if (pad && pad.mapping !== 'standard') return 'Botón ' + (Number(i) + 1);
+    return this.PAD_NAMES[i] || ('Botón ' + (Number(i) + 1));
+  }
+
+  /** Botones asignados a una acción, en texto ("X · RB") */
+  getPadDisplay(actionId) {
+    return Object.keys(this.padMap)
+      .filter(k => this.padMap[k] === actionId)
+      .sort((a, b) => a - b)
+      .map(k => this.padButtonName(k))
+      .join(' · ');
+  }
+
+  /**
+   * Asigna un botón del mando a una acción. Si el botón era de otra acción, esa
+   * acción se queda con el botón que tenía esta (intercambio).
+   * @returns {boolean} false si el botón está reservado
+   */
+  setPadBinding(actionId, button) {
+    const pad = this.game && this.game.getPad ? this.game.getPad() : null;
+    const standard = !pad || pad.mapping === 'standard';
+    button = Number(button);
+    if (standard ? this.PAD_RESERVED.includes(button) : button === 9) return false;
+    const mine = Object.keys(this.padMap).filter(k => this.padMap[k] === actionId).map(Number);
+    const other = this.padMap[button];
+    for (const k of mine) delete this.padMap[k];
+    if (other && other !== actionId) {
+      const free = mine.find(k => k !== button);
+      if (free !== undefined) this.padMap[free] = other;
+    }
+    this.padMap[button] = actionId;
+    this.savePadMap();
+    return true;
+  }
+
+  /** Con el menú esperando un botón del mando: asigna el botón pulsado */
+  capturePadButton(button) {
+    const slot = this.listeningSlot;
+    if (!slot || !slot.pad) return;
+    if (!this.setPadBinding(slot.actionId, button)) {
+      if (this.game && this.game.showNotification) {
+        this.game.showNotification(this.padButtonName(button) + ' ya tiene un uso fijo: elegí otro botón');
+      }
+      if (window.soundManager && window.soundManager.playHit) window.soundManager.playHit();
+      return;
+    }
+    if (window.soundManager && window.soundManager.playPickup) window.soundManager.playPickup();
+    this.stopListening();
+  }
+
+  /** true si el menú espera un botón del mando (no una tecla) */
+  isListeningPad() {
+    return !!(this.listeningSlot && this.listeningSlot.pad);
+  }
+
   /**
    * Guarda las asignaciones actuales en localStorage
    */
@@ -165,6 +263,8 @@ class ControlsManager {
   resetToDefaults() {
     this.bindings = this.getDefaultBindings();
     this.saveBindings();
+    this.padMap = Object.assign({}, this.defaultPadMap);
+    this.savePadMap();
     this.renderUI();
     if (window.soundManager && window.soundManager.playDoorUnlock) {
       window.soundManager.playDoorUnlock();
@@ -357,6 +457,12 @@ class ControlsManager {
 
       const { actionId, slotIndex } = this.listeningSlot;
 
+      // Esperando un botón del mando: el teclado solo puede cancelar (Esc)
+      if (this.listeningSlot.pad) {
+        if (e.code === 'Escape') this.stopListening();
+        return;
+      }
+
       // Escape cancela la reasignación sin alterar nada
       if (e.code === 'Escape') {
         this.stopListening();
@@ -393,9 +499,10 @@ class ControlsManager {
       this.stopListening();
     }
 
-    this.listeningSlot = { actionId, slotIndex, buttonElement };
+    const pad = slotIndex === 'pad';
+    this.listeningSlot = { actionId, slotIndex, buttonElement, pad };
     buttonElement.classList.add('listening');
-    buttonElement.textContent = 'Pulsa tecla...';
+    buttonElement.textContent = pad ? 'Pulsa botón...' : 'Pulsa tecla...';
     if (window.soundManager && window.soundManager.playJump) {
       window.soundManager.playJump();
     }
@@ -554,23 +661,23 @@ class ControlsManager {
 
     const rows = [
       ['arrow-right', 'Moverse', null, 'Stick / Cruceta'],
-      ['jump', 'Saltar', null, 'A'],
-      ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', 'X · RB'],
-      ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', 'B'],
-      ['potion', 'Beber Poción de Regeneración', null, 'LB'],
-      ['scroll', 'Interactuar / Hablar / Abrir', null, 'Y'],
+      ['jump', 'Saltar', null, null, 'jump'],
+      ['sword', 'Golpear (Ataque)', 'Clic Izquierdo', null, 'attack'],
+      ['grab', 'Agarrar / Lanzar Objeto', 'Clic Derecho', null, 'grab'],
+      ['potion', 'Beber Poción de Regeneración', null, null, 'potion'],
+      ['scroll', 'Interactuar / Hablar / Abrir', null, null, 'interact'],
       ['scroll', 'Leer nota de Angelo', 'Arriba (↑ / W)', 'Stick / Cruceta arriba'],
       ['wind', 'Jalar / Soplar el Aire', null, 'Abajo/Arriba + L2'],
       ['wind', 'Apuntar el aire', 'Mover el ratón', 'Stick derecho'],
       ['water', 'Dominio del Agua (cerca del agua)', 'Apuntar: ratón', 'L2 · stick der.'],
       ['water', 'Esfera guiada (tras mejorar)', null, 'L3 · stick izq.'],
-      ['earth', 'Tierra: pilar de roca (antes de aprenderla, RT ataca)', 'Apuntar: ratón', 'RT · stick der.'],
+      ['earth', 'Tierra: pilar de roca (antes de aprenderla, ataca) · apuntá con el stick der.', 'Apuntar: ratón', null, 'earth'],
       ['book', 'Mapa del Reino', 'M (teclado)', 'R3'],
       ['book', 'Diario de Ruben', 'I / Tab (teclado)', 'Select'],
       ['gear', 'Pausa', 'Esc (teclado)', 'Start'],
       ['gamepad', 'En menús: elegir / volver', 'Clic', 'A (✕) / B (○)']
     ];
-    for (const [ic, name, mouse, pad] of rows) {
+    for (const [ic, name, mouse, pad, padAction] of rows) {
       const row = document.createElement('div');
       row.className = 'control-row control-row-fixed';
       const labelDiv = document.createElement('div');
@@ -586,6 +693,27 @@ class ControlsManager {
         slot.textContent = val || '—';
         slot.title = val || '';
         slotsDiv.appendChild(slot);
+      }
+      if (padAction) {
+        // Botón del mando reasignable: elegilo (clic o A) y pulsá el botón nuevo en el mando
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-key-slot pad-slot';
+        btn.dataset.action = padAction;
+        btn.dataset.slot = 'pad';
+        const txt = this.getPadDisplay(padAction);
+        btn.textContent = txt || '---';
+        btn.title = 'Elegilo y pulsá un botón del mando para cambiarlo';
+        if (!txt) btn.classList.add('empty');
+        if (this.listeningSlot && this.listeningSlot.pad && this.listeningSlot.actionId === padAction) {
+          btn.classList.add('listening');
+          btn.textContent = 'Pulsa botón...';
+        }
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          this.startListening(padAction, 'pad', btn);
+        });
+        slotsDiv.replaceChild(btn, slotsDiv.lastChild);
       }
       row.appendChild(slotsDiv);
       this.listContainer.appendChild(row);

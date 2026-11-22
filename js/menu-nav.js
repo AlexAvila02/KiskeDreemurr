@@ -188,6 +188,15 @@ class MenuNavigator {
     const just = (i) => pressed[i] && !prev[i];
     const cm = this.game.controlsManager;
 
+    // Esperando un botón del mando: el primero que se pulse se asigna (Start cancela)
+    if (cm && cm.isListeningPad && cm.isListeningPad()) {
+      if (just(9)) { cm.stopListening(); return true; }
+      for (let i = 0; i < pressed.length; i++) {
+        if (just(i)) { cm.capturePadButton(i); break; }
+      }
+      return true;
+    }
+
     // Esperando una tecla para reasignar: B o Start cancelan
     if (cm && cm.isListening && cm.isListening()) {
       if (just(1) || just(9)) cm.stopListening();

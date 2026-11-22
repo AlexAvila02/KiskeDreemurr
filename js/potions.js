@@ -23,6 +23,23 @@
   const state = { count: START_COUNT, effects: [] };
   let els = null;
   let frame = 0;
+  // ¿Lo último que se usó fue el mando? (el HUD muestra su botón en vez de la tecla)
+  let lastPad = false;
+  const markKeyboard = () => { lastPad = false; };
+  window.addEventListener('keydown', markKeyboard, true);
+  window.addEventListener('mousedown', markKeyboard, true);
+
+  function readPad(game) {
+    const pad = game.getPad ? game.getPad() : null;
+    if (!pad) { lastPad = false; return; }
+    for (let i = 0; i < pad.buttons.length; i++) {
+      const b = pad.buttons[i];
+      if (b && b.pressed) { lastPad = true; return; }
+    }
+    for (let i = 0; i < Math.min(4, pad.axes.length); i++) {
+      if (Math.abs(pad.axes[i] || 0) > 0.35) { lastPad = true; return; }
+    }
+  }
 
   function hud(game) {
     if (!els) {
@@ -35,8 +52,10 @@
     if (els.count) els.count.textContent = String(state.count);
     if (els.key) {
       const cm = game && game.controlsManager;
-      const k = cm && cm.getPrimaryDisplayKey ? cm.getPrimaryDisplayKey('potion') : 'R';
-      els.key.textContent = k || 'R';
+      // Con mando se muestra su botón (LB por defecto); si no, la tecla
+      const padKey = lastPad && cm && cm.getPadDisplay ? cm.getPadDisplay('potion') : '';
+      const k = padKey || (cm && cm.getPrimaryDisplayKey ? cm.getPrimaryDisplayKey('potion') : 'R');
+      if (els.key.textContent !== (k || 'R')) els.key.textContent = k || 'R';
     }
     const active = state.effects.length > 0;
     if (els.slot) {
@@ -74,8 +93,11 @@
   }
 
   function update(game, running) {
-    if (!running || !state.effects.length) return;
+    if (!running) return;
     frame++;
+    readPad(game);
+    // Refrescar la tecla del HUD (teclado ↔ mando) dos veces por segundo
+    if (!state.effects.length) { if (frame % 30 === 0) hud(game); return; }
     const p = game.player;
     if (!p) return;
     if (p.dead || game.deathTimer > 0) { state.effects.length = 0; hud(game); return; }
